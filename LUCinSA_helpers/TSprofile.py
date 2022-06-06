@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# coding: utf-8
+
 import os
 from pathlib import Path
 import rasterio
@@ -24,100 +23,8 @@ from rasterio.plot import show
 import xarray as xr
 
 
-##This is just for data checking. Not actually used in processing sequence so far.
-def GetClosestImage(img_dir, imageType, YYYY, DDD):
-    '''
-    returns path of image closest to day DDD of year YYYY in directory of images
-    Currently looks for images with name YYYYDDD* (DDD is day-of-year(1-365))
-    or Sentinel images starting with L1C* (Date format is YYYYMMDD, starting at position 19)
-    TODO: expand imageType to Landsat
-    '''
-    
-    imgList = []
-    
-    if imageType == 'TS':
-        for img in os.listdir(img_dir):
-            if img.startswith(str(YYYY)):
-                imgList.append(int(img[4:7]))
-    elif imageType == 'L1C':
-        for img in os.listdir(img_dir):
-            if img.startswith('L1C') and img[19:23]==str(YYYY):
-                MM = int(img[23:25])
-                DD = int(img[25:27])
-                ymd = datetime.datetime(YYYY, MM, DD)
-                doy=int(ymd.strftime('%j'))
-                imgList.append(doy)
-    
-    closestDay = min(imgList, key=lambda x:abs(x-DDD))
-    print('closest day is: {}'.format(str(YYYY)+str(closestDay)))
-    
-    for fname in os.listdir(img_dir):
-        if imageType == 'TS':
-            if str(YYYY)+str(closestDay) in fname:
-                closestimg = os.path.join(img_dir,fname)
-        elif imageType == 'L1C':
-            if str(YYYY)+str(MM)+str(DD) in fname and fname.startswith('L1C') and 'angles' not in fname:
-                closestimg = os.path.join(img_dir,fname)
- 
-    return closestimg
-
-
-def exploreBand(img, spec_index):
-
-    print('plotting {} band of image {}'.format(img, spec_index))
-    fig, axarr = plt.subplots(1, 3, figsize=(15,5))
-    
-    if img.endswith('.tif'):
-        with rasterio.open(img) as src:
-            TSamp = src.read()
-    elif img.endswith('.nc'):
-        with xr.open_dataset(img) as xrimg:
-            xrcrs = xrimg.crs
-            print(xrcrs)  ##epsg:32632
-            #print(xrimg.variables)
-            print(xrimg.dims)
-            #print(xrimg.coords)
-    
-        ### Check that x and y values correspond to UTM coords
-        print("Coord range is: y: {}-{}. x: {}-{}".format(
-          xrimg[spec_index]["y"].values.min(), 
-          xrimg[spec_index]["y"].values.max(),
-          xrimg[spec_index]["x"].values.min(), 
-          xrimg[spec_index]["x"].values.max()))
-    
-        ### Get single band (Opens as Dataset)
-        xr_idx = xrimg[spec_index]
-    
-        ##Note outliers (while nodata = None)
-        origHist = xr_idx.plot.hist(color="purple")
-        #ax.imshow()
-        
-        xr_idx_clean = xr_idx.where(xr_idx < 10000)
-        maskedHist = xr_idx_clean.plot.hist(color="purple")
-        #print('The no data value is:', xrimg[spec_index].rio.nodata)
-    
-        TSamp = xr_idx_clean
-
-    if img.endswith('.nc'):
-        xr_idx.plot.hist(color="purple",  ax=axarr[0])
-        axarr[0].set_title("original data")
-        xr_idx_clean.plot.hist(color="purple", ax=axarr[1])
-        axarr[1].set_title("masked data")
-        TSamp.plot(x="x",y="y")
-        plot.show(TSamp, ax=axarr[2])
-        axarr[2].set_title('{} band'.format(spec_index))
-        axarr[2].axis('off')
-    
-    elif img.endswith('.tif'):
-        plot.show(TSamp)
-        axarr[2].set_title('{} band'.format(spec_index))
-        axarr[2].axis('off')
-        
-    return axarr
-
-
 def getCoordAtRowCol (Img, spec_index, row, col):
-    df = exploreBand(Img, spec_index) 
+    df = exploreBand(Img, spec_index)
     testSamp = df[row,col]
     print('Test Samp at coords x={}, y={} is {}'.format(testSamp['x'].values,testSamp['y'].values, testSamp.values))
     return testSamp['x'].values, testSamp['y'].values
@@ -127,7 +34,6 @@ def getValatXY(Img, spec_index, xcoord,ycoord):
     one_point = df[spec_index].sel(x=xcoord,y=ycoord, method='nearest', tolerance=15)
     print('value at {},{}={}'.format(xcoord,ycoord,one_point.values))
     return one_point.values
-
 
 def GetPolygonsInAOI(out_dir, AOI_file, polyPath, oldest=2018, newest=2020):
     '''
@@ -144,26 +50,26 @@ def GetPolygonsInAOI(out_dir, AOI_file, polyPath, oldest=2018, newest=2020):
 
     # Clip polygons to AOI
     polysInAOI = gpd.clip(AllPolys, AOI)
-    
+
     print("Of the {} polygons, {} are in AOI". format (AllPolys.shape[0], polysInAOI.shape[0]))
-    
+
     ##Filter out polygons that were observed before year set as 'oldest' or after year set as 'newest'
     if oldest > 0:
-        polysInAOI = polysInAOI[polysInAOI['FirstYrObs'] >= oldest] 
+        polysInAOI = polysInAOI[polysInAOI['FirstYrObs'] >= oldest]
     if newest > 0:
         polysInAOI = polysInAOI[polysInAOI['FirstYrObs'] <= newest]
-        print("{} DLs first seen between {} and {} in AOI".format(len(polysInAOI),oldest,newest))    
-   
+        print("{} DLs first seen between {} and {} in AOI".format(len(polysInAOI),oldest,newest))
+
     polyClip = Path(os.path.join(out_dir,'polysInAOI.json'))
     polysInAOI.to_file(polyClip, driver="GeoJSON")
-    
+
     return polyClip
 
 
 def GetPtsInGrid (gridFile, gridCell, ptFile):
     '''
-    loads point file (from .csv with 'XCoord' and 'YCoord' columns) and returns points that overlap a gridcell 
-    as a geopandas GeoDataFrame. Use this if trying to match/append data to existing sample points 
+    loads point file (from .csv with 'XCoord' and 'YCoord' columns) and returns points that overlap a gridcell
+    as a geopandas GeoDataFrame. Use this if trying to match/append data to existing sample points
     rather than making a new random sample each time (e.g. if matching Planet and Sentinel points)
     Note that crs of point file is known ahead of time and hardcoded here to match specific grid file.
     '''
@@ -171,14 +77,14 @@ def GetPtsInGrid (gridFile, gridCell, ptFile):
     ### pt file is in SA Albers Equal Area Conic (ESRI:102033)
     pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs='esri:102033')
     out_path = Path(gridFile).parent
-    
+
     with tempfile.TemporaryDirectory(dir=out_path) as temp_dir:
         temp_file = Path(temp_dir) / Path(gridFile).name
         shutil.copy(gridFile, temp_file)
         df = gpd.read_file(temp_file)
         crs_grid = df.crs
     #print(crs_grid)  #ESRI:102033
-    
+
     bb = df.query(f'UNQ == {gridCell}').geometry.total_bounds
 
     gridBbox = box(bb[0],bb[1],bb[2],bb[3])
@@ -187,14 +93,14 @@ def GetPtsInGrid (gridFile, gridCell, ptFile):
 
     ptsInGrid = gpd.sjoin(pts, gridBounds, op='within')
     ptsInGrid = ptsInGrid.loc[:,['geometry']]
-    
+
     print("Of the {} ppts, {} are in gridCell {}". format (pts.shape[0], ptsInGrid.shape[0],gridCell))
-    
+
     #Write to geojson file
     if ptsInGrid.shape[0] > 0:
         ptClip = Path(os.path.join(out_path,'ptsGrid_'+str(gridCell)+'.json'))
         ptsInGrid.to_file(ptClip, driver="GeoJSON")
-    
+
         return ptsInGrid
         print(ptsInGrid.head(n=5))
 
@@ -213,38 +119,38 @@ def GetPolygonsInGrid (gridFile, gridCell, polyPath, oldest=2018, newest=2020):
         shutil.copy(gridFile, temp_file)
         df = gpd.read_file(temp_file)
         crs_grid = df.crs
-    
+
     bb = df.query(f'UNQ == {gridCell}').geometry.total_bounds
 
     gridBbox = box(bb[0],bb[1],bb[2],bb[3])
     gridBounds = gpd.GeoDataFrame(gpd.GeoSeries(gridBbox), columns=['geometry'], crs=crs_grid)
     polysInGrid = gpd.overlay(gridBounds, polys, how='intersection')
-    
+
     print("Of the {} polygons, {} are in gridCell {}". format (polys.shape[0], polysInGrid.shape[0],gridCell))
-    
+
     ##Filter out polygons that were observed before year set as 'oldest' or after year set as 'newest'
     if oldest > 0:
-        polysInGrid = polysInGrid[polysInGrid['FirstYrObs'] >= oldest] 
+        polysInGrid = polysInGrid[polysInGrid['FirstYrObs'] >= oldest]
     if newest > 0:
         polysInGrid = polysInGrid[polysInGrid['FirstYrObs'] <= newest]
         print("{} DLs first seen between {} and {} in AOI".format(len(polysInGrid),oldest,newest))
-    
+
     #Write to geojson file
     if polysInGrid.shape[0] > 0:
         polyClip = Path(os.path.join(out_path,'polysGrid_'+str(gridCell)+'.json'))
         polysInGrid.to_file(polyClip, driver="GeoJSON")
-    
+
         return polyClip
 
 
 def plotPolyOnIndex(zoomPoly, Img, polyFile):
     '''
-    Plots a polygon file {'polyFile'} on top of a .tiff image {'Img'} 
+    Plots a polygon file {'polyFile'} on top of a .tiff image {'Img'}
     and zooms to a selected poly {'zoomPoly'}
     '''
     #fig, ax = plt.subplots(figsize=(12,12),subplot_kw={'projection': ccrs.epsg(32632)})
     fig, ax = plt.subplots(figsize=(12,12))
-    
+
     if Img.endswith('.tif'):
         with rasterio.open(Img) as src:
             img = src.read()
@@ -255,7 +161,7 @@ def plotPolyOnIndex(zoomPoly, Img, polyFile):
             img = xr_band.where(xr_band < 10000)
         img.plot(x="x",y="y")
         plot.show(img, ax=ax)
-    
+
     polys = gpd.read_file(polyFile)
     polys.plot(ax=ax, facecolor='none', edgecolor='orangered')
 
@@ -301,7 +207,7 @@ def getRanPtsInPolys(polys, npts, seed=88):
                 ptName = str(poly['properties']['FID'])+'_'+str(i+1)
                 pt_in_poly = getRanPtInPoly(polyobj, seed)
                 ptDict[ptName] = pt_in_poly
-    
+
     ptsdb = pd.DataFrame.from_dict(ptDict, orient='index')
     ptsgdb = gpd.GeoDataFrame(ptsdb, geometry=ptsdb[0])
     ptsgdb.drop(columns=[0], inplace=True)
@@ -336,11 +242,11 @@ def PlotPtsInPolys(polys, npts, sampID=1, zoom=200, seed=88):
     {'zoom'} is buffer around zoom polygon for extent (smaller zooms in closer)
     '''
 
-    polys3 = gpd.read_file(polys)        
+    polys3 = gpd.read_file(polys)
     ax = polys3.plot(color='gray')
     pti = getRanPtsInPolys (polys, npts, seed)
     plt.scatter(pti['geometry'].x, pti['geometry'].y, color='red')
-    plt.axis([pti['geometry'][sampID].x-zoom, pti['geometry'][sampID].x+zoom, 
+    plt.axis([pti['geometry'][sampID].x-zoom, pti['geometry'][sampID].x+zoom,
               pti['geometry'][sampID].y-zoom, pti['geometry'][sampID].y+zoom])
 
 
@@ -362,7 +268,7 @@ def CalculateRawIndex(nir_val, b2_val, spec_index):
         index_val = 10000* nir_val
     elif spec_index in ['swir1','swir2','red','green']:
         index_val = 10000* b2_val
-        
+
     return index_val
 
 
@@ -370,16 +276,12 @@ def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadS
     '''
     Gets values for all sampled points {'numpts'} in all polygons {'polys'} for all images in {'TStack'}
     OR gets values for points in a previously generated dataframe {ptgdb} using loadSamp=True.
-    
-    If imageType == 'TS', indices are assumed to already be calculated and 
+    If imageType == 'TS', indices are assumed to already be calculated and
     {'TStack'} is a list of image paths, with basenames = YYYYDDD of image acquisition (DDD is Julien day, 1-365)
-    
     If imageType == 'L1C' images are still in raw .nc form (6 bands) and indices are calculated here
     {'TStack'} is a list of image paths from which YYYYDDD info can be extracted
-    
-    output is a dataframe with a pt (named polygonID_pt#) 
+    output is a dataframe with a pt (named polygonID_pt#)
     on each row and an image index value(named YYYYDDD) in each column
-    
     '''
     if loadSamp == False:
         if polys:
@@ -389,10 +291,9 @@ def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadS
             return None
     elif loadSamp == True:
         ptsgdb = ptgdb
-        
+
     xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
     coords = list(map(list, zip(*xy)))
-                          
     if imageType == 'TS':
         for img in TSstack:
             img_name = os.path.basename(img)[:7]
@@ -414,7 +315,6 @@ def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadS
             img_name = str(YYYY)+doy
             xrimg = xr.open_dataset(img)
             xr_nir = xrimg['nir'].where(xrimg['nir'] < 10000)
-            
             if spec_index in ['evi2','msavi','ndvi','savi','red']:
                 xr_red = xrimg['red'].where(xrimg['red'] < 10000)
             elif spec_index in ['ndmi','swir1']:
@@ -426,13 +326,13 @@ def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadS
             elif spec_index in ['nir']:
                 pass
             else: print('{} is not specified or does not have current method'.format(spec_index))
-                
+
             ptVals = []
             for index, row in ptsgdb.iterrows():
-                thispt_nir = xr_nir.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index], 
+                thispt_nir = xr_nir.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index],
                                         method='nearest', tolerance=30)
                 nir_val = thispt_nir.values
-                
+
                 if spec_index in ['evi2','msavi','ndvi','savi','red']:
                     thispt_b2 = xr_red.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index],
                                 method='nearest', tolerance=30)
@@ -451,28 +351,28 @@ def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadS
                     b2_val = thispt_b2.values
                 elif spec_index in ['nir']:
                     b2_val = nir_val
-                
+
                 indexVal = CalculateRawIndex(nir_val, b2_val, spec_index)
                 ptVals.append(indexVal)
-                
+
             ptsgdb[img_name] = ptVals
-                
+
     return ptsgdb
 
 # +
-def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, imageType, gridFile, cellList, 
-                            groundPolys, oldest=2018, newest=2018, npts=2, seed=88, loadSamp=False, ptFile=None):
+def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, imageType, gridFile, cellList,
+                            groundPolys, oldest, newest, npts,seed, loadSamp, ptFile):
     '''
     Returns datetime dataframe of values for sampled pts (n={'npts}) for each polygon in {'polys'}
-    OR for previously generated points with {loadSamp}=True and {ptFile}=path to .csv file 
+    OR for previously generated points with {loadSamp}=True and {ptFile}=path to .csv file
      (.csv file needs 'XCoord' and 'YCoord' fields (in this case, groundpolys, oldest, newest, npts and seed are not used))
-    for all images of {imageType} acquired between {'StartYr'} and {'EndYr'} in {'TS_Directory'} 
+    for all images of {imageType} acquired between {'StartYr'} and {'EndYr'} in {'TS_Directory'}
     imageType can be 'Sentinel', 'Landsat', or 'All'
     Output format is a datetime object with date (YYYY-MM-DD) on each row and sample name (polygonID_pt#) in columns
     '''
-    
+
     Allpts = pd.DataFrame()
-    
+
     for cell in cellList:
         TStack = []
         print ('working on cell {}'.format(cell))
@@ -490,9 +390,9 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
                     if imgYr >= StartYr and imgYr <= EndYr:
                         TStack.append(os.path.join(img_dir,cellDir,img))
 
-            else: 
+            else:
                 cellDir = os.path.join(img_dir,'{:06d}'.format(cell),'brdf')
-                
+
                 if imageType == 'Sentinel':
                     for img in os.listdir(cellDir):
                         if img.startswith('L1C') and 'angles' not in img:
@@ -524,14 +424,14 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
                 pts = GetIndexValsAtPts(TStack, imageType, polys, spec_index, 2, seed=88, loadSamp=True, ptgdb=points)
             else:
                 pts = GetIndexValsAtPts(TStack, imageType, polys, spec_index, 2, seed=88, loadSamp=False, ptgdb=None)
-            
+
             pts.drop(columns=['geometry'], inplace=True)
             Allpts = pd.concat([Allpts, pts])
-    
+
         else:
             print('skipping this cell')
             pass
-    
+
     TS = Allpts.transpose()
     TS['date'] = [pd.to_datetime(e[:4]) + pd.to_timedelta(int(e[4:]) - 1, unit='D') for e in TS.index]
     TS.set_index('date', drop=True, inplace=True)
@@ -539,21 +439,18 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
 
     TS['ALL'] = TS.mean(axis=1)
     TS['stdv'] = TS.std(axis=1)
-    
+
     pd.DataFrame(TS).to_csv(os.path.join(out_dir,'TS_{}_{}-{}.csv'.format(spec_index, StartYr, EndYr)), sep=',', na_rep='NaN', index=True)
-    
     return TS
-    
-    
+
+
 def LoadTSfromFile(TSfile):
     TS = pd.read_csv(TSfile)
     TS.set_index('date', drop=True, inplace=True)
     TS.index = pd.to_datetime(TS.index)
-    
+
     return TS
 
-
-# -
 
 def ConvertTimeSeriesToMonthlyDoy(FullTS_dir,mo,newdir):
     '''
@@ -579,7 +476,7 @@ def Convert_FullTimeSeries_toDOY(TSdf, Yr, StartDay=0, EndDay=365):
     newDF.index = newDF.index.dayofyear
     newDF = newDF[newDF.index >= StartDay]
     newDF = newDF[newDF.index <= EndDay]
-    
+
     return newDF
 
 
@@ -602,13 +499,13 @@ def LoadPlanetTS(mainPath, midPath, DLType, AOI, Yr, mos, band):
                 tsPath = os.path.join(mainPath,midPath,ts)
                 tsdf = pd.read_csv(tsPath)
                 focusData.append(tsdf)
-            
+
     FramedTS = pd.concat(focusData)
     FramedTS.set_index('imDay', drop=True, inplace=True)
     FramedTS.index = pd.to_datetime(FramedTS.index, format='%Y%j')
     FramedTS['ALL'] = FramedTS.mean(axis=1)
     FramedTS['stdv'] = FramedTS.std(axis=1)
-    
+
     return FramedTS
 
 
