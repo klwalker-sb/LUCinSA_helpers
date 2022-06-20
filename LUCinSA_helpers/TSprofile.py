@@ -94,7 +94,7 @@ def GetPtsInGrid (gridFile, gridCell, ptFile):
     ptsInGrid = gpd.sjoin(pts, gridBounds, op='within')
     ptsInGrid = ptsInGrid.loc[:,['geometry']]
 
-    print("Of the {} ppts, {} are in gridCell {}". format (pts.shape[0], ptsInGrid.shape[0],gridCell))
+    print("Of the {} ppts, {} are in gridCell {}. I am actually in here". format (pts.shape[0], ptsInGrid.shape[0],gridCell))
 
     #Write to geojson file
     if ptsInGrid.shape[0] > 0:
@@ -191,7 +191,7 @@ def getRanPtInPoly(polyg, seed):
 
 def getRanPtsInPolys(polys, npts, seed=88):
     '''
-    Returns a geodatabase with geometry column containing shapely Point objects
+    Returns a geodataframe with geometry column containing shapely Point objects
     With {'npts'} random samples from each polygon in {'polys'}
     ({'polys'} is path to json file with polygon geometries)
     '''
@@ -204,7 +204,7 @@ def getRanPtsInPolys(polys, npts, seed=88):
             polyList.append(poly['geometry'])
             polyobj = shape(poly['geometry'])
             for i in range(0,npts):
-                ptName = str(poly['properties']['FID'])+'_'+str(i+1)
+                ptName = str(poly['properties']['Id'])+'_'+str(i+1)
                 pt_in_poly = getRanPtInPoly(polyobj, seed)
                 ptDict[ptName] = pt_in_poly
 
@@ -252,27 +252,46 @@ def PlotPtsInPolys(polys, npts, sampID=1, zoom=200, seed=88):
 
 def CalculateRawIndex(nir_val, b2_val, spec_index):
     if spec_index == 'evi2':
-        index_val = 10000* 2.5 * ((nir_val - b2_val) / (nir_val + 1.0 + 2.4 * b2_val))
+        index_val =  2.5 * ((nir_val - b2_val) / (nir_val + 1.0 + 2.4 * b2_val))
     elif spec_index == 'ndvi':
-        index_val = 10000* (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
+        index_val = (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
     elif spec_index == 'savi':
         lfactor = .5 #(0-1, 0=very green, 1=very arid. .5 most common. Some use negative vals for arid env)
-        index_val = 10000* (1 + lfactor) * ((nir_val - b2_val) / (nir_val + b2_val + lfactor))
+        index_val = (1 + lfactor) * ((nir_val - b2_val) / (nir_val + b2_val + lfactor))
     elif spec_index == 'msavi':
-        index_val = 10000* 1/2 * (2 * nir_val + 1) - ((2 * nir_val + 1)**2 - 8*(nir_val - b2_val))**1/2
+        index_val =  1/2 * (2 * nir_val + 1) - ((2 * nir_val + 1)**2 - 8*(nir_val - b2_val))**1/2
     elif spec_index == 'ndmi':
-        index_val = 10000* (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
+        index_val = (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
     elif spec_index == 'ndwi':
-        index_val = 10000* (b2_val - nir_val) / ((b2_val + nir_val) + 1e-9)
+        index_val = (b2_val - nir_val) / ((b2_val + nir_val) + 1e-9)
     elif spec_index == 'nir':
-        index_val = 10000* nir_val
+        index_val = nir_val
     elif spec_index in ['swir1','swir2','red','green']:
-        index_val = 10000* b2_val
+        index_val = b2_val
 
     return index_val
 
+def GetImgDate(img, imageType):
+    imgBase = os.path.basename(img)
+    if imageType == 'Smooth':  #Expects images to be named YYYYDDD
+        YYYY = int(imgBase[:4])
+        doy = int(imgBase[4:7])
+    elif imageType in ['Sentinel','Landsat','AllRaw']:
+        if imgBase.startswith('L1C'):
+            YYYY = int(imgBase[19:23])
+            MM = int(imgBase[23:25])
+            DD = int(imgBase[25:27])
+        elif imgBase.startswith('LC') or imgBase.startswith('LT') or imgBase.startswith('LE'):
+            YYYY = int(imgBase[17:21])
+            MM = int(imgBase[21:23])
+            DD = int(imgBase[23:25])
+        ymd = datetime.datetime(YYYY, MM, DD)
+        doy = int(ymd.strftime('%j'))
+    else: print ('Currently valid image types are Smooth,Sentinel,Landsat and AllRaw. You put {}'.format(imageType))
 
-def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadSamp=False, ptgdb=None):
+    return YYYY, doy
+
+def GetIndexValsAtPts(out_dir, TSstack, imageType, polys, spec_index, numPts, seed, loadSamp=False, ptgdb=None):
     '''
     Gets values for all sampled points {'numpts'} in all polygons {'polys'} for all images in {'TStack'}
     OR gets values for points in a previously generated dataframe {ptgdb} using loadSamp=True.
@@ -283,6 +302,7 @@ def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadS
     output is a dataframe with a pt (named polygonID_pt#)
     on each row and an image index value(named YYYYDDD) in each column
     '''
+    print('now I am here in GetIndexValsAtPts')
     if loadSamp == False:
         if polys:
             ptsgdb = getRanPtsInPolys (polys, numPts, seed)
@@ -294,37 +314,33 @@ def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadS
 
     xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
     coords = list(map(list, zip(*xy)))
-    if imageType == 'TS':
-        for img in TSstack:
-            img_name = os.path.basename(img)[:7]
+
+    for img in TSstack:
+        imgDate = GetImgDate(img, imageType)
+        #print('imgDate={}'.format(imgDate))
+        #imgDay = str('{:03d}'.format(imgDate[1]))
+        img_name = str(imgDate[0])+(f"{imgDate[1]:03d}")
+        if imageType == 'Smooth':
             with rasterio.open(img, 'r') as src:
                 ptsgdb[img_name] = [sample[0] for sample in src.sample(coords)]
-
-    elif imageType == 'Sentinel' or imageType == 'Landsat' or imageType == 'All' :
-        for img in TSstack:
-            if os.path.basename(img).startswith('L1C'):
-                YYYY = int(os.path.basename(img)[19:23])
-                MM = int(os.path.basename(img)[23:25])
-                DD = int(os.path.basename(img)[25:27])
-            elif os.path.basename(img).startswith('LC') or img.startswith('LT') or img.startswith('LE'):
-                YYYY = int(os.path.basename(img)[17:21])
-                MM = int(os.path.basename(img)[21:23])
-                DD = int(os.path.basename(img)[23:25])
-            ymd = datetime.datetime(YYYY, MM, DD)
-            doy = ymd.strftime('%j')
-            img_name = str(YYYY)+doy
+        elif imageType in ['Sentinel','Landsat','AllRaw']:
             xrimg = xr.open_dataset(img)
             xr_nir = xrimg['nir'].where(xrimg['nir'] < 10000)
+            #xr_nir = xrimg['nir'].map({>9999: np.nan, < 10000: xrimg['nir']})
             if spec_index in ['evi2','msavi','ndvi','savi','red']:
                 xr_red = xrimg['red'].where(xrimg['red'] < 10000)
+                #xr_red = xrimg['red'].map({>9999: np.nan, < 10000: xrimg['red']})
             elif spec_index in ['ndmi','swir1']:
-                xr_swir1 = xrimg['swir1'].where(xrimg['swir1']< 10000)
+                xr_swir1 = xrimg['swir1'].where(xrimg['swir1'] < 10000)
+                #xr_swir1 = xrimg['swir1'].map({>9999: np.nan, < 10000: xrimg['swir1']})
             elif spec_index in ['ndwi','green']:
-                xr_green = xrimg['green'].where(xrimg['green']< 10000)
+                xr_green = xrimg['green'].where(xrimg['green'] < 10000)
+                #xr_green = xrimg['green'].map({>9999: np.nan, < 10000: xrimg['green']})
             elif spec_index in ['swir2']:
-                xr_swir2 = xrimg['swir2'].where(xrimg['swir2']< 10000)
+                xr_swir2 = xrimg['swir2'].where(xrimg['swir2'] < 10000)
+                #xr_swir2 = xrimg['swir2'].map({>9999: np.nan, < 10000: xrimg['swir2']})
             elif spec_index in ['nir']:
-                pass
+                 pass
             else: print('{} is not specified or does not have current method'.format(spec_index))
 
             ptVals = []
@@ -352,16 +368,19 @@ def GetIndexValsAtPts(TSstack, imageType, polys, spec_index, numPts, seed, loadS
                 elif spec_index in ['nir']:
                     b2_val = nir_val
 
+                #print('b2_val = {} for image {}.'.format(b2_val, img_name))
+
                 indexVal = CalculateRawIndex(nir_val, b2_val, spec_index)
                 ptVals.append(indexVal)
-
             ptsgdb[img_name] = ptVals
 
+        else: print ('Currently valid image types are Smooth,Sentinel,Landsat and AllRaw. You put {}'.format(imageType))
+
+    pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
     return ptsgdb
 
-# +
 def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, imageType, gridFile, cellList,
-                            groundPolys, oldest, newest, npts,seed, loadSamp, ptFile):
+                            groundPolys, oldest, newest, npts, seed, loadSamp, ptFile):
     '''
     Returns datetime dataframe of values for sampled pts (n={'npts}) for each polygon in {'polys'}
     OR for previously generated points with {loadSamp}=True and {ptFile}=path to .csv file
@@ -383,7 +402,7 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
             polys = GetPolygonsInGrid (gridFile, cell, groundPolys, oldest, newest)
             points = None
         if isinstance(points, gpd.GeoDataFrame) or polys is not None:
-            if imageType == 'TS':
+            if imageType == 'Smooth':
                 cellDir = os.path.join(img_dir,'{:06d}'.format(cell),'brdf_ts','ms',spec_index)
                 for img in os.listdir(cellDir):
                     imgYr = int(img[:4])
@@ -406,7 +425,7 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
                                 imgYr = int(img[17:21])
                                 if imgYr >= StartYr and imgYr <= EndYr:
                                     TStack.append(os.path.join(img_dir,cellDir,img))
-                if imageType == 'All':
+                if imageType == 'AllRaw':
                     for img in os.listdir(cellDir):
                         if img.startswith('L1C') and 'angles' not in img:
                             imgYr = int(img[19:23])
@@ -421,9 +440,9 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
             TStack.sort()
             if loadSamp == True:
                 polys=None
-                pts = GetIndexValsAtPts(TStack, imageType, polys, spec_index, 2, seed=88, loadSamp=True, ptgdb=points)
+                pts = GetIndexValsAtPts(out_dir, TStack, imageType, polys, spec_index, npts, seed=88, loadSamp=True, ptgdb=points)
             else:
-                pts = GetIndexValsAtPts(TStack, imageType, polys, spec_index, 2, seed=88, loadSamp=False, ptgdb=None)
+                pts = GetIndexValsAtPts(out_dir, TStack, imageType, polys, spec_index, npts, seed=88, loadSamp=False, ptgdb=None)
 
             pts.drop(columns=['geometry'], inplace=True)
             Allpts = pd.concat([Allpts, pts])
@@ -434,13 +453,21 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
 
     TS = Allpts.transpose()
     TS['date'] = [pd.to_datetime(e[:4]) + pd.to_timedelta(int(e[4:]) - 1, unit='D') for e in TS.index]
+    ##Note columns are all object due to mask. Need to change to numeric or any NA will result in  NA in average.
+    #print(TS.dtypes)
+    cols = TS.columns[TS.dtypes.eq('object')]
+    for c in cols:
+        TS[c] = TS[c].astype(float)
+    print(TS.dtypes)
+    ##There are a lot of 9s...
+    #TS = TS.replace(9, np.nan)
     TS.set_index('date', drop=True, inplace=True)
-    TS.index = pd.to_datetime(TS.index)
+    TS=TS.sort_index()
 
     TS['ALL'] = TS.mean(axis=1)
     TS['stdv'] = TS.std(axis=1)
 
-    pd.DataFrame(TS).to_csv(os.path.join(out_dir,'TS_{}_{}-{}.csv'.format(spec_index, StartYr, EndYr)), sep=',', na_rep='NaN', index=True)
+    pd.DataFrame.to_csv(TS, os.path.join(out_dir,'TS_{}_{}-{}.csv'.format(spec_index, StartYr, EndYr)), sep=',', na_rep='NaN', index=True)
     return TS
 
 
@@ -448,6 +475,7 @@ def LoadTSfromFile(TSfile):
     TS = pd.read_csv(TSfile)
     TS.set_index('date', drop=True, inplace=True)
     TS.index = pd.to_datetime(TS.index)
+    TS = TS.sort_index()
 
     return TS
 
