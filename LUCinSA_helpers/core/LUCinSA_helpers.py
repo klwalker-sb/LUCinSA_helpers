@@ -35,7 +35,7 @@ def main():
         subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
         subparser.add_argument('--StartYr', dest ='StartYr', help='start year', default=2010, type=int)
         subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
-        
+
         if process == 'GetTimeSeries':
             subparser.add_argument('--EndYr', dest ='EndYr', help='end year', default=2020, type=int)
             subparser.add_argument('--imageType', dest ='imageType', help='.nc or TS currently supported', default='TS')
@@ -51,8 +51,8 @@ def main():
             subparser.add_argument('--ptFile', dest ='ptFile', help='Path to file containing points, if loadSamp=True', default=None)
 
         if process == 'MakeTScomposite':
-            subparser.add_argument('--BandsOut', dest ='BandsOut', help='bands to create. Currently only 3 allowed. Current options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov', nargs='+')
-            subparser.add_argument('gridCell', dest='gridCell', help='cell being processed')
+            subparser.add_argument('--BandsOut', dest ='BandsOut', help='bands to create. Currently only 3 allowed. Current options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov')
+            subparser.add_argument('--gridCell', dest='gridCell', help='cell being processed')
     args = parser.parse_args()
 
     if args.process == 'version':
@@ -75,7 +75,7 @@ def main():
                              seed = args.seed,
                              loadSamp = args.loadSamp,
                              ptFile = args.ptFile)
-    
+
     if args.process == 'MakeTScomposite':
         MakeTSComposite(gridCell = args.gridCell,
                         img_dir = args.img_dir,

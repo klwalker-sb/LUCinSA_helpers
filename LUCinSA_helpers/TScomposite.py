@@ -1,100 +1,116 @@
 #!/usr/bin/env python
 # coding: utf-8
-# %%
+
 import os
 from pathlib import Path
 import geowombat as gw
 import datetime
 import rasterio
 
-
-# %%
 def MakeTSComposite(gridCell,img_dir,out_dir,StartYr,spec_index,BandsOut):
-    
+    ##BandsOut is list, fed to args as string. need to reparse as list:
+    if BandsOut.startswith('['):
+        BandsOut = BandsOut[1:-1].split(',')
+        #BandsOut = list(map(str, BandsOut))
+
     rasList = []
-    
+
+    if not os.path.exists(out_dir):
+        Path(out_dir).mkdir(parents=True, exist_ok=True)
+        print('made new directory: {}'.format(out_dir))
+
     ##Convert Image stack to XArray using geowombat:
     TStack = []
     DStack = []
     for img in os.listdir(img_dir):
-        imgYr = int(img[:4])
-        imgDoy = int(img[4:7])
-        if imgYr == StartYr:
-            TStack.append(os.path.join(img_dir,img))
-            DStack.append(imgDoy)
-    
+        if img.endswith('.tif'):
+            imgYr = int(img[:4])
+            imgDoy = int(img[4:7])
+            if imgYr == StartYr:
+                TStack.append(os.path.join(img_dir,img))
+                DStack.append(imgDoy)
     with gw.open(TStack, time_names= DStack) as src:
         attrs = src.attrs.copy()
-        
+
+    print(BandsOut)
+
     if 'Max' in BandsOut or 'Amp' in BandsOut or 'MaxDate' in BandsOut or 'MaxDateCos' in BandsOut:
         Max = src.max(dim='time')
         if 'Max' in BandsOut:
             Max.attrs = attrs
             ras = os.path.join(out_dir,'Max.tif')
+            print('making max raster')
             Max.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
             rasList.append(ras)
     if 'Min' in BandsOut or 'Amp' in BandsOut or 'MinDate' in BandsOut or 'MinDateCos' in BandsOut:
         Min = src.min(dim='time')
         if 'Min' in BandsOut:
             Min.attrs = attrs
-            ras = os.path.join(out_dir,'Min.tif') 
+            print('making min raster')
+            ras = os.path.join(out_dir,'Min.tif')
             rasList.append(ras)
             Min.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'Amp' in BandsOut:
         Amp = Max - Min
         Amp.attrs = attrs
-        ras = os.path.join(out_dir,'Amp.tif') 
+        print('making amp raster')
+        ras = os.path.join(out_dir,'Amp.tif')
         rasList.append(ras)
         Amp.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'Avg' in BandsOut or 'CV' in BandsOut:
         Avg = src.mean(dim='time')
         if 'Avg' in BandsOut:
             Avg.attrs = attrs
-            ras = os.path.join(out_dir,'Avg.tif') 
+            ras = os.path.join(out_dir,'Avg.tif')
             rasList.append(ras)
+            print('making avg raster')
             Avg.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'Std' in BandsOut or 'CV' in BandsOut:
         Std = src.std(dim='time')
         if 'Std' in BandsOut:
             Std.attrs = attrs
-            ras = os.path.join(out_dir,'Std.tif') 
+            ras = os.path.join(out_dir,'Std.tif')
             rasList.append(ras)
+            print('making std raster')
             Std.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'CV' in BandsOut:
         CV = Std/Avg
         CV.attrs = attrs
-        ras = os.path.join(out_dir,'CV.tif') 
+        ras = os.path.join(out_dir,'CV.tif')
         rasList.append(ras)
+        print('making coef of var raster')
         CV.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'MaxDate' in BandsOut or 'MaxDateCos' in BandsOut:
         MaxDate = src.idxmax(dim='time',skipna=True)
         if 'MaxDate' in BandsOut:
             MaxDate.attrs = attrs
-            ras = os.path.join(out_dir,'MaxDate.tif') 
+            ras = os.path.join(out_dir,'MaxDate.tif')
             rasList.append(ras)
+            print('making maxDate raster')
             MaxDate.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'MaxDateCos' in BandsOut:
         MaxDate360 = MaxDate * MaxDate/360
         MaxDateCos = xr.ufuncs.cos(MaxDate360)
         MaxDateCos.attrs = attrs
-        ras = os.path.join(out_dir,'MaxDateCos.tif') 
+        ras = os.path.join(out_dir,'MaxDateCos.tif')
         rasList.append(ras)
         MaxDateCos.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'MinDate' in BandsOut or 'MinDateCos' in BandsOut:
         MinDate = src.idxmin(dim='time',skipna=True)
         if 'MinDate' in BandsOut:
             MinDate.attrs = attrs
-            ras = os.path.join(out_dir,'MinDate.tif') 
+            ras = os.path.join(out_dir,'MinDate.tif')
             rasList.append(ras)
+            print('making minDate raster')
             MinDate.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'MinDateCos' in BandsOut:
         MinDate360 = MinDate * MinDate/360
         MinDateCos = xr.ufuncs.cos(MinDate360)
         MinDateCos.attrs = attrs
-        ras = os.path.join(out_dir,'MinDateCos.tif') 
+        ras = os.path.join(out_dir,'MinDateCos.tif')
         rasList.append(ras)
         MinDateCos.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
-        
+
     for img in os.listdir(img_dir):
         if img.startswith(str(StartYr)):
             if img.endswith('020.tif') and 'Jan' in BandsOut:
@@ -107,23 +123,19 @@ def MakeTSComposite(gridCell,img_dir,out_dir,StartYr,spec_index,BandsOut):
                 rasList.append(os.path.join(img_dir,img))
             if img.endswith('324.tif') and 'Nov' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-    
-    if len(rasList)<len(BandsOut):
+
+    if len(rasList)<len(BandsOut) or len(BandsOut)>3:
+        print('{} rasters made. Code currently only accepts 3 bands'.format(len(rasList)))
         print('oops--got an unknown band; Current Band options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov')
-    
+
     else:
-        ##Start writing output composite:
-        if os.path.exists(out_dir) == False:
-            os.makedirs(out_dir)
-            
+        ##Start writing output composite
         with rasterio.open(rasList[0]) as src0:
             meta = src0.meta
             meta.update(count = len(rasList))
         # Read each layer and write it to stack
-        with rasterio.open(os.path.join(out_dir,'{:06d}'.format(gridCell)+'_'+str(StartYr)+spec_index+'_'+BandsOut[0]+BandsOut[1]+BandsOut[2]+'.tif'), 'w', **meta) as dst:
+        with rasterio.open(os.path.join(out_dir,'{:06d}'.format(int(gridCell))+'_'+str(StartYr)+spec_index+'_'+BandsOut[0]+BandsOut[1]+BandsOut[2]+'.tif'), 'w', **meta) as dst:
             for id, layer in enumerate(rasList, start=1):
                 with rasterio.open(layer) as src1:
                     dst.write(src1.read(1),id)
 
-
-# %%
