@@ -22,7 +22,7 @@ def MakeTSComposite(gridCell,img_dir,out_dir,StartYr,spec_index,BandsOut):
     ##Convert Image stack to XArray using geowombat:
     TStack = []
     DStack = []
-    for img in os.listdir(img_dir):
+    for img in sorted(os.listdir(img_dir)):
         if img.endswith('.tif'):
             imgYr = int(img[:4])
             imgDoy = int(img[4:7])
@@ -74,7 +74,8 @@ def MakeTSComposite(gridCell,img_dir,out_dir,StartYr,spec_index,BandsOut):
             print('making std raster')
             Std.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'CV' in BandsOut:
-        CV = Std/Avg
+        StdvB = Std.dot(1000)
+        CV = StdvB/Avg
         CV.attrs = attrs
         ras = os.path.join(out_dir,'CV.tif')
         rasList.append(ras)
@@ -111,31 +112,57 @@ def MakeTSComposite(gridCell,img_dir,out_dir,StartYr,spec_index,BandsOut):
         rasList.append(ras)
         MinDateCos.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
 
-    for img in os.listdir(img_dir):
+    for img in sorted(os.listdir(img_dir)):
         if img.startswith(str(StartYr)):
             if img.endswith('020.tif') and 'Jan' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
+            if img.endswith('051.tif') and 'Feb' in BandsOut:
+                rasList.append(os.path.join(img_dir,img))
+            if img.endswith('079.tif') and 'Mar' in BandsOut:
+                rasList.append(os.path.join(img_dir,img))
             if img.endswith('110.tif') and 'Apr' in BandsOut:
+                rasList.append(os.path.join(img_dir,img))
+            if img.endswith('140.tif') and 'May' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
             if img.endswith('171.tif') and 'Jun' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
+            if img.endswith('201.tif') and 'Jul' in BandsOut:
+                rasList.append(os.path.join(img_dir,img))
             if img.endswith('232.tif') and 'Aug' in BandsOut:
+                rasList.append(os.path.join(img_dir,img))
+            if img.endswith('263.tif') and 'Sep' in BandsOut:
+                rasList.append(os.path.join(img_dir,img))
+            if img.endswith('293.tif') and 'Oct' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
             if img.endswith('324.tif') and 'Nov' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-
-    if len(rasList)<len(BandsOut) or len(BandsOut)>3:
-        print('{} rasters made. Code currently only accepts 3 bands'.format(len(rasList)))
-        print('oops--got an unknown band; Current Band options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov')
+            if img.endswith('354.tif') and 'Dec' in BandsOut:
+                rasList.append(os.path.join(img_dir,img))
+    
+    print(rasList)
+    if len(rasList)<len(BandsOut):
+        print('oops--got an unknown band; Current Band options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec')
 
     else:
         ##Start writing output composite
-        with rasterio.open(rasList[0]) as src0:
+        with rasterio.open(rasList[1]) as src0:
             meta = src0.meta
             meta.update(count = len(rasList))
+            
         # Read each layer and write it to stack
-        with rasterio.open(os.path.join(out_dir,'{:06d}'.format(int(gridCell))+'_'+str(StartYr)+spec_index+'_'+BandsOut[0]+BandsOut[1]+BandsOut[2]+'.tif'), 'w', **meta) as dst:
+        
+        if len(BandsOut)==12:
+            outRas = os.path.join(out_dir,'{:06d}'.format(int(gridCell))+'_'+str(StartYr)+spec_index+'_monthly.tif')
+        elif len(BandsOut)==4:
+            outRas = os.path.join(out_dir,'{:06d}'.format(int(gridCell))+'_'+str(StartYr)+spec_index+'_'+ BandsOut[0]+BandsOut[1]+BandsOut[2]+BandsOut[3]+'.tif')
+        elif len(BandsOut)==2:
+            outRas = os.path.join(out_dir,'{:06d}'.format(int(gridCell))+'_'+str(StartYr)+spec_index+'_'+BandsOut[0]+BandsOut[1]+'.tif')
+        elif len(BandsOut)==1:
+            outRas = os.path.join(out_dir,'{:06d}'.format(int(gridCell))+'_'+str(StartYr)+spec_index+'_'+BandsOut[0]+'.tif')
+        else:
+            outRas = os.path.join(out_dir,'{:06d}'.format(int(gridCell))+'_'+str(StartYr)+spec_index+'_'+ BandsOut[0]+BandsOut[1]+BandsOut[2]+'.tif')
+        
+        with rasterio.open(outRas, 'w', **meta) as dst:
             for id, layer in enumerate(rasList, start=1):
                 with rasterio.open(layer) as src1:
                     dst.write(src1.read(1),id)
-

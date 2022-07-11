@@ -26,6 +26,7 @@ OUT_DIR="/raid-cel/r/downspout-cel/${COUNTRY}_lc/raster/grids/000${GRID_ID}/comp
 
 BANDS="[Min,Max,Amp]"
 #BANDS="[Jan,Jun,Nov]"
+#BANDS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 # ####################################################
 
