@@ -118,25 +118,25 @@ def MakeTSComposite(gridCell,img_dir,out_dir,StartYr,spec_index,BandsOut):
                 rasList.append(os.path.join(img_dir,img))
             if img.endswith('051.tif') and 'Feb' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('079.tif') | img.endswith('080.tif') and 'Mar' in BandsOut:
+            if (img.endswith('079.tif') | img.endswith('080.tif')) and 'Mar' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('110.tif') | img.endswith('111.tif') and 'Apr' in BandsOut:
+            if (img.endswith('110.tif') | img.endswith('111.tif')) and 'Apr' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('140.tif') | img.endswith('141.tif') and 'May' in BandsOut:
+            if (img.endswith('140.tif') | img.endswith('141.tif')) and 'May' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('171.tif') | img.endswith('172.tif') and 'Jun' in BandsOut:
+            if (img.endswith('171.tif') | img.endswith('172.tif')) and 'Jun' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('201.tif') | img.endswith('202.tif') and 'Jul' in BandsOut:
+            if (img.endswith('201.tif') | img.endswith('202.tif')) and 'Jul' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('232.tif') | img.endswith('233.tif') and 'Aug' in BandsOut:
+            if (img.endswith('232.tif') | img.endswith('233.tif')) and 'Aug' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('263.tif') | img.endswith('264.tif') and 'Sep' in BandsOut:
+            if (img.endswith('263.tif') | img.endswith('264.tif')) and 'Sep' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('293.tif') | img.endswith('294.tif') and 'Oct' in BandsOut:
+            if (img.endswith('293.tif') | img.endswith('294.tif')) and 'Oct' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('324.tif') | img.endswith('325.tif') and 'Nov' in BandsOut:
+            if (img.endswith('324.tif') | img.endswith('325.tif')) and 'Nov' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
-            if img.endswith('354.tif') | img.endswith('355.tif') and 'Dec' in BandsOut:
+            if (img.endswith('354.tif') | img.endswith('355.tif')) and 'Dec' in BandsOut:
                 rasList.append(os.path.join(img_dir,img))
     
     print(rasList)
