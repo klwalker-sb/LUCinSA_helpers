@@ -3,3 +3,7 @@ pandas
 geopandas
 rasterio
 rasterstats
+
+xarray_leaflet
+netcdf4
+h5netcdf

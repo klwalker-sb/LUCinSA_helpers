@@ -204,7 +204,7 @@ def getRanPtsInPolys(polys, npts, seed=88):
             polyList.append(poly['geometry'])
             polyobj = shape(poly['geometry'])
             for i in range(0,npts):
-                ptName = str(poly['properties']['Id'])+'_'+str(i+1)
+                ptName = str(poly['properties']['id'])+'_'+str(i+1)
                 pt_in_poly = getRanPtInPoly(polyobj, seed)
                 ptDict[ptName] = pt_in_poly
 
@@ -405,10 +405,11 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
             if imageType == 'Smooth':
                 cellDir = os.path.join(img_dir,'{:06d}'.format(cell),'brdf_ts','ms',spec_index)
                 for img in os.listdir(cellDir):
-                    imgYr = int(img[:4])
-                    if imgYr >= StartYr and imgYr <= EndYr:
-                        TStack.append(os.path.join(img_dir,cellDir,img))
-
+                    if img.endswith('.tif'):
+                        imgYr = int(img[:4])
+                        imgDoy = int(img[4:7])
+                        if ((imgYr > StartYr) or (imgYr == StartYr and imgDoy >= 150)) and ((imgYr < EndYr) or (imgYr == EndYr and imgDoy <= 150)):    
+                            TStack.append(os.path.join(img_dir,cellDir,img))
             else:
                 cellDir = os.path.join(img_dir,'{:06d}'.format(cell),'brdf')
 
@@ -458,7 +459,7 @@ def GetTimeSeriesForPts_MultiCell(out_dir, spec_index, StartYr, EndYr, img_dir, 
     cols = TS.columns[TS.dtypes.eq('object')]
     for c in cols:
         TS[c] = TS[c].astype(float)
-    print(TS.dtypes)
+    #print(TS.dtypes)
     ##There are a lot of 9s...
     #TS = TS.replace(9, np.nan)
     TS.set_index('date', drop=True, inplace=True)
