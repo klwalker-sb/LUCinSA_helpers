@@ -73,9 +73,6 @@ def GetPtsInGrid (gridFile, gridCell, ptFile):
     rather than making a new random sample each time (e.g. if matching Planet and Sentinel points)
     Note that crs of point file is known ahead of time and hardcoded here to match specific grid file.
     '''
-    ptsdf = pd.read_csv(ptFile, index_col=0)
-    ### pt file is in SA Albers Equal Area Conic (ESRI:102033)
-    pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs='esri:102033')
     out_path = Path(gridFile).parent
 
     with tempfile.TemporaryDirectory(dir=out_path) as temp_dir:
@@ -83,7 +80,10 @@ def GetPtsInGrid (gridFile, gridCell, ptFile):
         shutil.copy(gridFile, temp_file)
         df = gpd.read_file(temp_file)
         crs_grid = df.crs
-    #print(crs_grid)  #ESRI:102033
+    print('grid is in: ', crs_grid)  #ESRI:102033
+
+    ptsdf = pd.read_csv(ptFile, index_col=0)
+    pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=crs_grid)
 
     bb = df.query(f'UNQ == {gridCell}').geometry.total_bounds
 
