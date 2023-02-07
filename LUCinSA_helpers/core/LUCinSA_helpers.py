@@ -2,6 +2,7 @@
 import argparse
 from LUCinSA_helpers.TSprofile import GetTimeSeriesForPts_MultiCell
 from LUCinSA_helpers.TScomposite import MakeTSComposite
+from LUCinSA_helpers.FileChecks import checkValidPixels
 from LUCinSA_helpers.version import __version__
 
 
@@ -23,14 +24,23 @@ def main():
 
     subparsers = parser.add_subparsers(dest='process')
 
-    available_processes = ['version', 'GetTimeSeries', 'MakeTScomposite']
+    available_processes = ['version', 'GetTimeSeries', 'MakeTScomposite', 'checkProcessing']
 
     for process in available_processes:
         subparser = subparsers.add_parser(process)
 
         if process == 'version':
             continue
-
+        
+        if process == 'checkProcessing':
+            subparser.add_argument('--raw_dir', dest ='raw_dir', help='directory containing downloaded images')
+            subparser.add_argument('--brdf_dir', dest ='brdf_dir', help='directory containing brdf images')
+            subparser.add_argument('--gridCell', dest ='gridCell', help='cell to process')
+            subparser.add_argument('--imageType', dest ='imageType', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
+            subparser.add_argument('--Yrs', dest ='Yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
+            subparser.add_argument('--dataSource', dest ='dataSource', help='stac or GEE', default='stac')
+        
+        else:
         subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
         subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
         subparser.add_argument('--StartYr', dest ='StartYr', help='start year', default=2010, type=int)
@@ -83,6 +93,14 @@ def main():
                         StartYr = args.StartYr,
                         spec_index = args.spec_index,
                         BandsOut = args.BandsOut)
+        
+    if args.process == 'checkProcessing':   
+        checkValidPixels(raw_dir = args.raw_dir,
+                         brdf_dir = args.brdf_dir, 
+                         gridCell = args.gridCell, 
+                         imageType = args.imageType, 
+                         Yrs = args.Yrs,
+                         dataSource = args.dataSource
 
 
 if __name__ == '__main__':

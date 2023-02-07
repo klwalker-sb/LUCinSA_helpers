@@ -9,6 +9,9 @@ import geopandas as gpd
 import numpy as np
 import pyproj
 import pickle
+import xarray as xr
+import geowombat as gw
+import rasterio as rio
 from shapely.geometry import box
 
 def PrintFilesInDirectory(in_dir,endstring,printList=False,out_dir=None,dataSource='stac'):
@@ -73,46 +76,126 @@ def PrintFilesInMultipleDirectories(full_dir,sub_dir,endstring,printList=False,o
         
     return uniqueImgs
 
-def GetImgListFromDb(sensor, in_dir, gridCell,Yrs, dataSource='stac'):
-    '''
-    returns list of images in database for year range (Yrs) for selected directory (raw or brdf)
-    and sensor ('Landsat', 'Sentinel').
-    Yrs is a list in format [YYYY, YYYY]
-    '''
-    if dataSource == 'stac':
-        if 'brdf' not in str(in_dir):
-            if sensor == 'Landsat':
-                scene_info = (Path('{}/{:06d}/landsat/scene.info'.format(in_dir,gridCell)))
-                if os.path.exists(scene_info) == False:
-                    print('There is no scene.info file in the Landsat directory for cell {}'.format(gridCell))
-                    return None
-            elif sensor == 'Sentinel':
-                scene_info = (Path('{}/{:06d}/sentinel2/scene.info'.format(in_dir,gridCell)))
-                if os.path.exists(scene_info) == False:
-                    print('There is no scene.info file in the Sentinel directory for cell {}'.format(gridCell))
-                    return None
-    
-    print('Getting scene info: ',scene_info)
-
+def ReadDB(scene_info_path):
     pyver = float((sys.version)[:3])
     if pyver < 3.8:
         print('python version is {}'.format(pyver))
         ### note this may not work depending on what version of Pandas you have. Maybe upgrade Pandas
         import pickle5 as pickle
-        with open(scene_info, 'rb') as file1:         
+        with open(scene_info_path, 'rb') as file1:         
             df = pickle.load(file1)
     else:
-        df = pd.read_pickle(scene_info).set_index('date')
-        df.index.rename(None, inplace=True)
-        df = df.assign(date=df.index)
-        df = df.sort_index()
+        df = pd.read_pickle(scene_info_path).set_index('date')
+        
+    df.index.rename(None, inplace=True)
+    df = df.assign(date=df.index)
+    df = df.sort_index()
     
-    if Yrs:
-        df = df[f'{Yrs[0]}-01-01':f'{Yrs[1]}-12-30']
-
     return df
 
+def GetImgListFromDb(in_dir, gridCell, sensor, Yrs, dataSource='stac'):
+    '''
+    returns list of images in database for year range (Yrs) for selected directory (raw or brdf)
+    and sensor ('Landsat', 'Sentinel').
+    Yrs is a list in format [YYYY, YYYY]
+    '''
+    if dataSource == 'stac' and 'brdf' not in str(in_dir):
+        #original downloads for stac data are in separate landsat and sentinel2 folders. Each has its own scene.info file
+        if 'Landsat' in sensor or sensor=='All':
+            scene_info_L = (Path('{}/{:06d}/landsat/scene.info'.format(in_dir,int(gridCell))))
+            if os.path.exists(scene_info) == False:
+                print('There is no scene.info file in the Landsat directory for cell {}'.format(gridCell))
+                Landsat_df = None
+            else: Landsat_df = ReadDB(scene_info_L)
+                
+            if sensor == 'All':
+                scene_info_S = (Path('{}/{:06d}/sentinel2/scene.info'.format(in_dir,int(gridCell))))
+                if os.path.exists(scene_info_S) == False:
+                    print('There is no scene.info file in the Sentinel directory for cell {}'.format(gridCell))
+                    Sentinel_df == None
+                else:
+                    Sentinel_df = ReadDB(scene_info_S)
+                    if Landsat_df is None:
+                        dff = Sentinel_df
+                    else:
+                        dff = pd.concat([Landsat_df,Sentinel_df],axis=0)
+            else:
+                dff = Landsat_df
+                    
+        elif sensor == 'Sentinel':
+            scene_info_S = (Path('{}/{:06d}/sentinel2/scene.info'.format(in_dir,int(gridCell))))
+            if os.path.exists(scene_info_S) == False:
+                print('There is no scene.info file in the Sentinel directory for cell {}'.format(gridCell))
+            else: dff = ReadDB(scene_info_S)
+            
+        else:
+            print('sensor options are Sentinel, Landsat(5,7,8,9) or All. You put {}'.format(sensor))
+            
+    else:
+        scene_info = (os.path.join(in_dir,'scene.info'))
+        df = ReadDB(scene_info)
+        # scene.info file in brdf folder has a 'sensor' field we can use to filter
+        if sensor == 'Landsat5':
+            dff = df.loc[df.sensor=='lt05']
+        elif sensor == 'Landsat7':
+            dff = df.loc[df.sensor=='le07']
+        elif sensor == 'Landsat8':
+            dff = df.loc[df.sensor=='lc08']
+        elif sensor == 'Landsat9':
+            dff = df.loc[df.sensor=='lc09']
+        elif 'Landsat' in sensor:
+            dff = df.loc[df.sensor.startswith('l')]
+        elif 'Sentinel' in sensor:
+            dff = df.loc[df.sensor.startswith('s')]
+        else:
+            dff = df
+    if Yrs:
+        dff = dff[f'{Yrs[0]}-01-01':f'{Yrs[1]}-12-31']
 
+    return dff
+
+def SeparateMissingDBFiles(in_dir,gridCell,imageType='All', Yrs=None,dataSource='stac'):
+    df = GetImgListFromDb(in_dir, gridCell, imageType, Yrs, dataSource)          
+    if 'brdf' in in_dir:
+        df['file_path'] = df.out_id.apply(lambda x: os.path.join(in_dir,x))
+    else:
+        df['file_path'] = df.id.apply(lambda x: os.path.join(in_dir,x+'.tif'))
+
+    df['file_path_exists'] = df.file_path.apply(lambda x: Path(x).is_file())
+    dfExisting = df.loc[df.file_path_exists]
+    #dfMissing = df.loc[!file_path_exists] #FIXME
+    dfMissing = 1
+    
+    return dfExisting, dfMissing
+
+def GetValidPixPer(imgPath):
+    if imgPath.endswith('.tif'):
+        with rio.open(imgPath) as src:
+            no_data = src.nodata
+            img = src.read(4)
+        allpix = img.shape[0]*img.shape[1]
+        NANpix = np.count_nonzero(np.isnan(img))
+        validpix = allpix-NANpix
+    elif imgPath.endswith('.nc'):
+        with xr.open_dataset(imgPath) as xrimg:
+            xr_idx = xrimg['nir']
+        xr_idx_valid = xr_idx.where(xr_idx < 10000)
+        allpix = xr_idx.count() 
+        validpix = xr_idx_valid.count()
+    
+    validper = (validpix/allpix)    
+    return validper
+
+def checkValidPixels(raw_dir, brdf_dir, gridCell, imageType='All', Yrs=None, dataSource='stac'):
+    df_brdf = SeparateMissingDBFiles(brdf_dir,gridCell,imageType,Yrs,dataSource)[0]          
+    Landsat_dir = Path('{}/{:06d}/landsat'.format(raw_dir,int(gridCell)))
+    Sentinel_dir = Path('{}/{:06d}/sentinel2'.format(raw_dir,int(gridCell)))
+    df_brdf['orig_file_path'] = df_brdf.apply(lambda x: os.path.join(Landsat_dir,x['id']+'.tif') if x['sensor'].startswith('l') else os.path.join(Sentinel_dir,x['id']+'.tif'), axis=1)
+    df_brdf['ValidPix_orig'] = df_brdf.orig_file_path.apply(lambda x: int(GetValidPixPer(x)*100))
+    df_brdf['ValidPix_brdf'] = df_brdf.file_path.apply(lambda x: int(GetValidPixPer(x)*100))
+    out_df = os.path.join(raw_dir,'{:06d}'.format(gridCell),'processed_imgs_{}.info'.format(imageType))
+    df_brdf.to_pickle(out_df)       
+    return df_brdf
 
 def GetImgListFromCat(sensor, gridCell, gridFile, Yrs=None, cat='default'):
     '''
@@ -297,3 +380,31 @@ def GetCellStatus(in_dir, gridCell,gridFile,Yrs,dataSource='stac'):
         else: 
             missCheck = WhyMissingFiles('Sentinel',S2check[0],3)
             S2dl = missCheck[0]
+            
+def getNumValidPix_forStac(file_list, date_list=None):
+    #Note: if files are .tif, need corresponding list of dates (TODO: derive from file names) 
+    if file_list[0].endswith('.nc'):
+        with xr.open_mfdataset(
+            file_list,
+            chunks={'band': -1, 'y': 256, 'x': 256},
+            concat_dim='time',
+            combine='nested',
+            engine='h5netcdf'
+        ) as src:
+            validpix = src.nir.where(src.nir < 10000).count(dim='time').chunk({'y': 256, 'x': 256})
+            validpix = validpix.squeeze()
+    
+    elif file_list[0].endswith('tif'):                                                            
+        with gw.open(
+            file_list,
+            time_names=date_list,
+            band_names=['blue', 'green', 'red', 'nir', 'swir1', 'swir2'],
+            overlap='min'   # We use overlap='min' because the nodata values are 32768 or 10000.
+        ) as src:
+            validpix = src.sel(band=['nir']).transpose('time','band','y','x').where(lambda x: x != x.nodatavals[0]).count(dim='time')
+            validpix = validpix.squeeze()
+    else:
+        print('can only count valid pix for .nc and .tif files currently')
+        validpix = None
+    
+    return validpix

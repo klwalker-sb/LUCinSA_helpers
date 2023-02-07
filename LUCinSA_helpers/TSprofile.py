@@ -271,12 +271,10 @@ def CalculateRawIndex(nir_val, b2_val, spec_index):
 
     return index_val
 
-def GetImgDate(img, imageType):
-    imgBase = os.path.basename(img)
-    if imageType == 'Smooth':  #Expects images to be named YYYYDDD
-        YYYY = int(imgBase[:4])
-        doy = int(imgBase[4:7])
-    elif imageType in ['Sentinel','Landsat','AllRaw']:
+def GetImgDate(img, imageType, data_source=None):
+    '''
+    old method. TODO: Make sure current is working on old GEE images and delete this:  
+    elif data_source == 'GEE':   
         if imgBase.startswith('L1C'):
             YYYY = int(imgBase[19:23])
             MM = int(imgBase[23:25])
@@ -284,11 +282,27 @@ def GetImgDate(img, imageType):
         elif imgBase.startswith('LC') or imgBase.startswith('LT') or imgBase.startswith('LE'):
             YYYY = int(imgBase[17:21])
             MM = int(imgBase[21:23])
-            DD = int(imgBase[23:25])
-        ymd = datetime.datetime(YYYY, MM, DD)
-        doy = int(ymd.strftime('%j'))
-    else: print ('Currently valid image types are Smooth,Sentinel,Landsat and AllRaw. You put {}'.format(imageType))
-
+            DD = int(imgBase[23:25]
+     '''
+    if '.' in img:
+        imgBase = os.path.basename(img)
+    else:
+        imgBase = img
+        
+    if imageType == 'Smooth':  #Expects images to be named YYYYDDD
+        YYYY = int(imgBase[:4])
+        doy = int(imgBase[4:7])
+    elif imageType not in ['Sentinel','Landsat','AllRaw']:
+        print ('Currently valid image types are Smooth,Sentinel,Landsat and AllRaw. You put {}'.format(imageType))
+    else:
+        YYYYMMDD = img.split('_')[3][:8]
+        YYYY = int(YYYYMMDD[:4])
+        MM = int(YYYYMMDD[4:6])
+        DD = int(YYYYMMDD[6:8])
+   
+    ymd = datetime.datetime(YYYY, MM, DD)
+    doy = int(ymd.strftime('%j'))
+    
     return YYYY, doy
 
 def GetIndexValsAtPts(out_dir, TSstack, imageType, polys, spec_index, numPts, seed, loadSamp=False, ptgdb=None):
