@@ -31,7 +31,7 @@ def main():
 
         if process == 'version':
             continue
-        
+
         if process == 'checkProcessing':
             subparser.add_argument('--raw_dir', dest ='raw_dir', help='directory containing downloaded images')
             subparser.add_argument('--brdf_dir', dest ='brdf_dir', help='directory containing brdf images')
@@ -39,12 +39,12 @@ def main():
             subparser.add_argument('--imageType', dest ='imageType', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
             subparser.add_argument('--Yrs', dest ='Yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
             subparser.add_argument('--dataSource', dest ='dataSource', help='stac or GEE', default='stac')
-        
+
         else:
-        subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
-        subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
-        subparser.add_argument('--StartYr', dest ='StartYr', help='start year', default=2010, type=int)
-        subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
+            subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
+            subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
+            subparser.add_argument('--StartYr', dest ='StartYr', help='start year', default=2010, type=int)
+            subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
 
         if process == 'GetTimeSeries':
             subparser.add_argument('--EndYr', dest ='EndYr', help='end year', default=2020, type=int)
@@ -93,14 +93,14 @@ def main():
                         StartYr = args.StartYr,
                         spec_index = args.spec_index,
                         BandsOut = args.BandsOut)
-        
-    if args.process == 'checkProcessing':   
+
+    if args.process == 'checkProcessing':
         checkValidPixels(raw_dir = args.raw_dir,
-                         brdf_dir = args.brdf_dir, 
-                         gridCell = args.gridCell, 
-                         imageType = args.imageType, 
+                         brdf_dir = args.brdf_dir,
+                         gridCell = args.gridCell,
+                         imageType = args.imageType,
                          Yrs = args.Yrs,
-                         dataSource = args.dataSource
+                         dataSource = args.dataSource)
 
 
 if __name__ == '__main__':
