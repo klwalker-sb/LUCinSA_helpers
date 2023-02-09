@@ -183,7 +183,10 @@ def GetValidPixPer(imgPath):
         allpix = xr_idx.count() 
         validpix = xr_idx_valid.count()
     
-    validper = (validpix/allpix)    
+    if allpix == 0:
+        validper = 0
+    else:
+        validper = (validpix/allpix)    
     return validper
 
 def checkValidPixels(raw_dir, brdf_dir, gridCell, imageType='All', Yrs=None, dataSource='stac'):
@@ -194,7 +197,8 @@ def checkValidPixels(raw_dir, brdf_dir, gridCell, imageType='All', Yrs=None, dat
     df_brdf['ValidPix_orig'] = df_brdf.orig_file_path.apply(lambda x: int(GetValidPixPer(x)*100))
     df_brdf['ValidPix_brdf'] = df_brdf.file_path.apply(lambda x: int(GetValidPixPer(x)*100))
     out_df = os.path.join(raw_dir,'{:06d}'.format(gridCell),'processed_imgs_{}.info'.format(imageType))
-    df_brdf.to_pickle(out_df)       
+    df_brdf.to_pickle(out_df)
+        
     return df_brdf
 
 def GetImgListFromCat(sensor, gridCell, gridFile, Yrs=None, cat='default'):
