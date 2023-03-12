@@ -57,7 +57,7 @@ def GetPtsInGrid (gridFile, gridCell, ptFile):
 
         return ptsInGrid
         print(ptsInGrid.head(n=5))
-        
+
 def GetVariablesAtPts(out_dir, in_dir, polys, spec_indices, numPts, seed, loadSamp=False, ptgdb=None):
     '''
     Gets values for all sampled points {'numpts'} in all polygons {'polys'} for all images in {'in_dir'}

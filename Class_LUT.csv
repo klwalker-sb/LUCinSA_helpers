@@ -1,0 +1,28 @@
+USE_NAME,Class1,LC5,LC22,LC3,LC4,LC2,Description
+NoVeg_Bare,NoVeg,10,1,0,0,0,Bare soil/rock/sand throughout the year (NOT part of crop cycle)
+NoVeg_Built,NoVeg,10,3,0,0,0,
+NoVeg_Water,NoVeg,10,7,0,0,0,
+Grassland,LowVeg,20,99,0,0,0,grass -- unknown if planted or natural
+Grassland-Natural,LowVeg,20,12,0,0,0,"natural grassland, dry year-round"
+Grassland-Planted,LowVeg,20,13,0,0,0,planted grass
+Grassland-Natural-wet,LowVeg,20,17,0,0,0,natural grassland that is flooded at some point in year
+Crops-low,LowVeg,20,99,1,1,1,unknown annual crop
+Crops-Soybeans,LowVeg,20,31,1,1,1,
+Crops-Beans,LowVeg,20,32,1,1,1,
+Crops-Corn,LowVeg,20,33,1,1,1,
+Crops-Mandioca,LowVeg,20,34,1,1,1,
+Crops-mix,LowVeg,20,35,1,1,1,intercropping with each crop <30m across
+TreePlant-new,LowVeg,20,36,1,1,1,<1 year
+Crops-Rice,LowVeg,20,37,1,1,1,
+Crops-Sugar,LowVeg,20,38,1,1,1,
+Shrub,MedVeg,50,52,0,0,0,natural shrubs / regrowth
+Crops-Orchard,MedVeg,40,53,2,2,1,
+Crops-Yerba-Mate,MedVeg,40,55,2,2,1,
+TreePlant-young,MedVeg,50,56,2,2,0,1-2 yrs
+TreePlant-mature,HighVeg,70,60,0,3,0,>=3 years
+Trees-Forest,HighVeg,70,80,0,3,0,
+Trees-disturbed,HighVeg,70,65,0,3,0,Mature trees with gaps (>70% closed canopy) or <10m from edge
+Grass_tree-mix,MedVeg,50,51,0,0,0,Grassland with trees (<70% closed canopy)
+unknown,99,99,99,99,99,99,no idea -- this is a placeholder for data checking
+Crops-Med,MedVeg,40,99,2,2,1,unknown or other shrubby perrenial crops (i.e. vineyards)
+Crops-Orchard-new,LowVeg,20,40,1,1,1,<1 year
