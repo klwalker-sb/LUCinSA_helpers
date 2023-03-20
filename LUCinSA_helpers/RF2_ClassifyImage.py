@@ -205,7 +205,7 @@ def ClassifyPixels(stack,rf,ClassImgOut):
     outdata.FlushCache() ##saves to disk!!
     sys.stdout.write('Image saved to: {}'.format(ClassImgOut))
 
-
-MakeVariableStack(in_dir,spec_indices,stats,'RFVars.tif')
-RFmod = MulticlassRF(VarDF,OutDir,Class,importanceMethod)
-ClassifyPixels(OutImg, RFmod, ClassImgOut)
+# +
+#MakeVariableStack(in_dir,spec_indices,stats,'RFVars.tif')
+#RFmod = MulticlassRF(VarDF,OutDir,Class,importanceMethod)
+#ClassifyPixels(OutImg, RFmod, ClassImgOut)

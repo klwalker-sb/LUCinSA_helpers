@@ -24,5 +24,5 @@ Crops-Sugar,38,LowVeg,20,38,Crops-Sugar,1,crop,1,crop,1,crop,38,Crops-Sugar,
 Crops-Orchard-new,40,LowVeg,20,99,unknown,1,crop,1,crop,1,crop,99,unknown,<1 year
 Crops-Orchard,53,MedVeg,40,53,Crops-Orchard,2,medcrop,2,medcrop,1,crop,99,unknown,
 Crops-Yerba-Mate,55,MedVeg,40,55,Crops-Yerba-Mate,2,medcrop,2,medcrop,1,crop,99,unknown,
-Crops-Med,99,MedVeg,40,99,unknown,2,medcrop,2,medcrop,1,crop,99,unknown,unknown or other shrubby perrenial crops (i.e. vineyards)
+Crops-Med,99,MedVeg,40,99,unknown,2,medcrop,2,medcrop,1,crop,99,unknown,unknown or other shrubby perrenial crops (eg. vineyards)
 unknown,99,99,99,99,unknown,99,unknown,99,unknown,99,unknown,99,unknown,no idea -- this is a placeholder for data checking

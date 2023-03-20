@@ -219,8 +219,3 @@ def get_holdout_scores(holdoutPix, rf_model, out_dir):
     pd.DataFrame.to_csv(holdout_fields, os.path.join(out_dir,'Holdouts_predictions.csv'), sep=',', na_rep='NaN', index=True)
    
     return holdout_fields
-    holdout_fields.head(n=5)
-
-
-
-
