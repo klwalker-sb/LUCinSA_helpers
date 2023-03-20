@@ -1,28 +1,28 @@
-USE_NAME,Class1,LC5,LC22,LC3,LC4,LC2,Description
-NoVeg_Bare,NoVeg,10,1,0,0,0,Bare soil/rock/sand throughout the year (NOT part of crop cycle)
-NoVeg_Built,NoVeg,10,3,0,0,0,
-NoVeg_Water,NoVeg,10,7,0,0,0,
-Grassland,LowVeg,20,99,0,0,0,grass -- unknown if planted or natural
-Grassland-Natural,LowVeg,20,12,0,0,0,"natural grassland, dry year-round"
-Grassland-Planted,LowVeg,20,13,0,0,0,planted grass
-Grassland-Natural-wet,LowVeg,20,17,0,0,0,natural grassland that is flooded at some point in year
-Crops-low,LowVeg,20,99,1,1,1,unknown annual crop
-Crops-Soybeans,LowVeg,20,31,1,1,1,
-Crops-Beans,LowVeg,20,32,1,1,1,
-Crops-Corn,LowVeg,20,33,1,1,1,
-Crops-Mandioca,LowVeg,20,34,1,1,1,
-Crops-mix,LowVeg,20,35,1,1,1,intercropping with each crop <30m across
-TreePlant-new,LowVeg,20,36,1,1,1,<1 year
-Crops-Rice,LowVeg,20,37,1,1,1,
-Crops-Sugar,LowVeg,20,38,1,1,1,
-Shrub,MedVeg,50,52,0,0,0,natural shrubs / regrowth
-Crops-Orchard,MedVeg,40,53,2,2,1,
-Crops-Yerba-Mate,MedVeg,40,55,2,2,1,
-TreePlant-young,MedVeg,50,56,2,2,0,1-2 yrs
-TreePlant-mature,HighVeg,70,60,0,3,0,>=3 years
-Trees-Forest,HighVeg,70,80,0,3,0,
-Trees-disturbed,HighVeg,70,65,0,3,0,Mature trees with gaps (>70% closed canopy) or <10m from edge
-Grass_tree-mix,MedVeg,50,51,0,0,0,Grassland with trees (<70% closed canopy)
-unknown,99,99,99,99,99,99,no idea -- this is a placeholder for data checking
-Crops-Med,MedVeg,40,99,2,2,1,unknown or other shrubby perrenial crops (i.e. vineyards)
-Crops-Orchard-new,LowVeg,20,40,1,1,1,<1 year
+USE_NAME,LC22,LC5_name,LC5,LC17,LC17_name,LC3,LC3_name,LC4,LC4_name,LC2,LC2_name,LC_crops,LC_crops_name,Description
+NoVeg_Bare,1,NoVeg,10,1,NoVeg_Bare,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,Bare soil/rock/sand throughout the year (NOT part of crop cycle)
+NoVeg_Built,3,NoVeg,10,3,NoVeg_Built,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,
+NoVeg_Water,7,NoVeg,10,7,NoVeg_Water,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,
+Grassland,99,LowVeg,20,99,unknown,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,grass -- unknown if planted or natural
+Grassland-Natural,12,LowVeg,20,12,Grassland-Natural,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,"natural grassland, dry year-round"
+Grassland-Planted,13,LowVeg,20,13,Grassland-Planted,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,planted grass
+Grassland-Natural-wet,17,LowVeg,20,13,Grassland-Natural,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,natural grassland that is flooded at some point in year
+Shrub,52,MedVeg,50,52,Shrub,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,natural shrubs / regrowth
+TreePlant-young,56,MedVeg,50,60,TreePlant,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,1-2 yrs
+Grass_tree-mix,51,MedVeg,50,51,Grass_tree-mix,0,nocrop,0,nocrop,0,nocrop,10,NoCrop,Grassland with trees (<70% closed canopy)
+TreePlant-mature,60,HighVeg,70,60,TreePlant,0,nocrop,3,tree,0,nocrop,10,NoCrop,>=3 years
+Trees-Forest,80,HighVeg,70,80,Trees-Forest,0,nocrop,3,tree,0,nocrop,10,NoCrop,
+Trees-disturbed,65,HighVeg,70,65,Trees-disturbed,0,nocrop,3,tree,0,nocrop,10,NoCrop,Mature trees with gaps (>70% closed canopy) or <10m from edge
+Crops-low,99,LowVeg,20,99,unknown,1,crop,1,crop,1,crop,99,unknown,unknown annual crop
+Crops-Soybeans,31,LowVeg,20,31,Crops-Soybeans,1,crop,1,crop,1,crop,31,Crops-Soybeans,
+Crops-Beans,32,LowVeg,20,35,Crops-mix,1,crop,1,crop,1,crop,35,Crops-mix,
+Crops-Corn,33,LowVeg,20,33,Crops-Corn,1,crop,1,crop,1,crop,33,Crops-Corn,
+Crops-Mandioca,34,LowVeg,20,35,Crops-mix,1,crop,1,crop,1,crop,35,Crops-mix,
+Crops-mix,35,LowVeg,20,35,Crops-mix,1,crop,1,crop,1,crop,35,Crops-mix,intercropping with each crop <30m across
+TreePlant-new,36,LowVeg,20,99,unknown,1,crop,1,crop,1,crop,99,unknown,<1 year
+Crops-Rice,37,LowVeg,20,37,Crops-Rice,1,crop,1,crop,1,crop,37,Crops-Rice,
+Crops-Sugar,38,LowVeg,20,38,Crops-Sugar,1,crop,1,crop,1,crop,38,Crops-Sugar,
+Crops-Orchard-new,40,LowVeg,20,99,unknown,1,crop,1,crop,1,crop,99,unknown,<1 year
+Crops-Orchard,53,MedVeg,40,53,Crops-Orchard,2,medcrop,2,medcrop,1,crop,99,unknown,
+Crops-Yerba-Mate,55,MedVeg,40,55,Crops-Yerba-Mate,2,medcrop,2,medcrop,1,crop,99,unknown,
+Crops-Med,99,MedVeg,40,99,unknown,2,medcrop,2,medcrop,1,crop,99,unknown,unknown or other shrubby perrenial crops (i.e. vineyards)
+unknown,99,99,99,99,unknown,99,unknown,99,unknown,99,unknown,99,unknown,no idea -- this is a placeholder for data checking

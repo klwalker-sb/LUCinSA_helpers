@@ -83,11 +83,12 @@ def GetVariablesAtPts(out_dir, in_dir, polys, spec_indices, numPts, seed, loadSa
     for vi in spec_indices:
         for img in os.listdir(in_dir):
             if img.endswith(RFVars.tif) and vi in img:
-                comp = rasterio.open(rasterio.open(os.path.join(in_dir,img), 'r')
-                #Open each band and get values
-                for b, var in band_names:
-                    ras.np = ras.read(b+1)
-                    ptsgdb[var] = [sample[b] for sample in src.sample(coords)]     
+                with rasterio.open(rasterio.open(os.path.join(in_dir,img), 'r') as comp:
+                    #Open each band and get values
+                    for b, var in enumerate(band_names):
+                        comp.np = comp.read(b+1)
+                        varn = ('var_{}_{}'.format(vi,var))
+                        ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]     
 
     #pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
     return ptsgdb
@@ -115,3 +116,50 @@ def MakeVarDataframe(out_dir, spec_indices, StartYr, in_dir, imageType, gridFile
             pts.drop(columns=['geometry'], inplace=True)
             Allpts = pd.concat([Allpts, pts])
             pd.DataFrame.to_csv(Allpts,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
+
+
+def GetVariablesAtPts_external(out_dir, ras_in,ptFile):
+
+    ptsdf = pd.read_csv(ptFile, index_col=0)
+    ptsgdb = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs='epsg:8858')
+    #pts4326 = ptsgdb.to_crs({'init': 'epsg:4326'})
+    xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
+    coords = list(map(list, zip(*xy)))
+    
+    with rasterio.open(ras_in, 'r') as comp:
+        comp.np = comp.read(3)
+        ptsgdb['B3'] = [sample[2] for sample in comp.sample(coords)]     
+
+    pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'seg_join6.csv'), sep=',', index=True)
+    return ptsgdb
+
+
+#ras_in = 'D:/NasaProject/Paraguay/CropMapsComparison/GCEP30/LGRIP30_2015_S30W60_001_2023014175240_8858.tif'
+#ras_in = 'D:/NasaProject/JordanConeLC_AOI_Py/mosaic2018_8858.tif'
+#ras_in = 'D:/NasaProject/Paraguay/Potapov_soy/SouthAmerica_Soybean_2021_8858.tif'
+ras_in = 'D:/NasaProject/SegmentationResults_Edges3/SegmentLayers.tif'
+#samp_pts = 'D:/NasaProject/Paraguay/sampling/samplePts_FINALdfs/AllPts_Mar2023.csv'
+samp_pts = 'D:/NasaProject/Paraguay/ClassificationModels/RF/seg_join5.csv'
+out_dir = 'D:/NasaProject/Paraguay/ClassificationModels/RF'
+GetVariablesAtPts_external(out_dir, ras_in, samp_pts)
+
+# +
+# %matplotlib inline
+from shapely.geometry import Point
+from geopandas import datasets, GeoDataFrame, read_file
+
+polydf = read_file('D:/NasaProject/SegmentationResults_Edges2/SegPred_ftp8020_NASA.gpkg')
+ptsdf = pd.read_csv('D:/NasaProject/Paraguay/sampling/samplePts_FINALdfs/AllPts_Mar2023.csv', index_col=0)
+ptsgdb = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs='epsg:8858')
+#pts4326 = ptsgdb.to_crs({'init': 'epsg:4326'})
+#join_left_df = pts4326.sjoin(polydf, how="left")        
+polySamp = polydf.sjoin(ptsgdb, how="left")  
+
+# -
+
+polySamp2 = polySamp.dropna(subset=['index_right'])
+print(polySamp2)
+
+polySamp2.to_file('D:/NasaProject/SegmentationResults_Edges2/polysJoined.gpkg',driver='GPKG')
+
+

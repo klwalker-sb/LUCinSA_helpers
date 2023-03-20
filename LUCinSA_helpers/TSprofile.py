@@ -300,8 +300,8 @@ def GetImgDate(img, imageType, data_source=None):
         MM = int(YYYYMMDD[4:6])
         DD = int(YYYYMMDD[6:8])
    
-    ymd = datetime.datetime(YYYY, MM, DD)
-    doy = int(ymd.strftime('%j'))
+        ymd = datetime.datetime(YYYY, MM, DD)
+        doy = int(ymd.strftime('%j'))
     
     return YYYY, doy
 
