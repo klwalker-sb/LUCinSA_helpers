@@ -1,0 +1,22 @@
+#!/bin/bash
+
+#SBATCH -N 1 # number of nodes
+#SBATCH -n 1 # number of cores
+#SBATCH -t 0-08:00 # time (D-HH:MM)
+#SBATCH -p basic
+#SBATCH -o stac_checkDls.%N.%a.%j.out # STDOUT
+#SBATCH -e stac_checkDls.%N.%a.%j.err # STDERR
+#SBATCH --job-name="checkDls"
+
+#Settables:
+
+DBPATH="/home/downspout-cel/paraguay_lc/cell_processing_dl.csv"
+ARCHIVE='/home/klwalker/archive/eostac_logs'
+IGNORE=('2022-11-01,2022-12-31')
+
+#Activate the virtual environment (which relys on anaconda)
+#source ~/.nasaenv/bin/activate
+
+python CheckLogFiles_dl.py $DBPATH $ARCHIVE $IGNORE
+
+deactivate
