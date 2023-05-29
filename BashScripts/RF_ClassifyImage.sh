@@ -34,6 +34,6 @@ CLASSIMG="/raid-cel/r/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}/comp/0
 # activate the virtual environment
 conda activate venv.lucinsa38_dl
 
-python RF2_ClassifyImage.py $INDIR $VARS $BANDS $VARDF $CLASS $IMPMETH $OUTDIR $OUTIMG $CLASSIMG
+python rf2_classify_image.py $INDIR $VARS $BANDS $VARDF $CLASS $IMPMETH $OUTDIR $OUTIMG $CLASSIMG
 
 conda deactivate

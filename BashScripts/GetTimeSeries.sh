@@ -35,6 +35,6 @@ PTFILE="/home/sandbox-cel/chile_lc/vector/sampleData/Arauco1A_Natural2014.csv"
 # activate the virtual environment
 source ~/.nasaenv/bin/activate
 
-LUCinSA_helpers GetTimeSeries --out_dir ${OUT_DIR} --spec_index ${SPEC_INDEX} --StartYr $STARTYR  --EndYr $ENDYR --img_dir ${IMGDIR} --imageType $IMGTYPE --gridFile ${GRIDFILE} --cellList ${CELLLIST} --groundPolys ${GROUNDPOLYS} --oldest $OLDEST --newest $NEWEST --npts $NPTS --seed $SEED --loadSamp $LOADSAMP --ptFile ${PTFILE}
+LUCinSA_helpers get_time_series --out_dir ${OUT_DIR} --spec_index ${SPEC_INDEX} --start_yr $STARTYR  --end_yr $ENDYR --img_dir ${IMGDIR} --image_type $IMGTYPE --grid_file ${GRIDFILE} --cell_list ${CELLLIST} --ground_polys ${GROUNDPOLYS} --oldest $OLDEST --newest $NEWEST --npts $NPTS --seed $SEED --load_samp $LOADSAMP --ptfile ${PTFILE}
 
 deactivate

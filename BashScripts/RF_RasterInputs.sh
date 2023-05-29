@@ -32,6 +32,6 @@ BANDS="[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]"
 # activate the virtual environment
 conda activate venv.lucinsa38_dl
 
-LUCinSA_helpers MakeTScomposite --gridCell $GRID_ID  --img_dir $IMGDIR --out_dir $OUT_DIR --StartYr $STARTYR --spec_index $SPEC_INDEX --BandsOut $BANDS
+LUCinSA_helpers make_ts_composite --grid_cell $GRID_ID  --img_dir $IMGDIR --out_dir $OUT_DIR --start_yr $STARTYR --spec_index $SPEC_INDEX --bands_out $BANDS
 
 deactivate

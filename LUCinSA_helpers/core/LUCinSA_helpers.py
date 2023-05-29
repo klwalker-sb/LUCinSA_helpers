@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import argparse
-from LUCinSA_helpers.TSprofile import GetTimeSeriesForPts_MultiCell
-from LUCinSA_helpers.TScomposite import MakeTSComposite
-from LUCinSA_helpers.FileChecks import checkValidPixels
+from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
+from LUCinSA_helpers.ts_composite import make_ts_composite
+from LUCinSA_helpers.file_checks import check_valid_pixels
 from LUCinSA_helpers.version import __version__
 
 
@@ -24,7 +24,7 @@ def main():
 
     subparsers = parser.add_subparsers(dest='process')
 
-    available_processes = ['version', 'GetTimeSeries', 'MakeTScomposite', 'checkProcessing']
+    available_processes = ['version', 'get_time_series', 'make_ts_composite', 'check_processing']
 
     for process in available_processes:
         subparser = subparsers.add_parser(process)
@@ -32,74 +32,74 @@ def main():
         if process == 'version':
             continue
 
-        if process == 'checkProcessing':
+        if process == 'check_processing':
             subparser.add_argument('--raw_dir', dest ='raw_dir', help='directory containing downloaded images')
             subparser.add_argument('--brdf_dir', dest ='brdf_dir', help='directory containing brdf images')
-            subparser.add_argument('--gridCell', dest ='gridCell', help='cell to process')
-            subparser.add_argument('--imageType', dest ='imageType', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
-            subparser.add_argument('--Yrs', dest ='Yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
-            subparser.add_argument('--dataSource', dest ='dataSource', help='stac or GEE', default='stac')
+            subparser.add_argument('--grid_cell', dest ='grid_cell', help='cell to process')
+            subparser.add_argument('--image_type', dest ='image_type', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
+            subparser.add_argument('--yrs', dest ='yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
+            subparser.add_argument('--data_source', dest ='data_source', help='stac or GEE', default='stac')
 
         else:
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
             subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
-            subparser.add_argument('--StartYr', dest ='StartYr', help='start year', default=2010, type=int)
+            subparser.add_argument('--start_yr', dest ='start_yr', help='start year', default=2010, type=int)
             subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
 
-        if process == 'GetTimeSeries':
-            subparser.add_argument('--EndYr', dest ='EndYr', help='end year', default=2020, type=int)
-            subparser.add_argument('--imageType', dest ='imageType', help='.nc or TS currently supported', default='TS')
-            subparser.add_argument('--gridFile', dest ='gridFile', help='path to grid file')
-            subparser.add_argument('--cellList', dest ='cellList', help='list of cells to process', type=int, nargs='+')
-            subparser.add_argument('--groundPolys', dest='groundPolys',help='path to polygons to sample from; only needed if loadSamp =False')
+        if process == 'get_time_series':
+            subparser.add_argument('--end_yr', dest ='end_yr', help='end year', default=2020, type=int)
+            subparser.add_argument('--image_type', dest ='image_type', help='.nc or TS currently supported', default='TS')
+            subparser.add_argument('--grid_file', dest ='grid_file', help='path to grid file')
+            subparser.add_argument('--cell_list', dest ='cell_list', help='list of cells to process', type=int, nargs='+')
+            subparser.add_argument('--ground_polys', dest='ground_polys',help='path to polygons to sample from; only needed if loadSamp =False')
             subparser.add_argument('--oldest', dest ='oldest', help='if using groundPolys, oldest poly to use', default=2010)
             subparser.add_argument('--newest', dest ='newest', help='if using groundPolys, oldest poly to use', default=2020)
             subparser.add_argument('--npts', dest ='npts', help='if using groundPolys, number of pts per poly to sample', default=2)
             subparser.add_argument('--seed', dest ='seed', help='if using groundPolys, seed for random sampling within', default=888)
-            subparser.add_argument('--loadSamp', dest ='loadSamp',help='whether to load point sample directly instead of sampling from polygons', type=bool, default=True)
-            subparser.add_argument('--ptFile', dest ='ptFile', help='Path to file containing points, if loadSamp=True', default=None)
+            subparser.add_argument('--load_samp', dest ='load_samp',help='whether to load point sample directly instead of sampling from polygons', type=bool, default=True)
+            subparser.add_argument('--pt_file', dest ='pt_file', help='Path to file containing points, if load_samp=True', default=None)
 
-        if process == 'MakeTScomposite':
-            subparser.add_argument('--BandsOut', dest ='BandsOut', help='bands to create. Currently only 3 allowed. Current options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov')
-            subparser.add_argument('--gridCell', dest='gridCell', help='cell being processed')
+        if process == 'make_ts_composite':
+            subparser.add_argument('--bands_out', dest ='bands_out', help='bands to create. Currently only 3 allowed. Current options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov')
+            subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed')
     args = parser.parse_args()
 
     if args.process == 'version':
       print(__version__)
       return
 
-    if args.process == 'GetTimeSeries':
-        GetTimeSeriesForPts_MultiCell(out_dir = args.out_dir,
+    if args.process == 'get_time_series':
+        get_timeseries_for_pts_multicell(out_dir = args.out_dir,
                              spec_index = args.spec_index,
-                             StartYr = args.StartYr,
-                             EndYr = args.EndYr,
+                             start_yr = args.start_yr,
+                             end_yr = args.end_yr,
                              img_dir = args.img_dir,
-                             imageType = args.imageType,
-                             gridFile = args.gridFile,
-                             cellList = args.cellList,
-                             groundPolys = args.groundPolys,
+                             image_type = args.image_type,
+                             grid_file = args.grid_file,
+                             cell_list = args.cell_list,
+                             ground_polys = args.ground_polys,
                              oldest = args.oldest,
                              newest = args.newest,
                              npts = args.npts,
                              seed = args.seed,
-                             loadSamp = args.loadSamp,
-                             ptFile = args.ptFile)
+                             load_samp = args.load_samp,
+                             ptfile = args.ptfile)
 
-    if args.process == 'MakeTScomposite':
-        MakeTSComposite(gridCell = args.gridCell,
+    if args.process == 'make_ts_composite':
+        make_ts_composite(grid_cell = args.grid_cell,
                         img_dir = args.img_dir,
                         out_dir = args.out_dir,
-                        StartYr = args.StartYr,
+                        start_yr = args.start_yr,
                         spec_index = args.spec_index,
-                        BandsOut = args.BandsOut)
+                        bands_out = args.bands_out)
 
-    if args.process == 'checkProcessing':
-        checkValidPixels(raw_dir = args.raw_dir,
+    if args.process == 'check_processing':
+        check_valid_pixels(raw_dir = args.raw_dir,
                          brdf_dir = args.brdf_dir,
-                         gridCell = args.gridCell,
-                         imageType = args.imageType,
-                         Yrs = args.Yrs,
-                         dataSource = args.dataSource)
+                         grid_cell = args.grid_cell,
+                         image_type = args.image_type,
+                         yrs = args.yrs,
+                         data_source = args.data_source)
 
 
 if __name__ == '__main__':

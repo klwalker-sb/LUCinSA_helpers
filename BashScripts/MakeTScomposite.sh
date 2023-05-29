@@ -33,6 +33,6 @@ BANDS="[Min,Max,Amp]"
 # activate the virtual environment
 source ~/.nasaenv/bin/activate
 
-LUCinSA_helpers MakeTScomposite --gridCell $GRID_ID  --img_dir $IMGDIR --out_dir $OUT_DIR --StartYr $STARTYR --spec_index $SPEC_INDEX --BandsOut $BANDS
+LUCinSA_helpers make_ts_composite --grid_cell $GRID_ID  --img_dir $IMGDIR --out_dir $OUT_DIR --start_yr $STARTYR --spec_index $SPEC_INDEX --bands_out $BANDS
 
 deactivate
