@@ -3,13 +3,14 @@
 
 import os
 from pathlib import Path
-#import geowombat as gw
+#import geowombat as gw # doesn't work in Jupyter with older versions  xarray.ufuncs throws error)
 import datetime
 import rasterio as rio
+import numpy as np
 
 def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
     import geowombat as gw
-    
+
     ##bands_out is list, fed to args as string. need to reparse as list:
     if bands_out.startswith('['):
         bands_out = bands_out[1:-1].split(',')
@@ -44,7 +45,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
             print('making max raster')
             mmax.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
             ras_list.append(ras)
-    if 'Min' in bands_out or 'Amp' in bands_out or 'MinDate' in bands_out or 'MinDateCos' in bandsO_out:
+    if 'Min' in bands_out or 'Amp' in bands_out or 'MinDate' in bands_out or 'MinDateCos' in bands_out:
         mmin = src.min(dim='time')
         if 'Min' in bands_out:
             mmin.attrs = attrs
@@ -70,7 +71,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
     if 'Std' in bands_out or 'CV' in bands_out:
         sstd = src.std(dim='time')
         if 'Std' in bands_out:
-            Std.attrs = attrs
+            sstd.attrs = attrs
             ras = os.path.join(out_dir,'Std.tif')
             ras_list.append(ras)
             print('making std raster')
@@ -93,12 +94,12 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
             max_date.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'MaxDateCos' in bands_out:
         max_date_360 = max_date * max_date/360
-        max_date_cos = xr.ufuncs.cos(max_date_360)
+        max_date_cos = np.cos(max_date_360)
         max_date_cos.attrs = attrs
         ras = os.path.join(out_dir,'max_date_cos.tif')
         ras_list.append(ras)
         max_date_cos.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
-    if 'MinDate' in BandsOut or 'MinDateCos' in BandsOut:
+    if 'MinDate' in bands_out or 'MinDateCos' in bands_out:
         min_date = src.idxmin(dim='time',skipna=True)
         if 'MinDate' in bands_out:
             min_date.attrs = attrs
@@ -108,7 +109,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
             min_date.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'MinDateCos' in bands_out:
         min_date_360 = min_date * min_date/360
-        min_date_cos = xr.ufuncs.cos(min_date_360)
+        min_date_cos = np.cos(min_date_360)
         min_date_cos.attrs = attrs
         ras = os.path.join(out_dir,'MinDateCos.tif')
         ras_list.append(ras)

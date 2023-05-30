@@ -21,7 +21,7 @@ from shapely.geometry import Point
 from shapely.geometry import Polygon
 from rasterio.plot import show
 import xarray as xr
-from file_info import get_img_date
+from .file_info import get_img_date
 
 
 def get_coord_at_row_col (img, spec_index, row, col):
