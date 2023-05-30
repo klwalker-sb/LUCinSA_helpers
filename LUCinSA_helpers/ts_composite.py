@@ -17,6 +17,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
         #bands_out = list(map(str, bands_out))
 
     ras_list = []
+    hemis = 'S'  #TODO: make this a parameter
 
     if not os.path.exists(out_dir):
         Path(out_dir).mkdir(parents=True, exist_ok=True)
@@ -29,9 +30,14 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
         if img.endswith('.tif'):
             img_yr = int(img[:4])
             img_doy = int(img[4:7])
-            if img_yr == start_yr:
-                ts_stack.append(os.path.join(img_dir,img))
-                ds_stack.append(img_doy)
+            if hemis == 'S':
+                if (img_yr == start_yr and img_doy >= 182) or (img_yr == (start_yr+1) and img_doy <= 182):
+                    ts_stack.append(os.path.join(img_dir,img))
+                    ds_stack.append(img_doy)
+            elif hemis == 'N':
+                if img_yr == start_yr:
+                    ts_stack.append(os.path.join(img_dir,img))
+                    ds_stack.append(img_doy)
     with gw.open(ts_stack, time_names= ds_stack) as src:
         attrs = src.attrs.copy()
 
@@ -116,7 +122,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
         min_date_cos.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
 
     for img in sorted(os.listdir(img_dir)):
-        if img.startswith(str(start_yr)):
+        if (hemis == 'N' and img.startswith(str(start_yr))) or (hemis == 'S' and img.startswith(str(start_yr+1))):
             if img.endswith('020.tif') and 'Jan' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
             if img.endswith('051.tif') and 'Feb' in bands_out:
@@ -129,6 +135,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
                 ras_list.append(os.path.join(img_dir,img))
             if (img.endswith('171.tif') | img.endswith('172.tif')) and 'Jun' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if img.startswith(str(start_yr)):
             if (img.endswith('201.tif') | img.endswith('202.tif')) and 'Jul' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
             if (img.endswith('232.tif') | img.endswith('233.tif')) and 'Aug' in bands_out:
