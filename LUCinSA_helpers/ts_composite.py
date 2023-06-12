@@ -11,10 +11,11 @@ import numpy as np
 def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
     import geowombat as gw
 
-    ##bands_out is list, fed to args as string. need to reparse as list:
-    if bands_out.startswith('['):
+    ##bands_out shoud be list. If fed via bash script, will be string; need to reparse as list:
+    if isinstance(bands_out, list):
+        bands_out == bands_out
+    elif bands_out.startswith('['):
         bands_out = bands_out[1:-1].split(',')
-        #bands_out = list(map(str, bands_out))
 
     ras_list = []
     hemis = 'S'  #TODO: make this a parameter
@@ -177,3 +178,5 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
             for id, layer in enumerate(ras_list, start=1):
                 with rio.open(layer) as src1:
                     dst.write(src1.read(1),id)
+
+    return out_ras

@@ -21,7 +21,7 @@ from shapely.geometry import Point
 from shapely.geometry import Polygon
 from rasterio.plot import show
 import xarray as xr
-from .file_info import get_img_date
+from LUCinSA_helpers.file_info import get_img_date
 
 
 def get_coord_at_row_col (img, spec_index, row, col):
@@ -92,7 +92,7 @@ def get_pts_in_grid (grid_file, grid_cell, ptfile):
     grid_bounds = gpd.GeoDataFrame(gpd.GeoSeries(grid_bbox), columns=['geometry'], crs=crs_grid)
     print(grid_bounds)
 
-    pts_in_grid = gpd.sjoin(pts, grid_bounds, op='within')
+    pts_in_grid = gpd.sjoin(pts, grid_bounds, predicate='within')
     pts_in_grid = pts_in_grid.loc[:,['geometry']]
 
     print("Of the {} ppts, {} are in gridCell {}". format (pts.shape[0], pts_in_grid.shape[0],grid_cell))
@@ -295,7 +295,8 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
 
     xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
     coords = list(map(list, zip(*xy)))
-
+    
+    pt_dict={}
     for img in ts_stack:
         img_date = get_img_date(img, image_type)
         #print('img_date={}'.format(img_date))
@@ -303,7 +304,8 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
         img_name = str(img_date[0])+(f"{img_date[1]:03d}")
         if 'Smooth'in image_type:
             with rio.open(img, 'r') as src:
-                ptsgdb[img_name] = [sample[0] for sample in src.sample(coords)]
+                #ptsgdb[img_name] = [sample[0] for sample in src.sample(coords)]
+                pt_dict[img_name] = [sample[0] for sample in src.sample(coords)]
         elif image_type in ['Sentinel','Landsat','AllRaw']:
             xrimg = xr.open_dataset(img)
             xr_nir = xrimg['nir'].where(xrimg['nir'] < 10000)
@@ -353,11 +355,14 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
 
                 index_val = calculate_raw_index(nir_val, b2_val, spec_index)
                 pt_vals.append(index_val)
-            ptsgdb[img_name] = pt_vals
+            pt_dict[img_name] = pt_vals
 
         else: print ('Currently valid image types are Smooth,Smooth_old,Sentinel,Landsat and AllRaw. You put {}'.format(image_type))
 
+    ptdf = pd.DataFrame.from_dict(pt_dict, orient='columns')
+    ptsgdb = pd.concat([ptsgdb,ptdf], axis=1)                           
     pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
+    print(ptsgdb)
     return ptsgdb
 
 def get_timeseries_for_pts_multicell(out_dir, spec_index, start_yr, end_yr, img_dir, image_type, grid_file, cell_list,
