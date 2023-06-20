@@ -253,18 +253,18 @@ def plot_pts_in_polys(polys, npts, samp_id=1, zoom=200, seed=88):
 
 def calculate_raw_index(nir_val, b2_val, spec_index):
     if spec_index == 'evi2':
-        index_val =  2.5 * ((nir_val - b2_val) / (nir_val + 1.0 + 2.4 * b2_val))
+        index_val =  10000* 2.5 * ((nir_val/10000 - b2_val/10000) / (nir_val/10000 + 1.0 + 2.4 * b2_val/10000))
     elif spec_index == 'ndvi':
-        index_val = (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
+        index_val = 10000* (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
     elif spec_index == 'savi':
         lfactor = .5 #(0-1, 0=very green, 1=very arid. .5 most common. Some use negative vals for arid env)
-        index_val = (1 + lfactor) * ((nir_val - b2_val) / (nir_val + b2_val + lfactor))
+        index_val = 10000* (1 + lfactor) * ((nir_val - b2_val) / (nir_val + b2_val + lfactor))
     elif spec_index == 'msavi':
-        index_val =  1/2 * (2 * nir_val + 1) - ((2 * nir_val + 1)**2 - 8*(nir_val - b2_val))**1/2
+        index_val =  5000 * (2 * nir_val/10000 + 1) - ((2 * nir_val/10000 + 1)**2 - 8*(nir_val/10000 - b2_val/10000))**1/2
     elif spec_index == 'ndmi':
-        index_val = (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
+        index_val = 10000* (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
     elif spec_index == 'ndwi':
-        index_val = (b2_val - nir_val) / ((b2_val + nir_val) + 1e-9)
+        index_val = 10000* (b2_val - nir_val) / ((b2_val + nir_val) + 1e-9)
     elif spec_index == 'nir':
         index_val = nir_val
     elif spec_index in ['swir1','swir2','red','green']:

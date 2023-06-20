@@ -3,7 +3,7 @@
 
 import os
 from pathlib import Path
-#import geowombat as gw # doesn't work in Jupyter with older versions  xarray.ufuncs throws error)
+#import geowombat as gw
 import datetime
 import rasterio as rio
 import numpy as np

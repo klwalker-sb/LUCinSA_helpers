@@ -1,13 +1,39 @@
 #!/usr/bin/env python
 # coding: utf-8
-
+import os
+from pathlib import Path
+import datetime
 import matplotlib.pyplot as plt
+import rasterio as rio
 from rasterio import plot
 from rasterio.plot import show
 from rasterio.plot import show_hist
+from rasterio.warp import calculate_default_transform, reproject, Resampling
 import rasterio as rio
 import xarray as xr
 import numpy as np
+import pandas as pd
+import geopandas as gpd
+import pyproj
+from pyproj import Proj, transform
+import geowombat as gw
+import xarray
+#import rioxarray
+#from shapely.geometry import box
+#from shapely.geometry import shape
+#from shapely.geometry import MultiPoint
+#from shapely.geometry import Point
+#from shapely.geometry import Polygon
+from ipywidgets import Label
+from ipyleaflet  import Map, GeoData, basemaps, LayersControl, ImageOverlay, Marker
+from localtileserver import get_leaflet_tile_layer, TileClient
+#from rio_cogeo.cogeo import cog_translate
+#from rio_cogeo.profiles import cog_profiles
+
+#pyver = float((sys.version)[:3])
+#if pyver >= 3.8:
+#    import geemap   ##Note geemap doesn't work with Python 3.6 which is native on cluster, but works in a conda envt
+
 
 ### For visualizing index image (Process check 1)
 def explore_band(img, band):
@@ -110,3 +136,189 @@ def get_rbg_img(image, gamma):
     rgb = np.dstack([red_n, green_n, blue_n])
     
     return rgb
+
+def get_coords(**kwargs):
+    '''
+    Note: if selected_coords in initialized on same cell, this will add results, but cannot pass list
+    '''
+    if kwargs.get('type') == 'click':
+        label = Label()
+        label.value = str(kwargs.get('coordinates'))
+        coords =eval(label.value) 
+        selected_coords.append(coords)
+        print(selected_coords)
+        return selected_coords
+    
+def convert_and_print_coord_list(coord_list,img_crs, out_dir):
+    ### Convert list of coordinates back to original CRS and print to file:
+    coord_listX = []
+    coord_listY = []
+    transformer = pyproj.Transformer.from_crs("epsg:4326", img_crs )
+    for pt in transformer.itransform(coord_list): 
+        print('{:.3f} {:.3f}'.format(pt[0],pt[1]))
+        coord_listX.append(pt[0])
+        coord_listY.append(pt[1])
+        coords = {'XCoord':coord_listX,'YCoord':coord_listY}
+    coorddb = pd.DataFrame(coords)
+    coorddb = coorddb.astype({'XCoord':'float','YCoord':'float'})
+    coord_path = os.path.join(out_dir,'SelectedCoords.csv')
+    coorddb.to_csv(coord_path, sep=',', na_rep='NaN', index=True)
+    return coord_path
+
+def get_values_at_coords(coord_list, coord_crs, img, bands):
+    
+    ptsval = {}
+    if isinstance(coord_list, pd.DataFrame):
+        ptsdf = coord_list
+    else:
+        ptsdf = pd.read_csv(coord_list)
+
+    pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=coord_crs)
+    xy = [pts['geometry'].x, pts['geometry'].y]
+    coords = list(map(list, zip(*xy)))
+    
+    #if 'Smooth' in image_type:
+    if img.endswith('.tif'):
+        #img_name = os.path.basename(img)[:7]
+        with rio.open(img, 'r') as src:
+            for b in bands:
+                ptsval[b] = [sample[b-1] for sample in src.sample(coords)]
+
+    #elif 'Sentinel' in image_type or 'Landsat' in image_type or image_type == 'AllRaw':
+    elif img.endswith('.nc'): 
+        #YYYY, doy = get_img_date(img, image_type, data_source=None)
+        #img_name = str(YYYY)+str(doy)
+        xrimg = xr.open_dataset(img)
+        for b in bands:
+            xr_val = xrimg[b.where(xrimg[b] < 10000)]
+
+            vals=[]
+            for index, row in pts.iterrows():
+                thispt_val = xr_val.sel(x=pts['geometry'].x[index],y=pts['geometry'].y[index], method='nearest', tolerance=30)
+                this_val = thispt_val.values
+                vals.append(this_val)
+                ptsval[b] = vals
+    
+    return ptsval
+
+def add_shpfile_overlay(shp, ptfile, inputCRS, polyfile=None):
+    ### TO Add A shapefile to map (optional):
+    if shp != None:
+        if shp == 'point':
+            if ptfile.endswith('.txt'):
+                ptsdf = pd.read_table(ptfile, index_col=0, sep=",")
+                shps = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=inputCRS)
+            elif ptfile.endswith('.csv'):
+                ptsdf = pd.read_csv(ptfile, index_col=0)
+                shps = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=inputCRS)
+            else:
+                shps = gpd.read_file(ptfile)
+        elif shp == 'poly':
+            shps = gpd.read_file(polyfile)
+        shps_ll = shps.to_crs("EPSG:4326")
+        viewshp = GeoData(geo_dataframe = shps_ll)
+    return viewshp
+
+def img_to_cog(img_path, cog_path):
+    from rio_cogeo.cogeo import cog_translate
+    from rio_cogeo.profiles import cog_profiles
+    
+    img_cog = (os.path.join(cog_path,'COG.tif'))
+    cog_translate(img_path, cog_path, cog_profiles.get("deflate"))
+    
+def reproject_to_ll(img, out_dir):
+    '''
+    tanslates .tif images from native resolution to lat-lon
+    if image is .nc, first convert to .tif with nc_to_tif, then run this on the .tif
+    '''
+    target_crs = 'epsg:4326' # Global lat-lon coordinate system (ipyleaflet only uses lat lon)
+    img_ll = os.path.join(out_dir,'temp_img_ll.tif')
+    with rio.open(img) as src:
+        if src.crs == target_crs:
+            print('image is already in latlon')
+            img_ll = img
+        else:
+            print('original image is in {}, translating to lat_lon...'.format(src.crs))
+            kwargs=src.meta.copy()
+            transform, width, height = calculate_default_transform(src.crs, target_crs, src.width, src.height, *src.bounds)
+            kwargs.update({'crs': target_crs,'transform': transform,'width': width,'height': height})
+            print(kwargs)
+            with rio.open(img_ll, 'w+', **kwargs) as dst:
+                for i in range(1, src.count + 1):
+                    reproject(
+                        source=rio.band(src, i),
+                        destination=rio.band(dst, i),
+                        src_transform=src.transform,
+                        src_crs=src.crs,
+                        dst_transform=transform,
+                        dst_crs=target_crs,
+                        resampling=Resampling.nearest)
+            print(dst.bounds)
+               
+    return img_ll
+
+def nc_to_tif(img, out_dir):
+    band_names = ['blue', 'green', 'red', 'nir', 'swir1', 'swir2']
+    with gw.open(img, band_names=band_names, chunks={'band': -1, 'y': 512, 'x': 512}, engine='h5netcdf') as src:
+        tif_out = ((src.chunk({'y': 512,'x': 512})).assign_attrs(**src.attrs))
+        temp_file = os.path.join(out_dir,'temp_img_tif.tif')
+        if Path(temp_file).is_file():
+            Path(temp_file).unlink()
+        tif_out.gw.save(temp_file, overwrite=True)
+    
+    return temp_file
+    
+def get_img_center(img,out_dir=None):
+    '''
+    returns lat-lon coordinates of image center point for .tif or .nc images
+    '''
+    target_crs = 'epsg:4326'
+    if img.endswith('.tif'):
+        with rio.open(img) as src:
+            if src.crs != target_crs:
+                print('image is in {}...projecting to latlon'.format(src.crs))
+                img = translate_image(img, out_dir)
+            else:
+                print('image is now in {}'.format(src.crs))
+            img_centerT = src.xy(src.height // 2, src.width // 2)
+            img_center = [img_centerT[1],img_centerT[0]]
+            sw = [src.bounds[1],src.bounds[0]]
+            ne = [src.bounds[3],src.bounds[2]]
+            img_bounds = [sw, ne]
+            print('Image center is at: {}'.format(img_center))
+            print('SW and NW corners are at: {}'.format(img_bounds))
+    elif img.endswith('.nc'):
+        with xr.open_dataset(img) as xrimg:
+            crs_to_latlon = pyproj.Transformer.from_crs(xrimg.crs, target_crs, always_xy=True)
+            lonB, latB = crs_to_latlon.transform([xrimg.x.min(), xrimg.x.max()],[xrimg.y.min(), xrimg.y.max()])
+            img_bounds = [(latB[0],lonB[0]),(latB[1],lonB[1])]
+            img_center = (latB[0]+((latB[1]-latB[0])/2), lonB[0]+((lonB[1]-lonB[0])/2))
+    else:
+        print('only set up to read .tif and .nc files at the moment')
+    
+    return img_center
+            
+def show_interactive_img(img, open_port, out_dir=None):
+    '''
+    Note: these steps work, but does not work when passed through method -- need to enter lines directly in cell
+    '''
+    if img.endswith('.tif'):
+        tile_client = TileClient(img,port=open_port)
+        cent = tile_client.center()
+    elif img.endswith('nc'):
+        cent = get_img_center(img, out_dir)
+        img_disp = nc_to_tif(img, out_dir)
+        #img_ll = reproject_to_ll(img_disp,out_dir) #not needed anymore
+        tile_client = TileClient(img_disp,port=open_port)
+    else:
+        print('need to add this filetype to the show_interactive_img method')
+    
+    #if numbands == 3: #TODO: get this from image, not parameter
+    #img_ll = translate_image(img_disp)
+    #img_center = get_img_center(img_ll)
+    ## note: ipleaflet will now find center directly and reproject on the fly for .tifs
+    m = Map(center=cent, zoom=12, basemap=basemaps.Esri.WorldImagery)
+    t = get_leaflet_tile_layer(tile_client, band=[1,2,3])
+    #m.add_layer(t)
+
+    return m,t
