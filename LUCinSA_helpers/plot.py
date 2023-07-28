@@ -18,6 +18,8 @@ import pyproj
 from pyproj import Proj, transform
 import geowombat as gw
 import xarray
+from IPython.display import Image
+from PIL import Image as PILImage
 #import rioxarray
 #from shapely.geometry import box
 #from shapely.geometry import shape
@@ -150,17 +152,19 @@ def get_coords(**kwargs):
         return selected_coords
     
 def convert_and_print_coord_list(coord_list,img_crs, out_dir):
+    coord_list_lat = [c[1] for c in coord_list]
+    coord_list_lon = [c[0] for c in coord_list]
     ### Convert list of coordinates back to original CRS and print to file:
     coord_listX = []
     coord_listY = []
-    transformer = pyproj.Transformer.from_crs("epsg:4326", img_crs )
-    for pt in transformer.itransform(coord_list): 
+    transformer = pyproj.Transformer.from_crs("epsg:4326", img_crs)
+    for pt in transformer.itransform(coord_list):
         print('{:.3f} {:.3f}'.format(pt[0],pt[1]))
         coord_listX.append(pt[0])
         coord_listY.append(pt[1])
-        coords = {'XCoord':coord_listX,'YCoord':coord_listY}
+        coords = {'XCoord':coord_listX,'YCoord':coord_listY, 'lat':coord_list_lat,'lon':coord_list_lon}
     coorddb = pd.DataFrame(coords)
-    coorddb = coorddb.astype({'XCoord':'float','YCoord':'float'})
+    coorddb = coorddb.astype({'XCoord':'float','YCoord':'float', 'lat':'float', 'lon':'float'})
     coord_path = os.path.join(out_dir,'SelectedCoords.csv')
     coorddb.to_csv(coord_path, sep=',', na_rep='NaN', index=True)
     return coord_path
@@ -322,3 +326,54 @@ def show_interactive_img(img, open_port, out_dir=None):
     #m.add_layer(t)
 
     return m,t
+
+def make_thumbnails(img_dir,thumbnail_dir,gamma,reduct_factor=10):
+    if not os.path.exists(thumbnail_dir):
+        os.makedirs(thumbnail_dir)
+    imgs = [f for f in os.listdir(img_dir) if f.endswith(tuple(['.nc','.tif']))]
+    for i, img in enumerate(imgs):
+        imgi = get_rbg_img(os.path.join(img_dir,img),gamma)
+        imgis = imgi[::reduct_factor, ::reduct_factor]
+        fig = plt.figure(figsize=(20,20),dpi=80)
+        plt.imsave(os.path.join(thumbnail_dir,"{}.png".format(img)), imgis)
+        plt.close(fig)
+        
+def view_thumbnails(img_dir,thumbnail_dir,out_file,gamma,exclude,include,yrs,reduct_factor=10):
+    if not os.path.exists(thumbnail_dir):
+        make_thumbnails(img_dir, thumbnail_dir, gamma, reduct_factor=10)
+    if len(os.listdir(thumbnail_dir)) == 0:
+        make_thumbnails(img_dir, thumbnail_dir, gamma, reduct_factor=10)
+    if exclude:
+        to_view = [f for f in os.listdir(thumbnail_dir) if f.endswith('.png') and exclude not in f]   
+    if include:
+        to_view = [f for f in os.listdir(thumbnail_dir) if f.endswith('.png') and include in f]
+    else:
+        to_view = [f for f in os.listdir(thumbnail_dir) if f.endswith('.png')]
+    if yrs:
+    #if len(yrs) > 0:
+        images = [f for f in to_view if f.split('_')[3].startswith(yrs)]
+    else:
+        images = to_view
+        
+    columns = 10
+    space=1
+    rows = len(images) // columns
+    if len(images) % columns:
+        rows += 1
+    width_max = max([PILImage.open(os.path.join(thumbnail_dir,image)).width for image in images])
+    height_max = max([PILImage.open(os.path.join(thumbnail_dir,image)).height for image in images])
+    background_width = width_max*columns + (space*columns)-space
+    background_height = height_max*rows + (space*rows)-space
+    background = PILImage.new('RGBA', (background_width, background_height), (255, 255, 255, 255))
+    x = 0
+    y = 0
+    for i, image in enumerate(images):
+        img = PILImage.open(os.path.join(thumbnail_dir,image))
+        x_offset = int((width_max-img.width)/2)
+        y_offset = int((height_max-img.height)/2)
+        background.paste(img, (x+x_offset, y+y_offset))
+        x += width_max + space
+        if (i+1) % columns == 0:
+            y += height_max + space
+            x = 0
+    background.save(out_file)

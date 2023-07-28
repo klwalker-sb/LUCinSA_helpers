@@ -86,7 +86,10 @@ def get_pts_in_grid (grid_file, grid_cell, ptfile):
     ptsdf = pd.read_csv(ptfile, index_col=0)
     pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=crs_grid)
 
-    bb = df.query(f'UNQ == {grid_cell}').geometry.total_bounds
+    if df.shape[0] > 1:
+        bb = df.query(f'UNQ == {grid_cell}').geometry.total_bounds
+    else:
+        bb = df.geometry.total_bounds
 
     grid_bbox = box(bb[0],bb[1],bb[2],bb[3])
     grid_bounds = gpd.GeoDataFrame(gpd.GeoSeries(grid_bbox), columns=['geometry'], crs=crs_grid)

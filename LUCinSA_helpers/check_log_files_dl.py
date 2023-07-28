@@ -182,31 +182,31 @@ def archive_logfile(logfile,cell_dict,archive_path):
     elif len(cell_dict[cell_id]['dl_fix_now']) == 0:
         shutil.move(f'./{logfile}', archive_path)
 
-## get the existing cell database as a dictionary
-if Path(cell_db_path).is_file():
-    cell_dict = pd.read_csv(Path(cell_db_path),index_col=[0]).to_dict(orient='index')
-else:
-    cell_dict = {}
-## update records based on curent logfiles
-cell_batch = set([])
-logfiles = [f for f in os.listdir('.') if f.startswith('stacdl')and f.endswith('.err')]
-for logfile in logfiles:
-    processed = check_logfile_dl(logfile, cell_dict, ignore_dates)
-    cell_batch.add(processed[0])
-## These output files contain no information; can just remove
-outfiles = [f for f in os.listdir('.') if f.startswith('stacdl')and f.endswith('.out')]
-for outfile in outfiles:
-    os.remove(outfile)
-## Archive logfiles after running all because errors in some may be removed by subsequent files
-for logfile in logfiles:
-    archive_logfile(logfile,cell_dict,archive_path)
-## Save full updated database
-new_processing_info = pd.DataFrame.from_dict(cell_dict,orient='index')
-new_processing_info.rename_axis('cell_id', axis=1, inplace=True)
-pd.DataFrame.to_csv(new_processing_info, cell_db_path, index='cell_id')
-## Print just the current batch of cells to logfile for easy error checking
-print(f'all cells prcessed in this batch:{cell_batch}')
-batch_status = new_processing_info[new_processing_info.index.isin(cell_batch)].sort_index()
-pd.set_option("max_columns", None)
-pd.set_option('display.max_rows', 500)
-print(batch_status)
+    ## get the existing cell database as a dictionary
+    if Path(cell_db_path).is_file():
+        cell_dict = pd.read_csv(Path(cell_db_path),index_col=[0]).to_dict(orient='index')
+    else:
+        cell_dict = {}
+    ## update records based on curent logfiles
+    cell_batch = set([])
+    logfiles = [f for f in os.listdir('.') if f.startswith('stacdl')and f.endswith('.err')]
+    for logfile in logfiles:
+        processed = check_logfile_dl(logfile, cell_dict, ignore_dates)
+        cell_batch.add(processed[0])
+    ## These output files contain no information; can just remove
+    outfiles = [f for f in os.listdir('.') if f.startswith('stacdl')and f.endswith('.out')]
+    for outfile in outfiles:
+        os.remove(outfile)
+    ## Archive logfiles after running all because errors in some may be removed by subsequent files
+    for logfile in logfiles:
+        archive_logfile(logfile,cell_dict,archive_path)
+    ## Save full updated database
+    new_processing_info = pd.DataFrame.from_dict(cell_dict,orient='index')
+    new_processing_info.rename_axis('cell_id', axis=1, inplace=True)
+    pd.DataFrame.to_csv(new_processing_info, cell_db_path, index='cell_id')
+    ## Print just the current batch of cells to logfile for easy error checking
+    print(f'all cells prcessed in this batch:{cell_batch}')
+    batch_status = new_processing_info[new_processing_info.index.isin(cell_batch)].sort_index()
+    pd.set_option("max_columns", None)
+    pd.set_option('display.max_rows', 500)
+    print(batch_status)
