@@ -16,13 +16,12 @@ GRID_ID="$(($SLURM_ARRAY_TASK_ID + 3000))"
 COUNTRY='paraguay'
 VIs=("evi2" "gcvi" "wi" "kndvi" "nbr" "ndmi") 
 #VIs=("evi2") 
-#Note VI is a folder in the IMGDIR containing the time series images
-#IMGDIR="/raid-cel/r/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}/brdf_ts/ms/${SPEC_INDEX}"
+## Note VI is a folder in the IMGDIR containing the time series images
 STARTYR=2021
 
-##For archive:
+## For archive:
 OUT_DIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}/comp"
-##For bulk export (for digitizing project TODO: link straight to Google Drive):
+## For bulk export (for digitizing project TODO: link straight to Google Drive):
 #OUT_DIR="/raid-cel/sandbox/sandbox-cel/${COUNTRY}_lc/TO_EXPORT/000${GRID_ID}"
 
 #BANDS="[Min,Max,Amp]"
@@ -31,8 +30,8 @@ OUT_DIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}/comp"
 BANDS="[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]"
 # ####################################################
 
-# activate the virtual environment
-conda activate venv.lucinsa38_test3
+## activate the virtual environment
+conda activate venv.lucinla38_pipe
 
 for VI in "${VIs[@]}"
 do
