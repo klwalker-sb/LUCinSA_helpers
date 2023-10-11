@@ -162,15 +162,15 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
             
         # Read each layer and write it to stack
         
-        if len(bands_out)>12:
+        if len(ras_list)>12:
             out_ras = os.path.join(out_dir,'{:06d}'.format(int(grid_cell))+'_'+str(start_yr)+spec_index+'_RFVars.tif')
-        if len(bands_out)==12:
+        elif len(ras_list)==12:
             out_ras = os.path.join(out_dir,'{:06d}'.format(int(grid_cell))+'_'+str(start_yr)+spec_index+'_monthly.tif')
-        elif len(bands_out)==4:
+        elif len(ras_list)==4:
             out_ras = os.path.join(out_dir,'{:06d}'.format(int(grid_cell))+'_'+str(start_yr)+spec_index+'_'+ bands_out[0]+bands_out[1]+bands_out[2]+bands_out[3]+'.tif')
-        elif len(bands_out)==2:
+        elif len(ras_list)==2:
             out_ras = os.path.join(out_dir,'{:06d}'.format(int(grid_cell))+'_'+str(start_yr)+spec_index+'_'+bands_out[0]+bands_out[1]+'.tif')
-        elif len(bands_out)==1:
+        elif len(ras_list)==1:
             out_ras = os.path.join(out_dir,'{:06d}'.format(int(grid_cell))+'_'+str(start_yr)+spec_index+'_'+bands_out[0]+'.tif')
         else:
             out_ras = os.path.join(out_dir,'{:06d}'.format(int(grid_cell))+'_'+str(start_yr)+spec_index+'_'+ bands_out[0]+bands_out[1]+bands_out[2]+'.tif') 

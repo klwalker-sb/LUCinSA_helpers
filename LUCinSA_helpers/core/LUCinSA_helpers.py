@@ -3,13 +3,12 @@ import argparse
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite
 from LUCinSA_helpers.file_checks import check_valid_pixels
+from LUCinSA_helpers.rf import rf_model, rf_classification
 from LUCinSA_helpers.version import __version__
-
 
 def main():
 
     ##Setup to parse lists from Bash script (need to enter as string in Bash)
-    ## NOTE: THIS IS PROBABLY NOT NEEDED ANYMORE
     def check_for_list(arg_input):
         if arg_input.startswith('['):
             arg_input = arg_input[1:-1].split(',')
@@ -24,7 +23,7 @@ def main():
 
     subparsers = parser.add_subparsers(dest='process')
 
-    available_processes = ['version', 'get_time_series', 'make_ts_composite', 'check_processing']
+    available_processes = ['version', 'get_time_series', 'make_ts_composite', 'check_processing', 'rf_model', 'rf_classification']
 
     for process in available_processes:
         subparser = subparsers.add_parser(process)
@@ -62,6 +61,21 @@ def main():
         if process == 'make_ts_composite':
             subparser.add_argument('--bands_out', dest ='bands_out', help='bands to create. Currently only 3 allowed. Current options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov')
             subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed')
+            
+        if process == 'rf_model' or process == 'rf_classification': 
+            subparser.add_argument('--df_in', dest ='df_in', help='path to sample dataframe with extracted variable data')
+            subparser.add_argument('--classification', dest ='classification', help='Permultation | Inference | None')
+            subparser.add_argument('--importance_method', dest ='importance_method', help="All(=LC17),...", default='All')
+            subparser.add_argument('--ran_hold', dest ='ran_hold', help='fixed random number, for repetition of same dataset', type=int, default=29)
+            subparser.add_argument('--model_name', dest ='model_name', help='name of model')
+                                  
+        if process == 'rf_classification':
+            subparser.add_argument('--in_dir', dest='in_dir',help='path to time series variables')
+            subparser.add_argument('--rf_mod', dest='rf_mod',help='path to existing random forest model, or None if model is to be created')
+            subparser.add_argument('--img_out', dest='img_out',help='Full path name of classified image to be created')
+            subparser.add_argument('--spec_indices', dest ='spec_indices', help='bands to create. Currently hardcoded as Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov')
+            subparser.add_argument('--stats', dest ='stats', help='currently = [evi2,gcv,wi,kndvi,nbr,ndmi]')
+
     args = parser.parse_args()
 
     if args.process == 'version':
@@ -100,8 +114,27 @@ def main():
                          image_type = args.image_type,
                          yrs = args.yrs,
                          data_source = args.data_source)
-
-
+    
+    if args.process == 'rf_model':
+        rf_model(df_in = args.df_in, 
+                 out_dir = args.out_dir,
+                 classification = args.classification,
+                 importance_method = args.importance_method,
+                 ran_hold = args.ran_hold,
+                 model_name = args.model_name)
+                                   
+    if args.process == 'rf_classification':
+        rf_classification(in_dir = args.in_dir,
+                 df_in = args.df_in,
+                 spec_indices = args.spec_indices,
+                 stats = args.stats,
+                 model_name = args.model_name,
+                 rf_mod = args.rf_mod,
+                 img_out = args.img_out,
+                 classification = args.classification,
+                 importance_method = args.importance_method,
+                 ran_hold = args.ran_hold,
+                 out_dir = args.out_dir)
+                         
 if __name__ == '__main__':
     main()
-

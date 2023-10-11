@@ -130,7 +130,7 @@ def get_polygons_in_grid (grid_file, grid_cell, poly_path, oldest=2018, newest=2
     grid_bounds = gpd.GeoDataFrame(gpd.GeoSeries(grid_bbox), columns=['geometry'], crs=crs_grid)
     polys_in_grid = gpd.overlay(grid_bounds, polys, how='intersection')
 
-    print("Of the {} polygons, {} are in gridCell {}". format (polys.shape[0], polys_in_grid.shape[0],grid_cell))
+    print("Of the {} polygons, {} are in grid_cell {}". format (polys.shape[0], polys_in_grid.shape[0],grid_cell))
 
     ##Filter out polygons that were observed before year set as 'oldest' or after year set as 'newest'
     if oldest > 0:
@@ -141,7 +141,7 @@ def get_polygons_in_grid (grid_file, grid_cell, poly_path, oldest=2018, newest=2
 
     #Write to geojson file
     if polys_in_grid.shape[0] > 0:
-        poly_clip = Path(os.path.join(out_path,'polysGrid_'+str(gridCell)+'.json'))
+        poly_clip = Path(os.path.join(out_path,'polysGrid_'+str(grid_cell)+'.json'))
         polys_in_grid.to_file(poly_clip, driver="GeoJSON")
 
         return poly_clip
@@ -209,7 +209,7 @@ def get_ran_pts_in_polys(polys, npts, seed=88):
             polyobj = shape(poly['geometry'])
             for i in range(0,npts):
                 pt_name = str(poly['properties']['id'])+'_'+str(i+1)
-                pt_in_poly = getRanPtInPoly(polyobj, seed)
+                pt_in_poly = get_ran_pt_in_poly(polyobj, seed)
                 pt_dict[pt_name] = pt_in_poly
 
     ptsdb = pd.DataFrame.from_dict(pt_dict, orient='index')
@@ -268,11 +268,18 @@ def calculate_raw_index(nir_val, b2_val, spec_index):
         index_val = 10000* (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
     elif spec_index == 'ndwi':
         index_val = 10000* (b2_val - nir_val) / ((b2_val + nir_val) + 1e-9)
+    elif spec_index == 'wi':  #note nir_val is actually swir1 here
+        index_v = nir_val + b2_val
+        print(index_v)
+        if index_v > 5000:
+            index_val = 1
+        else:
+            index_val = 10000 * (1.0 - (float(index_v) / 5000.0))
     elif spec_index == 'nir':
         index_val = nir_val
     elif spec_index in ['swir1','swir2','red','green']:
         index_val = b2_val
-
+   
     return index_val
                      
 def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_pts, seed, load_samp=False, ptgdb=None):
@@ -313,13 +320,13 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
             xrimg = xr.open_dataset(img)
             xr_nir = xrimg['nir'].where(xrimg['nir'] < 10000)
             #xr_nir = xrimg['nir'].map({>9999: np.nan, < 10000: xrimg['nir']})
-            if spec_index in ['evi2','msavi','ndvi','savi','red']:
+            if spec_index in ['evi2','msavi','ndvi','savi','wi','kndvi','red']:
                 xr_red = xrimg['red'].where(xrimg['red'] < 10000)
                 #xr_red = xrimg['red'].map({>9999: np.nan, < 10000: xrimg['red']})
-            elif spec_index in ['ndmi','swir1']:
+            if spec_index in ['ndmi','wi','swir1']:
                 xr_swir1 = xrimg['swir1'].where(xrimg['swir1'] < 10000)
                 #xr_swir1 = xrimg['swir1'].map({>9999: np.nan, < 10000: xrimg['swir1']})
-            elif spec_index in ['ndwi','green']:
+            elif spec_index in ['ndwi','gcvi','green']:
                 xr_green = xrimg['green'].where(xrimg['green'] < 10000)
                 #xr_green = xrimg['green'].map({>9999: np.nan, < 10000: xrimg['green']})
             elif spec_index in ['swir2']:
@@ -331,11 +338,16 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
 
             pt_vals = []
             for index, row in ptsgdb.iterrows():
-                thispt_nir = xr_nir.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index],
+                if spec_index == 'wi':  #note thisptnir is actually swir1 here
+                    thispt_nir = xr_swir1.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index],
+                                method='nearest', tolerance=30)
+                else:
+                    thispt_nir = xr_nir.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index],
                                         method='nearest', tolerance=30)
                 nir_val = thispt_nir.values
-
-                if spec_index in ['evi2','msavi','ndvi','savi','red']:
+                
+                    
+                if spec_index in ['evi2','msavi','ndvi','savi','wi','kndvi','red']:
                     thispt_b2 = xr_red.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index],
                                 method='nearest', tolerance=30)
                     b2_val = thispt_b2.values
@@ -343,7 +355,7 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
                     thispt_b2 = xr_swir1.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index],
                                 method='nearest', tolerance=30)
                     b2_val = thispt_b2.values
-                elif spec_index in ['ndwi','green']:
+                elif spec_index in ['ndwi','gcvi','green']:
                     thispt_b2 = xr_green.sel(x=ptsgdb['geometry'].x[index],y=ptsgdb['geometry'].y[index],
                                 method='nearest', tolerance=30)
                     b2_val = thispt_b2.values

@@ -7,3 +7,7 @@ rasterstats
 xarray_leaflet
 netcdf4
 h5netcdf
+
+## For planet composites:
+google-api-python-client
+earthengine-api
