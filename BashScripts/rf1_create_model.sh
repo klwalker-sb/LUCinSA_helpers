@@ -19,6 +19,7 @@ CLASS='All'
 # IMPMETH = 'Impurity' | 'Permutation' | 'None'
 IMPMETH='Impurity'
 VARDF="/home/downspout-cel/paraguay_lc/classification/RF/pixdf_lessSoy.csv"
+LUT="../Class_LUT.csv"
 RANHOLD=29
 MODNAME="ClassifiedLC17_soy20"
 
@@ -31,6 +32,6 @@ conda activate venv.lucinsa38_test3
 #python RF1_create_model.py $VARDF $CLASS $IMPMETH $OUTDIR $RANHOLD $MODNAME
 
 # if running from installed module:
-LUCinSA_helpers rf_model --df_in $VARDF --out_dir $OUTDIR --classification $CLASS --importance_method $IMPMETH --ran_hold $RANHOLD --model_name $MODNAME
+LUCinSA_helpers rf_model --df_in $VARDF --out_dir $OUTDIR --lc_mod $CLASS --importance_method $IMPMETH --ran_hold $RANHOLD --model_name $MODNAME --lut LUT
 
 conda deactivate

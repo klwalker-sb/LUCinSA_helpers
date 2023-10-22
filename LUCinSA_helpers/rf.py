@@ -22,11 +22,63 @@ from joblib import dump, load
 gdal.UseExceptions()
 gdal.AllRegister()
 
+
+def get_class_col(lc_mod):
+    if lc_mod == 'All':
+        class_col = 'LC17'
+    elif lc_mod == "trans_cats":
+        class_col = 'LCTrans'
+    elif lc_mod == 'crop_nocrop':
+        class_col = 'LC2'
+    elif lc_mod == 'crop_nocrop_medcrop':
+        class_col = 'LC3'
+    elif lc_mod == 'crop_nocrop_medcrop_tree':
+        class_col = 'LC4'
+    elif lc_mod == 'veg':
+        class_col = 'LC5'
+    elif lc_mod == 'cropType':
+        class_col = 'LC_crops'
+
+    '''
+    elif lc_mod == 'crop_post':
+        #where prediction == 1...
+        df_train = df_train[df_train['LC2'] == 1]
+        print('there are {} sample points after removing non-crop'.format(df_train.shape[0]))
+        y = df_train['LC_UNQ']
+        #TODO: need two step prediction methods
+    elif lc_mod == 'nocrop_post':
+        df_train = df_train[df_train['LC2'] == 0]
+        print('there are {} sample points after removing crop'.format(df_train.shape[0]))
+        #TODO: need two step prediction methods
+           
+    elif lc_mod in ['HighVeg', 'MedVeg', 'LowVeg', 'NoVeg']:
+        df_train['label'] = 0
+        df_train.loc[df_train['Class1'] == classification,'label'] = 1
+        y = df_train['label']
+    elif 'Crops' in lc_mod or 'Grass' in lc_mod:
+        df_train['label'] = 0
+        if 'Mate' in lc_mod:
+            df_low = df_train[(df_train['Class1'] == 'LowVeg') | (df_train['USE_NAME'] =='Crops-Yerba-Mate')]
+        else:
+            df_low = df_train[df_train['Class1'] == 'LowVeg']
+        print('There are {} LOWVeg records'.format(str(len(df_low))))
+        df_low.loc[df_low['USE_NAME'] == Class,'label'] = 1
+        X = df_low[vars_RF]
+        y = df_low['label']
+    elif lc_mod == 'LowVeg_Lev2':
+        df_low = df_train[df_train['Class1'] == 'LowVeg']
+        X = df_low[rf_vars]
+        y = df_low['USE_NAME']
+    '''
+        
+    return class_col
+        
 def separate_holdout(training_pix_path, out_dir):
     '''
     USE THIS WHEN WE AUGMENT BY POLYGON
     Generates separate pixel databases for training data and 20% field-level holdout
     Use this instead of generate_holdout() to fit a model to an exsisting holdout set
+       to avoid having points from the same polygon in both the training and holdout sets (as this would inflate accuracy)
     '''
     #holdout_set = pd.read_csv(holdout_field_path)
     #pixels = pd.read_csv(training_pix_path)
@@ -50,90 +102,69 @@ def separate_holdout(training_pix_path, out_dir):
     
     return training_pix_path2, holdout_field_pix_path
 
-def quick_accuracy (X_test, y_test, rf_model, classification, out_dir,mod_name):
-    predicted = rf_model.predict(X_test)
-    accuracy = accuracy_score(y_test, predicted)
-    print(f'Out-of-bag score estimate: {rf_model.oob_score_:.3}')
-    print(f'Mean accuracy score: {accuracy:.3}')
-   
-    confusion_matrix = pd.DataFrame()
-    confusion_matrix['observed'] = y_test
-    confusion_matrix['predicted'] = predicted
-    cm=pd.crosstab(confusion_matrix['observed'],confusion_matrix['predicted'],margins=True)
+def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_cm=False, out_dir=None, model_name=None):
+    '''
+    returns confusion matrix with optional regrouping of classes based on LUT 
+    model names and class columns defined in get_class_col
+    '''
     
+    map_cat = get_class_col(lc_mod_map)
+    acc_cat = get_class_col(lc_mod_acc)
+    
+    cmdf = pd.DataFrame()
+    cmdf['obs'] = obs_col
+    cmdf['pred'] = pred_col
+    
+    #print('getting confusion matrix based on {}...'.format(acc_cat))
+    cmdf2 = cmdf.merge(lut[['LC_UNQ','{}_name'.format(acc_cat)]], left_on='obs', right_on='LC_UNQ',how='left')
+    cmdf2.rename(columns={'{}_name'.format(acc_cat):'obs_reclass'}, inplace=True)
+    cmdf2.drop(['LC_UNQ'],axis=1,inplace=True)
+    cmdf3 = cmdf2.merge(lut[['LC_UNQ', '{}_name'.format(acc_cat)]], left_on='pred', right_on='LC_UNQ',how='left')
+    cmdf3.rename(columns={'{}_name'.format(acc_cat):'pred_reclass'}, inplace=True)
+    cmdf3.drop(['LC_UNQ'],axis=1,inplace=True)
+    cm=pd.crosstab(cmdf3['obs_reclass'],cmdf3['pred_reclass'],margins=True)
+        
     cm['correct'] = cm.apply(lambda x: x[x.name] if x.name in cm.columns else 0, axis=1)
     cm['sumcol'] = cm.apply(lambda x: cm.loc['All', x.name] if x.name in cm.columns else 0)
     cm['UA'] = cm['correct']/cm['All']
     cm['PA'] = cm['correct']/cm['sumcol']
+ 
+    '''
+    crops = lut.loc[lut['LC2'] == 1]
+    no_crops = lut.loc[lut['LC2'] == 0]
+    crop_cats = crops[class_col].to_list()
+    crop_cols = [i for i in crop_cats if i in cm.columns]
     
-    if classification == 'All':
-        crop_cats = [31,32,33,34,35,36,37,38,53,55,40]
-        crop_cols = [i for i in crop_cats if i in cm.columns]
-        cm['Crop'] = cm[crop_cols].sum(axis=1)
-        noCrop_cats = [1,2,3,7,12,13,17,51,52,56,60,65,70,80]
-        noCrop_cols = [i for i in noCrop_cats if i in cm.columns]
-        cm['NoCrop'] = cm[noCrop_cols].sum(axis=1)
-        
-    print(f'Confusion Matrix: {cm}')
-    pd.DataFrame.to_csv(cm,os.path.join(out_dir,f'CM_{mod_name}.csv'), sep=',', index=True)
+    cm['Crop'] = cm[crop_cols].sum(axis=1)
+    nocrop_cats = no_crops[class_col].to_list()
+    nocrop_cols = [i for i in nocrop_cats if i in cm.columns]
+    cm['NoCrop'] = cm[nocrop_cols].sum(axis=1)
+    '''
+    #print(f'Confusion Matrix: {cm}')
+    if print_cm == True:
+        pd.DataFrame.to_csv(cm,os.path.join(out_dir,f'CM_{model_name}.csv'), sep=',', index=True)
+    
+    return cm
+
+def quick_accuracy (X_test, y_test, rf_model, lc_mod, out_dir,model_name,lut):
+    
+    predicted = rf_model.predict(X_test)
+    accuracy = accuracy_score(y_test, predicted)
+    print(f'Out-of-bag score estimate: {rf_model.oob_score_:.3}')
+    print(f'Mean accuracy score: {accuracy:.3}')
+    
+    cm = get_confusion_matrix(predicted, y_test,lut, lc_mod, lc_mod, out_dir,model_name,lut)                    
     
     return accuracy, cm
 
-def prep_test_train(df_in, out_dir, classification,mod_name):
+def prep_test_train(df_in, out_dir, class_col, mod_name):
     
     if isinstance(df_in, pd.DataFrame):
         df_in = df_in
     else:
         df_in = pd.read_csv(df_in, index_col=0)
     print('there are {} pts in the full data set'.format(df_in.shape[0]))
-    
-    #df_in = df_in[df_in['SampMethod'] != 'CAN - unverified in GE']
-    #print('there are now {} pts in the training set after dropping CAN soy'.format(len(df_in)))
-    
-    if classification == 'All':
-        class_col = 'LC17'
-    elif classification == 'crop_nocrop':
-        class_col = 'LC2'
-    elif classification == 'crop_nocrop_medcrop':
-        class_col = 'LC3'
-    elif classification == 'crop_nocrop_medcrop_tree':
-        class_col = 'LC4'
-    elif classification == 'veg':
-        class_col = 'LC5'
-    elif classification == 'cropType':
-        class_col = 'LC_crops'
-    '''
-    elif classification == 'crop_post':
-        #where prediction == 1...
-        df_train = df_train[df_train['LC2'] == 1]
-        print('there are {} sample points after removing non-crop'.format(df_train.shape[0]))
-        y = df_train['LC22']
-        #TODO: need two step prediction methods
-    elif classification == 'nocrop_post':
-        df_train = df_train[df_train['LC2'] == 0]
-        print('there are {} sample points after removing crop'.format(df_train.shape[0]))
-        #TODO: need two step prediction methods
-           
-    elif classification in ['HighVeg', 'MedVeg', 'LowVeg', 'NoVeg']:
-        df_train['label'] = 0
-        df_train.loc[df_train['Class1'] == classification,'label'] = 1
-        y = df_train['label']
-    elif 'Crops' in classification or 'Grass' in classification:
-        df_train['label'] = 0
-        if 'Mate' in classification:
-            df_low = df_train[(df_train['Class1'] == 'LowVeg') | (df_train['USE_NAME'] =='Crops-Yerba-Mate')]
-        else:
-            df_low = df_train[df_train['Class1'] == 'LowVeg']
-        print('There are {} LOWVeg records'.format(str(len(df_low))))
-        df_low.loc[df_low['USE_NAME'] == Class,'label'] = 1
-        X = df_low[vars_RF]
-        y = df_low['label']
-    elif classification == 'LowVeg_Lev2':
-        df_low = df_train[df_train['Class1'] == 'LowVeg']
-        X = df_low[rf_vars]
-        y = df_low['USE_NAME']
-    '''
-    
+   
     # remove unknown and other entries where class is not specified a given level (i.e. crop_low if crop type is desired)
     df_in = df_in[df_in[class_col] < 99]
     print('there are {} sample points after removing those without clear class'.format(df_in.shape[0]))
@@ -148,11 +179,13 @@ def prep_test_train(df_in, out_dir, classification,mod_name):
     
     return(training_pix_path, holdout_pix_path)
 
-def multiclass_rf(trainfeatures, out_dir, mod_name, classification, importance_method, ran_hold):
+def multiclass_rf(trainfeatures, out_dir, mod_name, lc_mod, importance_method, ran_hold, lut):
     
     df_train = pd.read_csv(trainfeatures)
     print('There are {} training features'.format(df_train.shape[0]))
-    y = df_train['LC17']
+    
+    class_col = get_class_col(lc_mod)
+    y = df_train[class_col]
            
     vars_rf = [col for col in df_train if col.startswith('var_')]
     X = df_train[vars_rf]
@@ -167,7 +200,7 @@ def multiclass_rf(trainfeatures, out_dir, mod_name, classification, importance_m
     rf = rf.fit(X_train,y_train)
     dump(rf, os.path.join(out_dir,'{}_RFmod.joblib'.format(mod_name)))
 
-    cm = quick_accuracy (X_test, y_test, rf, classification, out_dir,mod_name)
+    cm = quick_accuracy (X_test, y_test, rf, lc_mod, out_dir,mod_name,lut)
 
     if importance_method != None:
         if importance_method == "Impurity":
@@ -181,7 +214,7 @@ def multiclass_rf(trainfeatures, out_dir, mod_name, classification, importance_m
     return rf, cm
 
 
-def get_holdout_scores(holdoutpix, rf_model, out_dir):
+def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir):
     ## Save info for extra columns and drop (model is expecting only variable input columns)
     
     if isinstance(holdoutpix, pd.DataFrame):
@@ -189,8 +222,7 @@ def get_holdout_scores(holdoutpix, rf_model, out_dir):
     else:
         holdout_pix = pd.read_csv(holdoutpix)
         
-    #holdout_labels = holdout_pix['LC17']
-    holdout_labels = holdout_pix['LC17']
+    holdout_labels = holdout_pix[class_col]
     h_IDs = holdout_pix['OID_']
     print('number of holdout pixels = {}'.format(len(holdout_pix)))
     
@@ -337,14 +369,16 @@ def classify_raster(var_stack,rf_path,class_img_out):
     sys.stdout.write('Image saved to: {}'.format(class_img_out))
 
          
-def rf_model(df_in, out_dir, classification, importance_method, ran_hold, model_name):
-    train, ho = prep_test_train(df_in, out_dir, classification, model_name)
-    rf = multiclass_rf(train, out_dir, model_name,classification,importance_method,ran_hold)
-    score = get_holdout_scores(ho, rf[0], out_dir)
+def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut):
+    class_col = get_class_col(lc_mod)
+    print('class_col = {}'.format(class_col))
+    train, ho = prep_test_train(df_in, out_dir, class_col, model_name)
+    rf = multiclass_rf(train, out_dir, model_name, lc_mod, importance_method, ran_hold, lut)
+    score = get_holdout_scores(ho, rf[0], class_col, out_dir)
     
     return rf, score
 
-def rf_classification(in_dir, df_in, spec_indices, stats, model_name, rf_mod, img_out, classification=None, importance_method=None, ran_hold=29, out_dir=None):
+def rf_classification(in_dir, df_in, spec_indices, stats, model_name, rf_mod, img_out, lc_mod=None, importance_method=None, ran_hold=29, out_dir=None):
     spec_indices = ['evi2','gcvi','wi','kndvi','nbr','ndmi']
     stats = ['Max','Min','Amp','Avg','CV','Std','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     var_stack = os.path.join(in_dir,'stack.tif')
@@ -362,5 +396,5 @@ def rf_classification(in_dir, df_in, spec_indices, stats, model_name, rf_mod, im
         classify_raster(var_stack, rf_mod,class_img_out)
     else:
         sys.stdout.write('creating rf model... \n')
-        rf_mod = rf_model(df_in, out_dir, classification, importance_method, ran_hold, model_name)
+        rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name)
         classify_raster(var_stack, rf_mod,class_img_out)
