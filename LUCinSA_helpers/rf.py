@@ -23,7 +23,7 @@ gdal.UseExceptions()
 gdal.AllRegister()
 
 
-def get_class_col(lc_mod):
+def get_class_col(lc_mod,lut):
     if lc_mod == 'All':
         class_col = 'LC17'
     elif lc_mod == "trans_cats":
@@ -38,7 +38,24 @@ def get_class_col(lc_mod):
         class_col = 'LC5'
     elif lc_mod == 'cropType':
         class_col = 'LC_crops'
-
+    elif lc_mod.startswith('single'):
+        lc_base =  lc_mod.split('_')[1].lower()
+        target_class = lut.index[lut['USE_NAME'].map(lambda s: lc_base in s.lower())].to_list()
+        if len(target_class) == 0:
+            print('no match found for {} in lut'.format(lc_base))
+        elif len(target_class) > 1:
+            print ('there are more than one entries with {} in USE_NAME column of lut'.format(lc_base))
+        else:
+            class_col = 'LC1'
+            if class_col not in lut.columns:
+                print('making new virtual {} column in lut'.format(lc_base))
+                lut['LC1'] = 0
+                lut['LC1_name'] = 'no_{}'.format(lc_base)
+                lut.at[target_class[0],'LC1'] = 1
+                lut.at[target_class[0],'LC1_name'] = '{}'.format(lc_base)
+    else:
+        print('current options for lc_mod are All, LCTrans, LC2, LC3, LC4, LC5, LC_crops and single_X with X as any category. You put {}'.format(lc_mod))
+    
     '''
     elif lc_mod == 'crop_post':
         #where prediction == 1...
@@ -71,7 +88,7 @@ def get_class_col(lc_mod):
         y = df_low['USE_NAME']
     '''
         
-    return class_col
+    return class_col,lut
         
 def separate_holdout(training_pix_path, out_dir):
     '''
@@ -107,22 +124,24 @@ def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_c
     returns confusion matrix with optional regrouping of classes based on LUT 
     model names and class columns defined in get_class_col
     '''
-    
-    map_cat = get_class_col(lc_mod_map)
-    acc_cat = get_class_col(lc_mod_acc)
-    
     cmdf = pd.DataFrame()
     cmdf['obs'] = obs_col
     cmdf['pred'] = pred_col
     
-    #print('getting confusion matrix based on {}...'.format(acc_cat))
-    cmdf2 = cmdf.merge(lut[['LC_UNQ','{}_name'.format(acc_cat)]], left_on='obs', right_on='LC_UNQ',how='left')
-    cmdf2.rename(columns={'{}_name'.format(acc_cat):'obs_reclass'}, inplace=True)
-    cmdf2.drop(['LC_UNQ'],axis=1,inplace=True)
-    cmdf3 = cmdf2.merge(lut[['LC_UNQ', '{}_name'.format(acc_cat)]], left_on='pred', right_on='LC_UNQ',how='left')
-    cmdf3.rename(columns={'{}_name'.format(acc_cat):'pred_reclass'}, inplace=True)
-    cmdf3.drop(['LC_UNQ'],axis=1,inplace=True)
-    cm=pd.crosstab(cmdf3['obs_reclass'],cmdf3['pred_reclass'],margins=True)
+    if lc_mod_map.startswith('single'):
+        cm=pd.crosstab(cmdf['obs'],cmdf['pred'],margins=True)
+        print(cm)
+    else: 
+        map_cat = get_class_col(lc_mod_map,lut)[0]
+        acc_cat = get_class_col(lc_mod_acc,lut)[0]
+        print('getting confusion matrix based on {}...'.format(acc_cat))
+        cmdf2 = cmdf.merge(lut2[['LC_UNQ','{}_name'.format(acc_cat)]], left_on='obs', right_on='LC_UNQ',how='left')
+        cmdf2.rename(columns={'{}_name'.format(acc_cat):'obs_reclass'}, inplace=True)
+        cmdf2.drop(['LC_UNQ'],axis=1,inplace=True)
+        cmdf3 = cmdf2.merge(lut2[['LC_UNQ', '{}_name'.format(acc_cat)]], left_on='pred', right_on='LC_UNQ',how='left')
+        cmdf3.rename(columns={'{}_name'.format(acc_cat):'pred_reclass'}, inplace=True)
+        cmdf3.drop(['LC_UNQ'],axis=1,inplace=True)
+        cm=pd.crosstab(cmdf3['obs_reclass'],cmdf3['pred_reclass'],margins=True)
         
     cm['correct'] = cm.apply(lambda x: x[x.name] if x.name in cm.columns else 0, axis=1)
     cm['sumcol'] = cm.apply(lambda x: cm.loc['All', x.name] if x.name in cm.columns else 0)
@@ -184,7 +203,7 @@ def multiclass_rf(trainfeatures, out_dir, mod_name, lc_mod, importance_method, r
     df_train = pd.read_csv(trainfeatures)
     print('There are {} training features'.format(df_train.shape[0]))
     
-    class_col = get_class_col(lc_mod)
+    class_col = get_class_col(lc_mod,lut)[0]
     y = df_train[class_col]
            
     vars_rf = [col for col in df_train if col.startswith('var_')]
@@ -370,10 +389,18 @@ def classify_raster(var_stack,rf_path,class_img_out):
 
          
 def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut):
-    class_col = get_class_col(lc_mod)
+    if isinstance(df_in, pd.DataFrame):
+        df = df_in
+    else:
+        df = pd.read_csv(df_in)
+    class_col,lut2 = get_class_col(lc_mod,lut)
     print('class_col = {}'.format(class_col))
-    train, ho = prep_test_train(df_in, out_dir, class_col, model_name)
-    rf = multiclass_rf(train, out_dir, model_name, lc_mod, importance_method, ran_hold, lut)
+    if '{}_name'.format(class_col) in df.columns:
+        df2 = df
+    else:
+        df2 = df.merge(lut2[['USE_NAME','{}'.format(class_col),'{}_name'.format(class_col)]], left_on='Class',right_on='USE_NAME', how='left')
+    train, ho = prep_test_train(df2, out_dir, class_col, model_name)
+    rf = multiclass_rf(train, out_dir, model_name, lc_mod, importance_method, ran_hold, lut2)
     score = get_holdout_scores(ho, rf[0], class_col, out_dir)
     
     return rf, score
