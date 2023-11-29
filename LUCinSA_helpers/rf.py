@@ -52,7 +52,7 @@ def get_class_col(lc_mod,lut):
                 lut['LC1'] = 0
                 lut['LC1_name'] = 'no_{}'.format(lc_base)
                 lut.at[target_class[0],'LC1'] = 1
-                lut.at[target_class[0],'LC1_name'] = '{}'.format(lc_base)
+                lut.at[target_class[0],'LC1_name'] = lc_base
     else:
         print('current options for lc_mod are All, LCTrans, LC2, LC3, LC4, LC5, LC_crops and single_X with X as any category. You put {}'.format(lc_mod))
     
@@ -122,7 +122,7 @@ def separate_holdout(training_pix_path, out_dir):
 def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_cm=False, out_dir=None, model_name=None):
     '''
     returns confusion matrix with optional regrouping of classes based on LUT 
-    model names and class columns defined in get_class_col
+    classification schema and class columns defined in get_class_col
     '''
     cmdf = pd.DataFrame()
     cmdf['obs'] = obs_col
@@ -135,10 +135,10 @@ def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_c
         map_cat = get_class_col(lc_mod_map,lut)[0]
         acc_cat = get_class_col(lc_mod_acc,lut)[0]
         print('getting confusion matrix based on {}...'.format(acc_cat))
-        cmdf2 = cmdf.merge(lut2[['LC_UNQ','{}_name'.format(acc_cat)]], left_on='obs', right_on='LC_UNQ',how='left')
+        cmdf2 = cmdf.merge(lut[['LC_UNQ','{}_name'.format(acc_cat)]], left_on='obs', right_on='LC_UNQ',how='left')
         cmdf2.rename(columns={'{}_name'.format(acc_cat):'obs_reclass'}, inplace=True)
         cmdf2.drop(['LC_UNQ'],axis=1,inplace=True)
-        cmdf3 = cmdf2.merge(lut2[['LC_UNQ', '{}_name'.format(acc_cat)]], left_on='pred', right_on='LC_UNQ',how='left')
+        cmdf3 = cmdf2.merge(lut[['LC_UNQ', '{}_name'.format(acc_cat)]], left_on='pred', right_on='LC_UNQ',how='left')
         cmdf3.rename(columns={'{}_name'.format(acc_cat):'pred_reclass'}, inplace=True)
         cmdf3.drop(['LC_UNQ'],axis=1,inplace=True)
         cm=pd.crosstab(cmdf3['obs_reclass'],cmdf3['pred_reclass'],margins=True)
@@ -393,14 +393,14 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
         df = df_in
     else:
         df = pd.read_csv(df_in)
-    class_col,lut2 = get_class_col(lc_mod,lut)
+    class_col,lut = get_class_col(lc_mod,lut)
     print('class_col = {}'.format(class_col))
     if '{}_name'.format(class_col) in df.columns:
         df2 = df
     else:
-        df2 = df.merge(lut2[['USE_NAME','{}'.format(class_col),'{}_name'.format(class_col)]], left_on='Class',right_on='USE_NAME', how='left')
+        df2 = df.merge(lut[['USE_NAME','{}'.format(class_col),'{}_name'.format(class_col)]], left_on='Class',right_on='USE_NAME', how='left')
     train, ho = prep_test_train(df2, out_dir, class_col, model_name)
-    rf = multiclass_rf(train, out_dir, model_name, lc_mod, importance_method, ran_hold, lut2)
+    rf = multiclass_rf(train, out_dir, model_name, lc_mod, importance_method, ran_hold, lut)
     score = get_holdout_scores(ho, rf[0], class_col, out_dir)
     
     return rf, score
