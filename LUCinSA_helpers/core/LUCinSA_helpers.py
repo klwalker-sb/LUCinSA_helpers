@@ -4,6 +4,7 @@ from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite
 from LUCinSA_helpers.file_checks import check_valid_pixels
 from LUCinSA_helpers.rf import rf_model, rf_classification
+from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.version import __version__
 
 def main():
@@ -23,7 +24,15 @@ def main():
 
     subparsers = parser.add_subparsers(dest='process')
 
-    available_processes = ['version', 'get_time_series', 'make_ts_composite', 'check_processing', 'rf_model', 'rf_classification']
+    available_processes = [
+                           'version', 
+                           'get_time_series', 
+                           'make_ts_composite', 
+                           'check_processing', 
+                           'rf_model', 
+                           'rf_classification', 
+                           'mosaic'
+                          ]
 
     for process in available_processes:
         subparser = subparsers.add_parser(process)
@@ -38,7 +47,12 @@ def main():
             subparser.add_argument('--image_type', dest ='image_type', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
             subparser.add_argument('--yrs', dest ='yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
             subparser.add_argument('--data_source', dest ='data_source', help='stac or GEE', default='stac')
-
+        if process == 'mosaic':
+            subparser.add_argument('--cell_list', dest='cell_list', help='list of cells to mosiac', default=None)
+            subparser.add_argument('--in_dir_main', dest='in_dir_main', help='overarching directory with all cells', default=None)
+            subparser.add_argument('--in_dir_local;', dest='in_dir_local', help='local folder name or path with raster', default=None)
+            subparser.add_argument('--common_str', dest='common_str', help='unique string in file name for mosaic', default=None)
+            subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
         else:
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
             subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
@@ -98,7 +112,14 @@ def main():
                              seed = args.seed,
                              load_samp = args.load_samp,
                              ptfile = args.ptfile)
-
+        
+    if args.process == 'mosaic':
+        moasic_cells(cell_list = args.cell_list,
+                     in_dir_main = args.in_dir_main,
+                     in_dir_local = args.in_dir_local,
+                     common_str = args.common_str,
+                     out_dir = args.out_dir)
+        
     if args.process == 'make_ts_composite':
         make_ts_composite(grid_cell = args.grid_cell,
                         img_dir = args.img_dir,

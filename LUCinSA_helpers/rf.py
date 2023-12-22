@@ -3,12 +3,16 @@
 
 import os
 from pathlib import Path
+import json
 import sys
 import pandas as pd
 import numpy as np
 import rasterio as rio
 from collections.abc import Iterable
 from osgeo import gdal, ogr, gdal_array
+from rasterio import mask as mask
+import osgeo  # needed only if running from Windows
+from shapely.geometry import Polygon
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.inspection import permutation_importance
@@ -267,57 +271,115 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir):
    
     return holdout_fields
 
-def make_variable_stack(in_dir,spec_indices,stats, name_end):
+def getset_variable_model(mod_dict,feat_mod_name,spec_indices,si_vars,singleton_vars):
+    with open(mod_dict, 'r+') as feature_model_dict:
+        dic = json.load(feature_model_dict)
+        if feat_mod_name in dic:
+            spec_indices = dic[feat_mod_name]['spec_indices']
+            si_vars = dic[feat_mod_name]['si_vars']
+            singleton_vars = dic[feat_mod_name]['singleton_vars']
+            print('using existing model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars={}'.format(feat_mod_name,spec_indices,si_vars,singleton_vars))
+        else:
+            dic[feat_mod_name] = {}
+            dic[feat_mod_name]['spec_indices'] = spec_indices
+            dic[feat_mod_name]['si_vars'] = si_vars
+            dic[feat_mod_name]['singleton_vars'] = singleton_vars
+            with open(mod_dict, 'w') as new_feature_model_dict:
+                json.dump(dic, new_feature_model_dict)
+            print('created new model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars = {}' .format(feat_mod_name,spec_indices,si_vars,global_vars))
+        
+    return spec_indices,si_vars,singleton_vars
+    
+def make_variable_stack(in_dir,spec_indices,si_vars,singleton_vars,poly_vars,var_mod_name):
 
     sys.stderr.write('making variable stack \n')
+    stack_path = os.path.join(in_dir,'{}_stack.tif'.format(var_mod_name))
+    if os.path.isfile(stack_path):
+        sys.stderr.write('stack file already exists for model {}'.format(var_mod_name))
+    else:
+        stack_paths = []
+        num_bands_all = 0
 
-    stack_paths = []
-    num_bands_all = 0
+        for vi in spec_indices:
+            for img in os.listdir(in_dir):
+                if img.endswith('RFVars_{}.tif'.format(var_mod_name)) and vi in img:
+                    img_path = os.path.join(in_dir,img)
+                    stack_paths.append(img_path)
+                    with rio.open(img_path) as src:
+                        num_bands = src.count
+                    sys.stdout.write('Found {} with {} bands \n'.format(img,num_bands))
+                    if num_bands < len(si_vars):
+                        sys.stderr.write('ERROR: number of bands does not match requested number')
+                        sys.exit()
+                    num_bands_all = num_bands_all + num_bands
+        if len(stack_paths) < len(spec_indices):
+            sys.stderr.write('ERROR: did not find {} files for all the requested spec_indices'.format(var_mod_name))
+            sys.exit()
 
-    for vi in spec_indices:
-        for img in os.listdir(in_dir):
-            if img.endswith(name_end) and vi in img:
-                img_path = os.path.join(in_dir,img)
-                stack_paths.append(img_path)
-                with rio.open(img_path) as src:
-                    num_bands = src.count
-                sys.stdout.write('Found {} with {} bands \n'.format(img,num_bands))
-                if num_bands < len(stats):
-                    sys.stderr.write('ERROR: number of bands does not match requested number')
-                    sys.exit()
-                num_bands_all = num_bands_all + num_bands
-    if len(stack_paths) < len(spec_indices):
-        sys.stderr.write('ERROR: did not find {} files for all the requested spec_indices'.format(name_end))
-        sys.exit()
+        if singleton_vars:
+            # Clips portion of singleton raster corresponding to gridcell and saves with stack files (if doesn't already exist there)
+            singleton_var_dict = '../singleton_var_dict.json'
+            for sf in singleton_vars:
+                with open(singleton_var_dict, 'r+') as singleton_feat_dict:
+                    dic = json.load(singleton_feat_dict)
+                    if sf in dic: 
+                        sf_path = dic[sf]['path']
+                        sf_col = dic[sf]['col']
+                        sys.stderr.write('getting {} from {}'.fortmat(sf,sf_path))    
+                    else:
+                        sys.stderr.write('ERROR: do not know path for {}. Add to singleton_var_dict and rerun'.format(sf))
+                        sys.exit()
 
-    sys.stdout.write('Final stack will have {} bands\n'.format(num_bands_all))
-    sys.stderr.write('made variable stack...')
+                singleton_clipped = os.path.join(in_dir,'{}.tif'.format(sf))
+                if os.path.isfile(singleton_clipped):
+                    stack_paths.append(singleton_clipped)
+                else:
+                    # clip global raster to extent of other rasters in stack for grid cell
+                    small_ras = stack_paths[0]
+                    src_small = gdal.Open(small_ras)
+                    ulx, xres, xskew, uly, yskew, yres  = src_small.GetGeoTransform()
+                    lrx = ulx + (src.RasterXSize * xres)
+                    lry = uly + (src.RasterYSize * yres)
+                    geometry = [[ulx,lry], [ulx,uly], [lrx,uly], [lrx,lry]]
+                    roi = [Polygon(geometry)]
+                    with rio.open(small_ras) as src0:
+                        out_meta = src0.meta.copy()
+                    out_meta.update({"count":1})
+                
+                with rio.open(sf_path) as big_src:
+                    out_img,transform = mask.mask(big_src, roi, crop = True)
+                    with rio.open(singleton_clipped, "w", **out_meta) as dest:
+                        dest.write(out_img)
+                stack_paths.append(singleton_clipped)
+    
+        sys.stdout.write('Final stack will have {} bands\n'.format(len(stack_paths)))
+        sys.stderr.write('making variable stack...')
 
-    output_count = 0
-    indexes = []
-    for path in stack_paths:
-        with rio.open(path) as src:
-            src_indexes = src.indexes
-            indexes.append(src_indexes)
-            output_count += len(src_indexes)
-
-    with rio.open(stack_paths[0],'r') as src0:
-        kwargs = src0.meta
-        kwargs.update(count = output_count)
-
-    with rio.open(os.path.join(in_dir,'stack.tif'),'w',**kwargs) as dst:
-        dst_idx = 1
-        for path, index in zip(stack_paths, indexes):
+        output_count = 0
+        indexes = []
+        for path in stack_paths:
             with rio.open(path) as src:
-                if isinstance(index, int):
-                    data = src.read(index)
-                    dst.write(data, dst_idx)
-                    dst_idx += 1
-                elif isinstance(index, Iterable):
-                   data = src.read(index)
-                   dst.write(data, range(dst_idx, dst_idx + len(index)))
-                   dst_idx += len(index)
+                src_indexes = src.indexes
+                indexes.append(src_indexes)
+                output_count += len(src_indexes)
 
+        with rio.open(stack_paths[0],'r') as src0:
+            kwargs = src0.meta
+            kwargs.update(count = output_count)
+
+        with rio.open(os.path.join(in_dir,'{}_stack.tif'),'w',**kwargs) as dst:
+            dst_idx = 1
+            for path, index in zip(stack_paths, indexes):
+                with rio.open(path) as src:
+                    if isinstance(index, int):
+                        data = src.read(index)
+                        dst.write(data, dst_idx)
+                        dst_idx += 1
+                    elif isinstance(index, Iterable):
+                       data = src.read(index)
+                       dst.write(data, range(dst_idx, dst_idx + len(index)))
+                       dst_idx += len(index)
+                
 def classify_raster(var_stack,rf_path,class_img_out):
 
     img_ds = gdal.Open(var_stack, gdal.GA_ReadOnly)
@@ -386,7 +448,6 @@ def classify_raster(var_stack,rf_path,class_img_out):
     outdata.GetRasterBand(1).WriteArray(class_prediction)
     outdata.FlushCache() ##saves to disk!!
     sys.stdout.write('Image saved to: {}'.format(class_img_out))
-
          
 def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut):
     if isinstance(df_in, pd.DataFrame):
@@ -405,17 +466,21 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
     
     return rf, score
 
-def rf_classification(in_dir, df_in, spec_indices, stats, model_name, rf_mod, img_out, lc_mod=None, importance_method=None, ran_hold=29, out_dir=None):
-    spec_indices = ['evi2','gcvi','wi','kndvi','nbr','ndmi']
-    stats = ['Max','Min','Amp','Avg','CV','Std','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-    var_stack = os.path.join(in_dir,'stack.tif')
+def rf_classification(in_dir, df_in, var_mod_name, samp_mod_name, rf_mod, img_out, spec_indices=None, si_vars=None, singleton_vars=None, lc_mod=None, importance_method=None, ran_hold=29, out_dir=None):
+    
+    var_mod_dict = '../Feature_Models.json'
+    spec_indices,si_vars,singleton_vars = getset_variable_model(var_mod_dict,var_mod_name,spec_indices,si_vars,singleton_vars)
+    
+    var_stack = os.path.join(in_dir,'{}_stack.tif'.format(var_mod_name))
     if os.path.isfile(var_stack):
         sys.stdout.write('variable stack already exists \n')
     else:
-        sys.stdout.write('making variable stack... \n')        
-        make_variable_stack(in_dir,spec_indices,stats,'RFVars.tif')
+        sys.stdout.write('making variable stack... \n')
+        make_variable_stack(in_dir,spec_indices,si_vars,global_vars,var_mod_name)
+    
+    model_name = '{}_{}'.format(var_mod_name, samp_mod_name)                        
     if img_out == None:
-        class_img_out = os.path.join(in_dir, '{}.tif'.format(model_name))
+        class_img_out = os.path.join(in_dir, '{}_{}.tif'.format(model_name))
     else:
         class_img_out = img_out
     if rf_mod != None and os.path.isfile(rf_mod):
