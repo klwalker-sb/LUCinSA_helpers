@@ -13,7 +13,7 @@ Jupyter notebook tools also need to be installed into your environment if not al
 ```
 conda install -c conda-forge notebook ipykernel jupyter_contrib_nbextensions
 ```
-To be able to run interactive notebook features (e.g. click on point to get time series, print thumbnails), will need to install additional modules:
+To be able to run interactive notebook features (e.g. click on point to get time series, print thumbnails), additional modules are needed:
 ```
 conda install -c conda-forge ipywidgets ipyleaflet localtileserver
 conda install -c anaconda pillow
@@ -28,6 +28,7 @@ Installed processes that can be run from command line / SLURM:
 * rf_model 
 * rf_classification 
 * mosaic
+
 Example SLURM scripts are included for these processes in the BashScripts folder.
 get_time_series, rf_classification, and mosaic use significant resources and should be run through SLURM for accounting (when running 
 processes through jupyter notebook, the resources are not accounted for and might result in crashing the whole HPC cluster if resources are
@@ -44,6 +45,6 @@ Relevant parameter settings are printed within the notebook, so it should be rep
 
 ### note regarding contributions:
 When edits are pushed, notebook outputs are automatically cleared at commit staging, as per
-https://medium.com/somosfit/version-control-on-jupyter-notebooks-6b67a0cf12a3
+[this post](https://medium.com/somosfit/version-control-on-jupyter-notebooks-6b67a0cf12a3)
 This helps to keep this git repo from getting overwhelmed with notebook data.
 Also make sure to use the original .gitignore file (which might be hidden) when pushing edits
