@@ -3,6 +3,7 @@ import argparse
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite
 from LUCinSA_helpers.file_checks import check_valid_pixels
+from LUCinSA_helpers.file_checks import reconstruct_db
 from LUCinSA_helpers.rf import rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.version import __version__
@@ -28,7 +29,8 @@ def main():
                            'version', 
                            'get_time_series', 
                            'make_ts_composite', 
-                           'check_processing', 
+                           'check_processing',
+                           'reconstruct_db',
                            'rf_model', 
                            'rf_classification', 
                            'mosaic'
@@ -47,6 +49,12 @@ def main():
             subparser.add_argument('--image_type', dest ='image_type', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
             subparser.add_argument('--yrs', dest ='yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
             subparser.add_argument('--data_source', dest ='data_source', help='stac or GEE', default='stac')
+        if process == 'reconstruct_db':
+            subparser.add_argument('--processing_info_path', dest ='processing_info_path', help='path to processing.info file')
+            subparser.add_argument('--landsat_path', dest ='landsat_path', help='path to landsat download folder')
+            subparser.add_argument('--senteinel2_path', dest ='sentinel2_path', help='path to sentinel2 download folder')
+            subparser.add_argument('--brdf_path', dest ='brdf_path', help='path to brdf folder')
+        
         if process == 'mosaic':
             subparser.add_argument('--cell_list', dest='cell_list', help='list of cells to mosiac', default=None)
             subparser.add_argument('--in_dir_main', dest='in_dir_main', help='overarching directory with all cells', default=None)
@@ -135,6 +143,12 @@ def main():
                          image_type = args.image_type,
                          yrs = args.yrs,
                          data_source = args.data_source)
+        
+    if args.process == 'reconstruct_db':           
+        reconstruct_db(processing_info_path = args.processing_info_path,
+                 landsat_path = args.landsat_path,
+                 sentinel2_path = args.sentinel2_path,
+                 brdf_path = args.brdf_path)
     
     if args.process == 'rf_model':
         rf_model(df_in = args.df_in, 
