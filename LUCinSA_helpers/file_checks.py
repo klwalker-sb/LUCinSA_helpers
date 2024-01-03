@@ -529,41 +529,62 @@ def compare_files_to_db(sensor, db_source, in_dir, grid_cell, grid_file, yrs, da
 def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source='stac'):
     
     cell_dict = {}
+    fig1_path = os.path.join(out_dir,'{}_images_processed_by_sensor.png'.format(grid_cell))
+    fig2_path = os.path.join(out_dir,'{}_images_processed_by_stat.png'.format(grid_cell))
  
     if os.path.exists(Path('{}/{:06d}/processing.info'.format(dl_dir,int(grid_cell)))):
         processing_db = get_img_list_from_db(dl_dir, grid_cell, 'All', yrs, data_source='stac')
         yrdf1 =  processing_db.groupby(['yr']).size().to_frame('seen')
-
-        ax = processing_db.groupby(['yr','sensor']).size().unstack().plot(kind='bar', stacked=True, figsize=(20, 5), 
-                                     title=('Number images processed per year for cell {}'.format(grid_cell)))
-        fig1 = ax.get_figure()
-        fig1_path = os.path.join(out_dir,'{}_images_processed_by_sensor.png'.format(grid_cell))
-        fig1.savefig(fig1_path, format="png")
-        print('saved fig1 to {}'.format(fig1_path))
-        
-        if 'redownload' in processing_db:
-            processing_errors1 = processing_db[processing_db['redownload'] == True]
-            cell_dict['dl_errors']= int(processing_errors1.shape[0])
-        if 'brdf_error' in processing_db:
-            processing_errors2 = processing_db[~processing_db['brdf_error'].isnull()]
-            cell_dict['brdf_errors']= int(processing_errors2.shape[0])
+        ## Exclude images that were intentionally not ingested (e.g. L7 past l7_stop_year)
         if 'skip' in processing_db:
             skip = processing_db[processing_db['skip'] == True]
             cell_dict['skipped']=int(skip.shape[0])
-            processed0 = processing_db[processing_db['skip']!=True]
-            yrdf2 = processed0.groupby(['yr']).size().to_frame('processed')
-            processed = processed0[processed0['redownload']!=True]
+            processed00 = processing_db[processing_db['skip']!=True]   
         else:
-            processed = processing_db
+            processed00 = processing_db
+                    
+        ## Refine to exclued images that were missed by error:
+        if 'redownload' in processing_db:
+            processing_errors1 = processing_db[processing_db['redownload'] == True]
+            cell_dict['dl_errors']= int(processing_errors1.shape[0])
+            processed0 = processed00[processed00['redownload']!=True]
+        else:
+            processed0 = processed00
+        if 'brdf_error' in  processing_db:
+            processing_errors2 = processing_db[~processing_db['brdf_error'].isnull()]
+            cell_dict['brdf_errors']= int(processing_errors2.shape[0])
+            processed = processed0[processed0['brdf_error'].isnull()]
+        else:
+            processed = processed0
+        
+        yrdf2 = processed.groupby(['yr']).size().to_frame('ingested')  
+                                              
+        ## Produce figure of images ingested by sensor and year
+        ax = processed.groupby(['yr','sensor']).size().unstack().plot(kind='bar', stacked=True, figsize=(20, 5), 
+                                     title=('Number images processed per year for cell {}'.format(grid_cell)))
+        fig1 = ax.get_figure()
+        fig1.savefig(fig1_path, format="png")
+        print('saved fig1 to {}'.format(fig1_path))
+        
+        ## Add info on images ingested per year to dict:    
+        for index, row in yrdf2.iterrows():                                      
+            cell_dict['images_ingested_{}'.format(index)]=int(row.ingested)
+                                              
+        ## Add brdf processing info to dict:
         if 'brdf' in processed:
             brdf = processed[processed['brdf']==True]
             cell_dict['num_processed']=processed.shape[0]
             cell_dict['num_brdf']=brdf.shape[0]
         else:
             cell_dict['num_brdf']='brdf step not complete'
+        ## Add coreg prcessing info to dict:
         if 'shift_x' in processed:
             coreged = processed0[processed0['coreg'] != False] 
             yrdf3 = coreged.groupby(['yr']).size().to_frame('coreged')
+            ## Add info on images images used (coreged) per year to dict:    
+            for index, row in yrdf3.iterrows():                                      
+                cell_dict['images_used_{}'.format(index)]=int(row.coreged)
+            
             cell_dict['num_coreged']=coreged.shape[0]
             processed_sentinel = processed[processed.index.str.startswith('S')]
             creg_sentinel = processed_sentinel[processed_sentinel['coreg']==True]
@@ -600,27 +621,32 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
             cell_dict['med_y_shift_L7']=creg_L7['abs_shift_y'].median()
         else:
             cell_dict['num_coreged']='coreg step not complete'
-            yrdf3 = yrdf2
+
         yrdf4 = yrdf1.join(yrdf2)
         yrdf = yrdf4.join(yrdf3)
-        yrdf['excluded'] = yrdf['seen'] - yrdf['processed']
-        yrdf['low quality'] = yrdf['processed'] - yrdf['coreged']
+        yrdf['excluded'] = yrdf['seen'] - yrdf['ingested']
+        yrdf['low quality'] = yrdf['ingested'] - yrdf['coreged']
         yrdf.rename(columns={'coreged': 'used'},inplace=True)
 
-        ax2 = yrdf[["used", "uncoreged", "excluded"]].plot(kind="bar", stacked=True, 
+        ## Produce figure of processing status by year
+        ax2 = yrdf[["used", "low quality", "excluded"]].plot(kind="bar", stacked=True, 
                 color=['black','grey','white'], edgecolor = "black", figsize=(20, 5), 
                 title=('Processing status for cell {}'.format(grid_cell)))
         fig2 = ax2.get_figure()
-        fig2_path = os.path.join(out_dir,'{}_images_processed_by_stat.png'.format(grid_cell))
         fig2.savefig(fig2_path, format="png")
         print('saved fig2 to {}'.format(fig2_path))
-        for idx in ['evi2','gcvi','wi','kndvi','nbr','ndmi']:
-            idx_path = Path('{}/{:06d}/brdf_ts/ms/{}'.format(processed_dir,int(grid_cell),idx))
-            if os.path.exists(idx_path):
-                ts = sorted([f for f in os.listdir(idx_path) if f.endswith('tif')])
-                if len(ts)>0:
-                    cell_dict['index_{}'.format(idx)]='{}-{}'.format(ts[0][:4],ts[-1][:4])
+        
+        ## Get ts processing stats 
+        #for idx in ['evi2','gcvi','wi','kndvi','nbr','ndmi']:
+        ts_dir = Path('{}/{:06d}/brdf_ts/ms)]'.format(processed_dir,int(grid_cell)))
+        ts_indices = [x[0] for x in os.walk(ts_dir)]
+        for idx in ts_indices:
+            idx_path = os.path.join(ts_dir,'{}'.format(idx))
+            ts = sorted([f for f in os.listdir(idx_path) if f.endswith('tif')])
+            if len(ts)>0:
+                cell_dict['index_{}'.format(idx)]='{}-{}'.format(ts[0][:4],ts[-1][:4])
     
+    ## check status if processing db dos not exist (this is now rare unless nothing has been downloaded)
     else:
         ##Check if files have been downloaded for cell:
         ls_dir = Path('{}/{:06d}/landsat'.format(dl_dir,grid_cell))
@@ -638,7 +664,6 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
             s2_imgs = print_files_in_directory(s2_dir,'.tif',print_list=False,out_dir=None,data_source='stac')
             if s2_imgs is None:
                 print('There are no images in the Sentinel directory for cell {}'.format(grid_cell))
-        cell_dict = {}
         
     return cell_dict, fig1_path, fig2_path
 

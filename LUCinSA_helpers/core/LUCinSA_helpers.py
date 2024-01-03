@@ -2,6 +2,7 @@
 import argparse
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite
+from LUCinSA_helpers.file_checks import get_cell_status
 from LUCinSA_helpers.file_checks import check_valid_pixels
 from LUCinSA_helpers.file_checks import reconstruct_db
 from LUCinSA_helpers.rf import rf_model, rf_classification
@@ -27,6 +28,7 @@ def main():
 
     available_processes = [
                            'version', 
+                           'get_cell_status'
                            'get_time_series', 
                            'make_ts_composite', 
                            'check_processing',
@@ -42,13 +44,16 @@ def main():
         if process == 'version':
             continue
 
-        if process == 'check_processing':
+        if process == 'get_cell_status' or process == 'check_processing':
             subparser.add_argument('--raw_dir', dest ='raw_dir', help='directory containing downloaded images')
-            subparser.add_argument('--brdf_dir', dest ='brdf_dir', help='directory containing brdf images')
+            subparser.add_argument('--processed_dir', dest ='processed_dir', help='directory containing processed images (brdf for check_processing, smooth ts for get_cell_status')
             subparser.add_argument('--grid_cell', dest ='grid_cell', help='cell to process')
-            subparser.add_argument('--image_type', dest ='image_type', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
             subparser.add_argument('--yrs', dest ='yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
             subparser.add_argument('--data_source', dest ='data_source', help='stac or GEE', default='stac')
+        if process == 'check_processing':
+            subparser.add_argument('--image_type', dest ='image_type', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
+        if process == 'get_cell_status':
+            subparser.add_argument('--out_dir', dest='out_dir', help='out directory for plot graphics', default=None)
         if process == 'reconstruct_db':
             subparser.add_argument('--processing_info_path', dest ='processing_info_path', help='path to processing.info file')
             subparser.add_argument('--landsat_path', dest ='landsat_path', help='path to landsat download folder')
@@ -138,11 +143,19 @@ def main():
 
     if args.process == 'check_processing':
         check_valid_pixels(raw_dir = args.raw_dir,
-                         brdf_dir = args.brdf_dir,
+                         brdf_dir = args.processed_dir,
                          grid_cell = args.grid_cell,
                          image_type = args.image_type,
                          yrs = args.yrs,
                          data_source = args.data_source)
+    
+    if args.process == 'get_cell_status':
+        get_cell_status(dl_dir  = args.raw_dir,
+                        processed_dir = args.processed_dir, 
+                        grid_cell = args.grid_cell, 
+                        yrs = args.yrs, 
+                        out_dir = args.out_dir, 
+                        data_source = args.data_source)
         
     if args.process == 'reconstruct_db':           
         reconstruct_db(processing_info_path = args.processing_info_path,
