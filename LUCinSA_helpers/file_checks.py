@@ -12,6 +12,7 @@ import pickle
 import xarray as xr
 import rasterio as rio
 from shapely.geometry import box
+import matplotlib.pyplot as plt
 
 def print_files_in_directory(in_dir,endstring,print_list=False,out_dir=None,data_source='stac'):
     '''
@@ -40,7 +41,7 @@ def print_files_in_directory(in_dir,endstring,print_list=False,out_dir=None,data
             sorted_files = filedf.sort_values(by='date')
     
         if print_list == True:
-            pd.DataFrame.to_csv(filedf, os.path.join(out_dir,'FileList.txt'), sep=',', na_rep='.', index=False)   
+            pd.DataFrame.to_csv(filedf, os.path.join(out_dir,'{}_FileList.txt'.format(os.path.basename(in_dir))), sep=',', na_rep='.', index=False)   
         
         return filedf
 
@@ -70,38 +71,13 @@ def print_files_in_multiple_directories(full_dir,sub_dir,endstring,print_list=Fa
         
     return unique_imgs
 
-def read_db(scene_info_path,db_version):
-    pyver = float((sys.version)[:3])
-    if pyver < 3.8:
-        print('python version is {}'.format(pyver))
-        ### note this may not work depending on what version of Pandas you have. Maybe upgrade Pandas
-        import pickle5 as pickle
-        with open(scene_info_path, 'rb') as file1:         
-            df = pickle.load(file1)
-    else:
-        if db_version == 'current':
-            df = pd.read_pickle(scene_info_path)
-            df['sensor']=df.index.map(lambda x:(x[:4].lower()))
-            df_lan = df[df['sensor'].str.startswith('l')]
-            df_lan['date'] = df_lan.index.map(lambda x: int(x.split('_')[3][:8]))
-            df_sen = df[df['sensor'].str.startswith('s')]
-            df_sen['date'] = df_sen.index.map(lambda x: int(x.split('_')[2][:8]))
-            df = pd.concat([df_lan,df_sen],axis=0)
-        else:
-            df = pd.read_pickle(scene_info_path).set_index('date')
-            df.index.rename(None, inplace=True)
-            df = df.assign(date=df.index)
-            df = df.sort_index()
-    
-    return df
-
 def reconstruct_db(processing_info_path,landsat_path,sentinel2_path,brdf_path):
     '''
-    This checks for an existing processing database and creates one if needed from download and brdf folders.
-    All downloaded images are assumed to be in download folders (landsat and sentinel2 still). If cleaning has
-    already occured, this won't work. TODO: make option to construct from brdf folder only if cleaning has already occured.
-    Note: this will not create the numpix and coreg shift_x and shift_y columns in the original db, nor any error notes,
-    so best to use original database whenever possible.
+    This checks for an existing processing.info database and creates one if needed from download and brdf folders.
+    This is only for cases of corruption or accidental deletion. -- 
+       processing.info is normally created as files are downloaded -- 
+    Note: It is best to use original database whenever possible, as this will not recreate error notes,
+       nor populate the numpix or coreg shift_x and shift_y columns that are in the original db
     '''
     modified = False
     
@@ -124,129 +100,178 @@ def reconstruct_db(processing_info_path,landsat_path,sentinel2_path,brdf_path):
         ## Make new processing db if it does not already exist:
         if not processing_info_path.is_file():
             processing_dict = {}
+            # First check for for files in the brdf folder (these are at the most processed stage)
             if len(brdf_files) > 0:
                 for b in brdf_files:
                     # get corresponding dl id:
                     if b.split("_")[1].startswith('L'):
-                        dlid = '{}_{}_{}_{}_{}_{}'.format(b.split("_")[1],'L2SP',b.split("_")[2][4:10],b.split("_")[3],b.split("_")[2][10:12],b.split("_")[2][12:14])
+                        dlid = '{}_{}_{}_{}_{}_{}'.format(b.split("_")[1],
+                                                         'L2SP',
+                                                          b.split("_")[2][4:10],
+                                                          b.split("_")[3],
+                                                          b.split("_")[2][10:12],
+                                                          b.split("_")[2][12:14])
                     else:
-                        dlid = '{}_{}_{}_{}_{}'.format(b.split("_")[1],b.split("_")[2][4:9],b.split("_")[3],b.split("_")[2][9:10],b.split("_")[2][10:13])
-                    processing_dict[dlid]={'dl':'{}'.format(landsat_path,dlid),'beforeDB':True,'brdf_id':'{}'.format(b),'brdf':'True','brdf_error':'NaN','bandpass':'Nan'}
-            elif len(landsat_files) + len(sentinel_files)> 0:
+                        dlid = '{}_{}_{}_{}_{}'.format(b.split("_")[1],
+                                                       b.split("_")[2][4:9],
+                                                       b.split("_")[3],
+                                                       b.split("_")[2][9:10],
+                                                       b.split("_")[2][10:13])
+                    bp = 'True' if b.split('_')[0] == 'L3B' else ('False' if b.split('_')[0] == 'L3A' else np.nan)
+                    processing_dict[dlid] = {'dl':'{}'.format(landsat_path,dlid),
+                                           'beforeDB':True,
+                                           'brdf_id':'{}'.format(b),
+                                           'brdf':'True',
+                                           'brdf_error':np.nan,
+                                           'bandpass':bp}
+            # If no files in brdf folder, reconstruct db from download folders
+            else:
                 for f in landsat_files:
-                    processing_dict[os.path.splitext(f)[0]]={'dl':'{}/{}'.format(landsat_path,f),'beforeDB':True}
+                    processing_dict[os.path.splitext(f)[0]]={'dl':'{}/{}'.format(landsat_path,f),
+                                                             'beforeDB':True}
                 for s in sentinel2_files:
-                    processing_dict[os.path.splitext(s)[0]]={'dl':'{}/{}'.format(sentinel2_path,s),'beforeDB':True}
+                    processing_dict[os.path.splitext(s)[0]]={'dl':'{}/{}'.format(sentinel2_path,s),
+                                                             'beforeDB':True}
             new_processing_info = pd.DataFrame.from_dict(processing_dict,orient='index')
             new_processing_info.rename_axis('id', axis=1, inplace=True)
             pd.to_pickle(new_processing_info, processing_info_path)
             print(f'{len(new_processing_info)} images downloaded and added to database.')
-
-    processing_db = pd.read_pickle(processing_info_path)
-    ## to fix issues from older version of db already created for some cells:
-    if 'id' not in processing_db:
-        processing_db.rename_axis('id', axis=1, inplace=True)
-    #if processing_db.index != 'id':
-    #    print('removing original index column and setting it to id column')
-    #    processing_db.set_index('id', drop=True, inplace=True)
+            
+        # read in existing db (can be the one that was just created or pre-existing):
+        processing_db = pd.read_pickle(processing_info_path)
         
-    print(f'{len(processing_db)} records in db. {len(landsat_files)} landsat and {len(sentinel2_files)} sentinel images in downloads.')
-
-    if len(processing_db) >= len(landsat_files) + len(sentinel2_files):
-        print('all downloaded images have probably been added to db already')
-    else:
-        print('adding images to db...')
-        new_dls = {}
-        for f in landsat_files:
-            if os.path.splitext(f)[0] in processing_db.values:
-                continue
-            else:
-                new_dls[os.path.splitext(f)[0]]={'dl':'{}/{}'.format(landsat_path,f),'beforeDB':True}
-        for s in sentinel2_files:
-            if os.path.splitext(s)[0] in processing_db.values:
-                continue
-            else:
-                new_dls[os.path.splitext(s)[0]]={'dl':'{}/{}'.format(sentinel2_path,s),',beforeDB':True}
+        ## to fix issues from older version of db already created for some cells:
+        if 'id' not in processing_db:
+            processing_db.rename_axis('id', axis=1, inplace=True)
+        #if processing_db.index != 'id':
+        #    print('removing original index column and setting it to id column')
+        #    processing_db.set_index('id', drop=True, inplace=True)
         
-        if len(new_dls)>0:
-            new_dl_db = pd.DataFrame.from_dict(new_dls,orient='index')
-            new_dl_db.rename_axis('id', axis=1, inplace=True)
-            processing_db.append(new_dl_db)
-            modified = True
-            
-    if os.path.exists(brdf_path):
-        if 'brdf' in processing_db:
-            print('brdf data already in database')
-            
-        else: 
-            print('adding brdf info to db...')
-            processing_db['brdf_id'] = np.nan
-            processing_db['brdf_error'] = np.nan
-            processing_db['brdf'] = np.nan
-            processing_db['bandpass'] = np.nan
-            for idx, row in processing_db.iterrows():
-                match=None
-                #print(idx)
-                for fi in os.listdir(brdf_path):
-                    if fi.endswith('.nc'):
-                        if idx.startswith('S'):  
-                            if (idx.split('_')[1] in fi.split('_')[2]) and (idx.split('_')[2] == fi.split('_')[3]):
-                                match = fi
-                        elif idx.startswith('L'): 
-                            if (idx.split('_')[0] == fi.split('_')[1]) and (idx.split('_')[2] in fi.split('_')[2]) and (idx.split('_')[3] == fi.split('_')[3]):
-                                match = fi
-                #print(f'match:{match}')
-                processing_db.at[idx,'brdf_id']=match
-                if match is not None:
-                    if match.split('_')[0] == 'L3B':
-                        processing_db.at[idx,'bandpass']=True
-                    elif match.split('_')[0] == 'L3A':
-                        processing_db.at[idx,'bandpass']=False
-                
-            modified = True
-            
-        num_coreged_files = len([fi for fi in os.listdir(brdf_path) if fi.endswith('coreg.nc')])
-        print(f'{num_coreged_files} images have been coreged')
-        if num_coreged_files == 0:
-            print('coregistration has not yet occured. Processing database is up to date')
+        print(f'{len(processing_db)} records in db. {len(landsat_files)} landsat and {len(sentinel2_files)} sentinel images in downloads.')
+
+        if len(processing_db) >= len(landsat_files) + len(sentinel2_files):
+            print('all downloaded images have probably been added to db already')
         else:
-            if 'shift_x' in processing_db:
-                print('coreg data has already been added to database')
-            else:
-                print('adding coreg info to db...')
-                processing_db['coreg'] = np.nan
-                processing_db['shift_x'] = np.nan
-                processing_db['shift_y'] = np.nan
-                processing_db['coreg_error'] = np.nan
+            print('adding images to db...')
+            new_dls = {}
+            for f in landsat_files:
+                if os.path.splitext(f)[0] in processing_db.values:
+                    continue
+                else:
+                    new_dls[os.path.splitext(f)[0]]={'dl':'{}/{}'.format(landsat_path,f),'beforeDB':True}
+            for s in sentinel2_files:
+                if os.path.splitext(s)[0] in processing_db.values:
+                    continue
+                else:
+                    new_dls[os.path.splitext(s)[0]]={'dl':'{}/{}'.format(sentinel2_path,s),',beforeDB':True}
+        
+            if len(new_dls)>0:
+                new_dl_db = pd.DataFrame.from_dict(new_dls,orient='index')
+                new_dl_db.rename_axis('id', axis=1, inplace=True)
+                processing_db.append(new_dl_db)
+                modified = True
+            
+        if os.path.exists(brdf_path):
+            if 'brdf' in processing_db:
+                print('brdf data already in database')
+            
+            else: 
+                print('adding brdf info to db...')
+                processing_db['brdf_id'] = np.nan
+                processing_db['brdf_error'] = np.nan
+                processing_db['brdf'] = np.nan
+                processing_db['bandpass'] = np.nan
                 for idx, row in processing_db.iterrows():
                     match=None
                     #print(idx)
                     for fi in os.listdir(brdf_path):
                         if fi.endswith('.nc'):
-                            if idx.startswith('S'):
+                            if idx.startswith('S'):  
                                 if (idx.split('_')[1] in fi.split('_')[2]) and (idx.split('_')[2] == fi.split('_')[3]):
-                                    match = fi 
+                                    match = fi
                             elif idx.startswith('L'): 
                                 if (idx.split('_')[0] == fi.split('_')[1]) and (idx.split('_')[2] in fi.split('_')[2]) and (idx.split('_')[3] == fi.split('_')[3]):
                                     match = fi
                     #print(f'match:{match}')
+                    processing_db.at[idx,'brdf_id']=match
                     if match is not None:
-                        if 'coreg' in match:
-                            processing_db.at[idx,'coreg']=True
-                        elif match.endswith('X.nc'):
-                            processing_db.at[idx,'coreg']=False
-                            processing_db.at[idx,'coreg_error']='unknown'
-                        else:
-                            processing_db.at[idx,'coreg']='NaN'                           
-                modified = True                        
-    else:
-        print('brdfs have not yet been created. Processing database is up to date')
+                        if match.split('_')[0] == 'L3B':
+                            processing_db.at[idx,'bandpass']=True
+                        elif match.split('_')[0] == 'L3A':
+                            processing_db.at[idx,'bandpass']=False
+                
+                modified = True
+            
+            num_coreged_files = len([fi for fi in os.listdir(brdf_path) if fi.endswith('coreg.nc')])
+            print(f'{num_coreged_files} images have been coreged')
+            if num_coreged_files == 0:
+                print('coregistration has not yet occured. Processing database is up to date')
+            else:
+                if 'shift_x' in processing_db:
+                    print('coreg data has already been added to database')
+                else:
+                    print('adding coreg info to db...')
+                    processing_db['coreg'] = np.nan
+                    processing_db['shift_x'] = np.nan
+                    processing_db['shift_y'] = np.nan
+                    processing_db['coreg_error'] = np.nan
+                    for idx, row in processing_db.iterrows():
+                        match=None
+                        #print(idx)
+                        for fi in os.listdir(brdf_path):
+                            if fi.endswith('.nc'):
+                                if idx.startswith('S'):
+                                    if (idx.split('_')[1] in fi.split('_')[2]) and (idx.split('_')[2] == fi.split('_')[3]):
+                                        match = fi 
+                                elif idx.startswith('L'): 
+                                    if (idx.split('_')[0] == fi.split('_')[1]) and (idx.split('_')[2] in fi.split('_')[2]) and (idx.split('_')[3] == fi.split('_')[3]):
+                                        match = fi
+                        #print(f'match:{match}')
+                        if match is not None:
+                            if 'coreg' in match:
+                                processing_db.at[idx,'coreg']=True
+                            elif match.endswith('X.nc'):
+                                processing_db.at[idx,'coreg']=False
+                                processing_db.at[idx,'coreg_error']='unknown'
+                            else:
+                                processing_db.at[idx,'coreg']='NaN'                           
+                    modified = True                        
+        else:
+            print('brdfs have not yet been created. Processing database is up to date')
 
-    if modified == True:
-        pd.to_pickle(processing_db, processing_info_path)
-        print('saving new database')
+        if modified == True:
+            pd.to_pickle(processing_db, processing_info_path)
+            print('saving new database')
         
-    return processing_db
+        return processing_db
+    
+def read_db(db_path,db_version):
+    pyver = float((sys.version)[:3])
+    if pyver < 3.8:
+        print('python version is {}'.format(pyver))
+        ### note this may not work depending on version of Pandas. If it doesn't, maybe upgrade Pandas
+        import pickle5 as pickle
+        with open(db_path, 'rb') as file1:         
+            df = pickle.load(file1)
+    else:
+        if db_version == 'current':
+            df = pd.read_pickle(db_path)
+            df['sensor']=df.index.map(lambda x:(x[:4].lower()))
+            # get date -- in current version, this is in different part of id for Landsat and Sentinel2
+            df_lan = df[df['sensor'].str.startswith('l')]
+            df_lan['date'] = df_lan.index.map(lambda x: int(x.split('_')[3][:8]))
+            df_sen = df[df['sensor'].str.startswith('s')]
+            df_sen['date'] = df_sen.index.map(lambda x: int(x.split('_')[2][:8]))
+            df = pd.concat([df_lan,df_sen],axis=0)
+            df['yr']=df.date.map(lambda x:(int(str(x)[:4])))
+        else:
+            df = pd.read_pickle(db_path).set_index('date')
+            df.index.rename(None, inplace=True)
+            df = df.assign(date=df.index)
+            df = df.sort_index()
+    
+    return df
+
 
 def get_img_list_from_db(in_dir, grid_cell, sensor, yrs, data_source='stac'):
     '''
@@ -255,17 +280,16 @@ def get_img_list_from_db(in_dir, grid_cell, sensor, yrs, data_source='stac'):
     yrs is a list in format [YYYY, YYYY]
     '''
     if data_source == 'stac':
-        scene_info_combo = (Path('{}/{:06d}/processing.info'.format(in_dir,int(grid_cell))))
+        scene_info_combo = (Path('{}/{:06d}/processing.info'.format(in_dir,grid_cell)))
         if os.path.exists(scene_info_combo):
             df = read_db(scene_info_combo,'current')
-            dfSen = df[df['sensor'].str.startswith('s')]
             if yrs:
-                df = df[(df['date']>=int('{}0101'.format(yrs[0]))) & (df['date']<int('{}0101'.format(yrs[1])))]
+                df_out0 = df[(df['date']>=int('{}0101'.format(yrs[0]))) & (df['date']<int('{}0101'.format(yrs[1])))]
         else:
             ## The following is all for backwards compatibility for files processed with previous versions of eostac
             if 'brdf' not in str(in_dir):
             #original downloads for stac data are in separate landsat and sentinel2 folders. Each has its own scene.info file
-                if 'Landsat' in sensor or sensor=='All':
+                if sensor.lower().startswith('l') or sensor=='All':
                     scene_info_l = (Path('{}/{:06d}/landsat/scene.info'.format(in_dir,int(grid_cell))))
                     if os.path.exists(scene_info_l) == False:
                         print('There is no scene.info file in the Landsat directory for cell {}'.format(grid_cell))
@@ -284,34 +308,26 @@ def get_img_list_from_db(in_dir, grid_cell, sensor, yrs, data_source='stac'):
                                 df = pd.concat([landsat_df,sentinel_df],axis=0)
                     else:
                         df = landsat_df        
-                elif sensor == 'Sentinel':
+                elif sensor.lower().startswith('s'):
                     scene_info_s = (Path('{}/{:06d}/sentinel2/scene.info'.format(in_dir,int(grid_cell))))
                     if os.path.exists(scene_info_s) == False:
                         print('There is no scene.info file in the Sentinel directory for cell {}'.format(grid_cell))
                     else: df = read_db(scene_info_s, 'old')
                 else:
-                    print('sensor options are Sentinel, Landsat(5,7,8,9) or All. You put {}'.format(sensor))           
+                    print('sensor options are All, s, l, lt05, le07, lc08, lc09 {}'.format(sensor))           
             else:
                 scene_info = (os.path.join(in_dir,'scene.info'))
                 df = read_db(scene_info,'old')
             if yrs:
-                df = df['{}-01-01:{}-12-31'.format(yrs[0],yrs[1])]
+                df_out0 = df['{}-01-01:{}-12-31'.format(yrs[0],yrs[1])]
         
         if sensor !='All':
             print('filtering returned dataset to {}...'.format(sensor))
-            if sensor == 'Landsat5':
-                df = df.loc[df.sensor=='lt05']
-            elif sensor == 'Landsat7':
-                df = df.loc[df.sensor=='le07']
-            elif sensor == 'Landsat8':
-                df = df.loc[df.sensor=='lc08']
-            elif sensor == 'Landsat9':
-                df = df.loc[df.sensor=='lc09']
-            elif 'Landsat' in sensor:
-                df = df.loc[df.sensor.str.startswith('l')]
-            elif 'Sentinel' in sensor:
-                df = df.loc[df['sensor'].str.startswith('s')]
-            
+            if len(sensor) == 1:
+                df_out = df_out0.loc[df_out0.sensor.str.startswith(sensor)]
+            else:
+                df_out = df_out0.loc[df.sensor==sensor]
+
     return df
 
 def separate_missing_db_files(in_dir,grid_cell,image_type='All', yrs=None,data_source='stac'):
@@ -381,11 +397,11 @@ def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default')
     else:
         TimeSlice=f"{yrs[0]}-01-01/{yrs[1]}-12-30"
         
-    if sensor == 'Landsat':
+    if sensor.startswith('l'):
         collect=["landsat-c2-l2"]
         api = pystac_client.Client.open("https://planetarycomputer.microsoft.com/api/stac/v1/")
 
-    elif sensor == 'Sentinel':
+    elif sensor == ('s'):
         if cat == 'default':
             collect=['sentinel-s2-l2a-cogs']  #if using element84
             api =  pystac_client.Client.open("https://earth-search.aws.element84.com/v0")
@@ -431,17 +447,17 @@ def check_for_missing_files(df, in_dir, grid_cell, sensor, data_source='stac'):
     '''
     if data_source == 'stac':
         if 'brdf' not in str(in_dir):
-            if sensor == 'Landsat':
-                df['file_path'] = df.apply(lambda x: Path('{}/{:06d}/landsat/{}.tif'.format(in_dir,grid_cell,x['id'])), axis=1)
-            elif sensor == 'Sentinel':
-                df['file_path'] = df.apply(lambda x: Path('{}/{:06d}/sentinel2/{}.tif'.format(in_dir,grid_cell,x['id'])), axis=1)
+            if sensor.lower().startswith('l'):
+                df['file_path'] = df.apply(lambda row: Path('{}/{:06d}/landsat/{}.tif'.format(in_dir,grid_cell,row.name)), axis=1)         
+            elif sensor.lower().startswith('s'):
+                df['file_path'] = df.apply(lambda row: Path('{}/{:06d}/sentinel2/{}.tif'.format(in_dir,grid_cell,row.name)), axis=1)
         else:
-            df['file_path'] = df.apply(lambda x: Path('{}/{}.tif'.format(in_dir,grid_cell,x['id'])), axis=1)
+            df['file_path'] = df.apply(lambda row: Path('{}/{}.tif'.format(in_dir,grid_cell,row.name)), axis=1)
             #TODO: modify to reflect change in basename (this does not work as is for brdf directory) 
     df['file_path_exists'] = df.apply(lambda x: x['file_path'].is_file(), axis=1)
     dfe = df.loc[df.file_path_exists]
     dfno = df.loc[df.file_path_exists==False]
-    missing = dfno.id.values.tolist()
+    missing = dfno.index.values.tolist()
     print('Of the {} files in the {} db, {} are missing from the directory'.format(df.shape[0],sensor,len(missing)))
     return missing
 
@@ -453,12 +469,12 @@ def why_missing_files(sensor,missing_list,num_to_allow):
     '''
     print('checking reason for missing files...')
     dl = 0
-    if sensor == 'Sentinel':
+    if sensor.lower().startswith('s'):
         print(missing_list)
         still_missing = missing_list
         if len(missing_list) <= num_to_allow:
             dl = 1
-    if sensor == 'Landsat':
+    if sensor.lower().startswith('l'):
         missing_df = pd.DataFrame(missing_list)
         missing_df['sensor'] = missing_df.apply(lambda x: x[0].split('_')[0][:4], axis=1)
         missing_df['yr'] = missing_df.apply(lambda x: int(x[0].split('_')[3][:4]), axis=1)
@@ -489,42 +505,53 @@ def compare_files_to_db(sensor, db_source, in_dir, grid_cell, grid_file, yrs, da
     if dbSource == 'Both', also compares remote and local databases to check whether there are remote files
     that were never seen by local database (never attempted to download) for cell/sensor/years 
     '''
-    if db_source in['Local','Both']:
+    if db_source in['local','both']:
         print (f'Checking files against local database for {yrs[0]}-{yrs[1]}...')
-        df_local = get_img_list_from_db(sensor, in_dir, grid_cell, yrs, data_source='stac')
+        df_local = get_img_list_from_db(in_dir, grid_cell, sensor, yrs, data_source='stac')
         missing_local = check_for_missing_files(df_local, in_dir, grid_cell, sensor, data_source='stac')
-    if db_source in['Remote','Both']:
+    if db_source in['remote','both']:
         print (f'Checking files agaist remote database for {yrs[0]}-{yrs[1]}...')
         df_remote = get_img_list_from_cat(sensor, grid_cell, grid_file, yrs)
         missing_remote = check_for_missing_files(df_remote, in_dir, grid_cell, sensor, data_source='stac')
-    if dbSource == 'Both':
+    if db_source == 'both':
         print (f'Checking local db against remote database for {yrs[0]}-{yrs[1]}...')
-        local_list = df_local['id'].values.tolist()
+        local_list = df_local.index.values.tolist()
         remote_list = df_remote['id'].values.tolist()
         missing_from_localdb = list(set(remote_list) - set(local_list))
         print('the following Files are in the remote catalog but not in the local database:',missing_from_localdb)
-    if db_source == 'Local':
+    if db_source == 'local':
         return missing_local
-    elif db_source == 'Remote':
+    elif db_source == 'remote':
         return missing_remote
     else:
         return missing_local, missing_remote, missing_from_localdb
 
-def get_cell_status(dl_dir, processed_dir, grid_cell, yrs,data_source='stac'):
+def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source='stac'):
     
     cell_dict = {}
  
     if os.path.exists(Path('{}/{:06d}/processing.info'.format(dl_dir,int(grid_cell)))):
         processing_db = get_img_list_from_db(dl_dir, grid_cell, 'All', yrs, data_source='stac')
+        yrdf1 =  processing_db.groupby(['yr']).size().to_frame('seen')
+
+        ax = processing_db.groupby(['yr','sensor']).size().unstack().plot(kind='bar', stacked=True, figsize=(20, 5), 
+                                     title=('Number images processed per year for cell {}'.format(grid_cell)))
+        fig1 = ax.get_figure()
+        fig1_path = os.path.join(out_dir,'{}_images_processed_by_sensor.png'.format(grid_cell))
+        fig1.savefig(fig1_path, format="png")
+        print('saved fig1 to {}'.format(fig1_path))
+        
         if 'redownload' in processing_db:
-            processing_errors1 = processing_db[processing_db['redownload']==True]
-            cell_dict['dl_errors']=processing_errors1.shape[0]
+            processing_errors1 = processing_db[processing_db['redownload'] == True]
+            cell_dict['dl_errors']= int(processing_errors1.shape[0])
         if 'brdf_error' in processing_db:
             processing_errors2 = processing_db[~processing_db['brdf_error'].isnull()]
-            cell_dict['brdf_errors']=processing_errors2.shape[0]
-        
+            cell_dict['brdf_errors']= int(processing_errors2.shape[0])
         if 'skip' in processing_db:
+            skip = processing_db[processing_db['skip'] == True]
+            cell_dict['skipped']=int(skip.shape[0])
             processed0 = processing_db[processing_db['skip']!=True]
+            yrdf2 = processed0.groupby(['yr']).size().to_frame('processed')
             processed = processed0[processed0['redownload']!=True]
         else:
             processed = processing_db
@@ -532,18 +559,61 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs,data_source='stac'):
             brdf = processed[processed['brdf']==True]
             cell_dict['num_processed']=processed.shape[0]
             cell_dict['num_brdf']=brdf.shape[0]
+        else:
+            cell_dict['num_brdf']='brdf step not complete'
         if 'shift_x' in processed:
+            coreged = processed0[processed0['coreg'] != False] 
+            yrdf3 = coreged.groupby(['yr']).size().to_frame('coreged')
+            cell_dict['num_coreged']=coreged.shape[0]
             processed_sentinel = processed[processed.index.str.startswith('S')]
             creg_sentinel = processed_sentinel[processed_sentinel['coreg']==True]
-            cell_dict['num_processed_sent']=processed_sentinel.shape[0]
-            cell_dict['num_coreg_sent']=creg_sentinel.shape[0]
+            cell_dict['num_processed_s2']=processed_sentinel.shape[0]
+            cell_dict['num_coreg_s2']=creg_sentinel.shape[0]
+            cell_dict['per_coreg_s2']=cell_dict['num_coreg_s2'] / cell_dict['num_processed_s2']
             creg_sentinel['abs_shift_x']=creg_sentinel['shift_x'].abs()
             creg_sentinel['abs_shift_y']=creg_sentinel['shift_y'].abs()
-            cell_dict['avg_x_shift']=creg_sentinel['abs_shift_x'].mean()
-            cell_dict['avg_y_shift']=creg_sentinel['abs_shift_y'].mean()
-            cell_dict['med_x_shift']=creg_sentinel['abs_shift_x'].median()
-            cell_dict['med_y_shift']=creg_sentinel['abs_shift_y'].median()
+            cell_dict['avg_x_shift_s2']=creg_sentinel['abs_shift_x'].mean()
+            cell_dict['avg_y_shift_s2']=creg_sentinel['abs_shift_y'].mean()
+            cell_dict['med_x_shift_s2']=creg_sentinel['abs_shift_x'].median()
+            cell_dict['med_y_shift_s2']=creg_sentinel['abs_shift_y'].median()
+            processed_L5 = processed[processed.index.str.startswith('LT05')]
+            creg_L5 = processed_L5[processed_L5['coreg']==True]
+            cell_dict['num_processed_L5']=processed_L5.shape[0]
+            cell_dict['num_coreg_L5']=creg_L5.shape[0]
+            cell_dict['per_coreg_L5']=cell_dict['num_coreg_L5'] / cell_dict['num_processed_L5']
+            creg_L5['abs_shift_x']=creg_L5['shift_x'].abs()
+            creg_L5['abs_shift_y']=creg_L5['shift_y'].abs()
+            cell_dict['avg_x_shift_L5']=creg_L5['abs_shift_x'].mean()
+            cell_dict['avg_y_shift_L5']=creg_L5['abs_shift_y'].mean()
+            cell_dict['med_x_shift_L5']=creg_L5['abs_shift_x'].median()
+            cell_dict['med_y_shift_L5']=creg_L5['abs_shift_y'].median()
+            processed_L7 = processed[processed.index.str.startswith('LE07')]
+            creg_L7 = processed_L7[processed_L7['coreg']==True]
+            cell_dict['num_processed_L7']=processed_L7.shape[0]
+            cell_dict['num_coreg_L7']=creg_L7.shape[0]
+            cell_dict['per_coreg_L7']=cell_dict['num_coreg_L7'] / cell_dict['num_processed_L7']
+            creg_L7['abs_shift_x']=creg_L7['shift_x'].abs()
+            creg_L7['abs_shift_y']=creg_L7['shift_y'].abs()
+            cell_dict['avg_x_shift_L7']=creg_L7['abs_shift_x'].mean()
+            cell_dict['avg_y_shift_L7']=creg_L7['abs_shift_y'].mean()
+            cell_dict['med_x_shift_L7']=creg_L7['abs_shift_x'].median()
+            cell_dict['med_y_shift_L7']=creg_L7['abs_shift_y'].median()
+        else:
+            cell_dict['num_coreged']='coreg step not complete'
+            yrdf3 = yrdf2
+        yrdf4 = yrdf1.join(yrdf2)
+        yrdf = yrdf4.join(yrdf3)
+        yrdf['excluded'] = yrdf['seen'] - yrdf['processed']
+        yrdf['low quality'] = yrdf['processed'] - yrdf['coreged']
+        yrdf.rename(columns={'coreged': 'used'},inplace=True)
 
+        ax2 = yrdf[["used", "uncoreged", "excluded"]].plot(kind="bar", stacked=True, 
+                color=['black','grey','white'], edgecolor = "black", figsize=(20, 5), 
+                title=('Processing status for cell {}'.format(grid_cell)))
+        fig2 = ax2.get_figure()
+        fig2_path = os.path.join(out_dir,'{}_images_processed_by_stat.png'.format(grid_cell))
+        fig2.savefig(fig2_path, format="png")
+        print('saved fig2 to {}'.format(fig2_path))
         for idx in ['evi2','gcvi','wi','kndvi','nbr','ndmi']:
             idx_path = Path('{}/{:06d}/brdf_ts/ms/{}'.format(processed_dir,int(grid_cell),idx))
             if os.path.exists(idx_path):
@@ -570,7 +640,7 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs,data_source='stac'):
                 print('There are no images in the Sentinel directory for cell {}'.format(grid_cell))
         cell_dict = {}
         
-    return cell_dict
+    return cell_dict, fig1_path, fig2_path
 
 def update_cell_status_db(status_db_path, cell_list, dl_dir, processed_dir, yrs, data_source='stac'):
  
