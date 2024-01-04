@@ -6,6 +6,7 @@ from LUCinSA_helpers.ts_composite import make_ts_composite
 from LUCinSA_helpers.file_checks import reconstruct_db
 from LUCinSA_helpers.file_checks import get_cell_status
 from LUCinSA_helpers.file_checks import check_valid_pixels
+from LUCinSA_helpers.file_checks import update_cell_status_db
 from LUCinSA_helpers.rf import rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.version import __version__
@@ -30,6 +31,7 @@ def main():
                            'version',
                            'check_dl_logs',
                            'get_cell_status',
+                           'update_summary_db',
                            'get_time_series', 
                            'make_ts_composite', 
                            'check_processing',
@@ -41,29 +43,32 @@ def main():
 
     for process in available_processes:
         subparser = subparsers.add_parser(process)
-
         if process == 'version':
             continue
         if process == 'check_dl_logs':
             subparser.add_argument('--cell_db_path', dest = 'cell_db_path', help='path to master downloading database') 
-            subparser.add_argument('--archive_path', dest = 'archive_path', help='path to location to store log files after processing)
+            subparser.add_argument('--archive_path', dest = 'archive_path', help='path to location to store log files after processing')
             subparser.add_argument('--stop_date', dest = 'stop_date', help='last date for gap search, YYYY-MM-DD', default='2022-12-31')
             subparser.add_argument('--start_date', dest = 'start_date', help='first date for gap search, YYYY-MM-DD', default='2000-01-01') 
             subparser.add_argument('--ignore_dates', dest = 'ignore_dates', help='dates to ignore errors for. YYYY-MM-DD,YYYY-MM-DD',default=None)
             subparser.add_argument('--log_path', dest = 'log_path', help='location of log files before processing',default=None)
-        if process == 'get_cell_status' or process == 'check_processing':
+        if process in ['get_cell_status','check_processing','update_summary_db']:
             subparser.add_argument('--raw_dir', dest ='raw_dir', help='directory containing downloaded images')
             subparser.add_argument('--processed_dir', dest ='processed_dir', help='directory containing processed images (brdf for check_processing, smooth ts for get_cell_status')
+        if process in ['get_cell_status','check_processing]:                           
             subparser.add_argument('--grid_cell', dest ='grid_cell', help='cell to process')
             subparser.add_argument('--yrs', dest ='yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
             subparser.add_argument('--data_source', dest ='data_source', help='stac or GEE', default='stac')
+        if process == 'check_dl_logs':
+            subparser.add_argument('--status_db_path', dest = 'status_db_path', help='path to master processing database') 
+            subparser.add_argument('--cell_list', dest ='cell_list', help='list of cells to process. If None, processes all in raw_dir', default=None)
         if process == 'check_processing':
             subparser.add_argument('--image_type', dest ='image_type', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
         if process == 'get_cell_status':
             subparser.add_argument('--print_plot', dest='print_plot', help='whether to generate plot graphics', default=False)
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for plot graphics', default=None)
         if process == 'reconstruct_db':
-            subparser.add_argument('--processing_info_path', dest ='processing_info_path', help='path to processing.info file')
+            subparser.add_argument('--processing_info_path', dest ='processing_info_path', help='path to processing.info file for cell')
             subparser.add_argument('--landsat_path', dest ='landsat_path', help='path to landsat download folder')
             subparser.add_argument('--senteinel2_path', dest ='sentinel2_path', help='path to sentinel2 download folder')
             subparser.add_argument('--brdf_path', dest ='brdf_path', help='path to brdf folder')
@@ -124,7 +129,11 @@ def main():
                       stop_date = args.stop_date,
                       start_date = args.start_date,
                       ignore_dates = args.ignore_dates)
-                                   
+    if args.process == 'update_summary_db':
+        update_cell_status_db(status_db_path = args.status_db_path, 
+                              cell_list = args.cell_list, 
+                              dl_dir = args.raw_dir, 
+                              processed_dir = args.processed_dir)
     if args.process == 'get_time_series':
         get_timeseries_for_pts_multicell(out_dir = args.out_dir,
                              spec_index = args.spec_index,
