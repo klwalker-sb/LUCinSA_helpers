@@ -53,6 +53,7 @@ def main():
         if process == 'check_processing':
             subparser.add_argument('--image_type', dest ='image_type', help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
         if process == 'get_cell_status':
+            subparser.add_argument('--print_plot', dest='print_plot', help='whether to generate plot graphics', default=False)
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for plot graphics', default=None)
         if process == 'reconstruct_db':
             subparser.add_argument('--processing_info_path', dest ='processing_info_path', help='path to processing.info file')
@@ -154,6 +155,7 @@ def main():
                         processed_dir = args.processed_dir, 
                         grid_cell = args.grid_cell, 
                         yrs = args.yrs, 
+                        print_plot = arge.print_plot
                         out_dir = args.out_dir, 
                         data_source = args.data_source)
         

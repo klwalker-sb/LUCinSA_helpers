@@ -35,7 +35,8 @@ def print_files_in_directory(in_dir,endstring,print_list=False,out_dir=None,data
             elif data_source == 'stac':
                 filedf['sensor'] = filedf.apply(lambda x: x['file'].split('_')[1][:4], axis=1)
                 filedf['date'] = filedf.apply(lambda x: x['file'].split('_')[3][:8], axis=1)
-                filedf['base']=filedf.apply(lambda x: "_".join(x['file'].split("_")[:4]), axis=1)
+                filedf['base'] = filedf.apply(lambda x: "_".join(x['file'].split("_")[:4]), axis=1)
+                filedf['quality'] = filedf.apply(lambda x: 'low_quality' if x['file'].endswith('X.nc') else 'image_used', axis=1)
             filedf['yr'] = filedf['date'].str[:4]
             filedf['yrmo'] = filedf['date'].str[:6]
             sorted_files = filedf.sort_values(by='date')
@@ -63,11 +64,14 @@ def print_files_in_multiple_directories(full_dir,sub_dir,endstring,print_list=Fa
     fullfile_df = pd.concat(multi_file_list)
     num_cells = len(multi_file_list)
     len_orig = len(fullfile_df)
+    # sort by 'quality' so that 'low_quality' are dropped before 'image_used' when keep='First'
+    #   (if an image is used for any cell it is used for the total product)
+    fullfile_df.sort_values(by='quality',inplace=True)
     unique_imgs = fullfile_df.drop_duplicates(subset=['base'],keep='first')
     print('There are {} processed images from {} unique Sentinel/Landsat images over {} cells.'.format(len_orig,len(unique_imgs),num_cells))
     
     if print_list == True:
-        pd.DataFrame.to_csv(unique_imgs, os.path.join(out_dir,'ALLFileList.txt'), sep=',', na_rep='.', index=False)   
+        pd.DataFrame.to_csv(unique_imgs, os.path.join(out_dir,'ALLFileList.csv'), sep=',', na_rep='.', index=False)   
         
     return unique_imgs
 
@@ -280,7 +284,7 @@ def get_img_list_from_db(in_dir, grid_cell, sensor, yrs, data_source='stac'):
     yrs is a list in format [YYYY, YYYY]
     '''
     if data_source == 'stac':
-        scene_info_combo = (Path('{}/{:06d}/processing.info'.format(in_dir,grid_cell)))
+        scene_info_combo = (Path('{}/{:06d}/processing.info'.format(in_dir,int(grid_cell))))
         if os.path.exists(scene_info_combo):
             df = read_db(scene_info_combo,'current')
             if yrs:
@@ -526,11 +530,12 @@ def compare_files_to_db(sensor, db_source, in_dir, grid_cell, grid_file, yrs, da
     else:
         return missing_local, missing_remote, missing_from_localdb
 
-def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source='stac'):
+def get_cell_status(dl_dir, processed_dir, grid_cell, yrs=None, print_plot=False, out_dir=None, data_source='stac'):
     
     cell_dict = {}
-    fig1_path = os.path.join(out_dir,'{}_images_processed_by_sensor.png'.format(grid_cell))
-    fig2_path = os.path.join(out_dir,'{}_images_processed_by_stat.png'.format(grid_cell))
+    if print_plot == True:
+        fig1_path = os.path.join(out_dir,'{}_images_processed_by_sensor.png'.format(grid_cell))
+        fig2_path = os.path.join(out_dir,'{}_images_processed_by_stat.png'.format(grid_cell))
  
     if os.path.exists(Path('{}/{:06d}/processing.info'.format(dl_dir,int(grid_cell)))):
         processing_db = get_img_list_from_db(dl_dir, grid_cell, 'All', yrs, data_source='stac')
@@ -560,11 +565,12 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
         yrdf2 = processed.groupby(['yr']).size().to_frame('ingested')  
                                               
         ## Produce figure of images ingested by sensor and year
-        ax = processed.groupby(['yr','sensor']).size().unstack().plot(kind='bar', stacked=True, figsize=(20, 5), 
+        if print_plot==True:
+            ax = processed.groupby(['yr','sensor']).size().unstack().plot(kind='bar', stacked=True, figsize=(20, 5), 
                                      title=('Number images processed per year for cell {}'.format(grid_cell)))
-        fig1 = ax.get_figure()
-        fig1.savefig(fig1_path, format="png")
-        print('saved fig1 to {}'.format(fig1_path))
+            fig1 = ax.get_figure()
+            fig1.savefig(fig1_path, format="png")
+            print('saved fig1 to {}'.format(fig1_path))
         
         ## Add info on images ingested per year to dict:    
         for index, row in yrdf2.iterrows():                                      
@@ -590,7 +596,8 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
             creg_sentinel = processed_sentinel[processed_sentinel['coreg']==True]
             cell_dict['num_processed_s2']=processed_sentinel.shape[0]
             cell_dict['num_coreg_s2']=creg_sentinel.shape[0]
-            cell_dict['per_coreg_s2']=cell_dict['num_coreg_s2'] / cell_dict['num_processed_s2']
+            if cell_dict['num_processed_s2'] > 0:
+                cell_dict['per_coreg_s2']=cell_dict['num_coreg_s2'] / cell_dict['num_processed_s2']
             creg_sentinel['abs_shift_x']=creg_sentinel['shift_x'].abs()
             creg_sentinel['abs_shift_y']=creg_sentinel['shift_y'].abs()
             cell_dict['avg_x_shift_s2']=creg_sentinel['abs_shift_x'].mean()
@@ -601,7 +608,8 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
             creg_L5 = processed_L5[processed_L5['coreg']==True]
             cell_dict['num_processed_L5']=processed_L5.shape[0]
             cell_dict['num_coreg_L5']=creg_L5.shape[0]
-            cell_dict['per_coreg_L5']=cell_dict['num_coreg_L5'] / cell_dict['num_processed_L5']
+            if cell_dict['num_processed_L5'] > 0:
+                cell_dict['per_coreg_L5']=cell_dict['num_coreg_L5'] / cell_dict['num_processed_L5']
             creg_L5['abs_shift_x']=creg_L5['shift_x'].abs()
             creg_L5['abs_shift_y']=creg_L5['shift_y'].abs()
             cell_dict['avg_x_shift_L5']=creg_L5['abs_shift_x'].mean()
@@ -612,7 +620,8 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
             creg_L7 = processed_L7[processed_L7['coreg']==True]
             cell_dict['num_processed_L7']=processed_L7.shape[0]
             cell_dict['num_coreg_L7']=creg_L7.shape[0]
-            cell_dict['per_coreg_L7']=cell_dict['num_coreg_L7'] / cell_dict['num_processed_L7']
+            if cell_dict['num_processed_L7'] > 0:
+                cell_dict['per_coreg_L7']=cell_dict['num_coreg_L7'] / cell_dict['num_processed_L7']
             creg_L7['abs_shift_x']=creg_L7['shift_x'].abs()
             creg_L7['abs_shift_y']=creg_L7['shift_y'].abs()
             cell_dict['avg_x_shift_L7']=creg_L7['abs_shift_x'].mean()
@@ -621,6 +630,8 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
             cell_dict['med_y_shift_L7']=creg_L7['abs_shift_y'].median()
         else:
             cell_dict['num_coreged']='coreg step not complete'
+            # TODO: fix this. This allows processing to go through, but not right for these cells.
+            yrdf3 = yrdf2.rename(columns={'ingested':'coreged'})
 
         yrdf4 = yrdf1.join(yrdf2)
         yrdf = yrdf4.join(yrdf3)
@@ -629,12 +640,13 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
         yrdf.rename(columns={'coreged': 'used'},inplace=True)
 
         ## Produce figure of processing status by year
-        ax2 = yrdf[["used", "low quality", "excluded"]].plot(kind="bar", stacked=True, 
+        if print_plot==True:
+            ax2 = yrdf[["used", "low quality", "excluded"]].plot(kind="bar", stacked=True, 
                 color=['black','grey','white'], edgecolor = "black", figsize=(20, 5), 
                 title=('Processing status for cell {}'.format(grid_cell)))
-        fig2 = ax2.get_figure()
-        fig2.savefig(fig2_path, format="png")
-        print('saved fig2 to {}'.format(fig2_path))
+            fig2 = ax2.get_figure()
+            fig2.savefig(fig2_path, format="png")
+            print('saved fig2 to {}'.format(fig2_path))
         
         ## Get ts processing stats 
         #for idx in ['evi2','gcvi','wi','kndvi','nbr','ndmi']:
@@ -649,7 +661,7 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
     ## check status if processing db dos not exist (this is now rare unless nothing has been downloaded)
     else:
         ##Check if files have been downloaded for cell:
-        ls_dir = Path('{}/{:06d}/landsat'.format(dl_dir,grid_cell))
+        ls_dir = Path('{}/{:06d}/landsat'.format(dl_dir,int(grid_cell)))
         if os.path.exists(ls_dir) == False:
             print('There is no Landsat directory for cell {}'.format(grid_cell))
         else:
@@ -657,19 +669,25 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs, out_dir, data_source=
             if ls_imgs is None:
                 print('There are no images in the Landsat directory for cell {}'.format(grid_cell))
      
-        s2_dir = Path('{}/{:06d}/sentinel2'.format(dl_dir,grid_cell))
+        s2_dir = Path('{}/{:06d}/sentinel2'.format(dl_dir,int(grid_cell)))
         if os.path.exists(s2_dir) == False:
             print('There is no Sentinel directory for cell {}'.format(grid_cell))
         else:
             s2_imgs = print_files_in_directory(s2_dir,'.tif',print_list=False,out_dir=None,data_source='stac')
             if s2_imgs is None:
                 print('There are no images in the Sentinel directory for cell {}'.format(grid_cell))
-        
-    return cell_dict, fig1_path, fig2_path
+    
+    if print_plot == True:
+        return cell_dict, fig1_path, fig2_path
+    else:
+        return cell_dict
 
-def update_cell_status_db(status_db_path, cell_list, dl_dir, processed_dir, yrs, data_source='stac'):
+def update_cell_status_db(status_db_path, cell_list, dl_dir, processed_dir):
  
-    #status_db_path = os.path.join(in_dir2,cell_processing_post.csv)
+    if cell_list == 'All':
+        cell_list = [f.name for f in os.scandir(processed_dir) if f.is_dir() and f.name.startswith('0')]
+        print('there are {} cells with some degree of processing.'.format(len(cell_list)))
+        
     if Path(status_db_path).is_file():
         status_dict = pd.read_csv(Path(status_db_path),index_col=[0]).to_dict(orient='index')
     else:
@@ -677,10 +695,11 @@ def update_cell_status_db(status_db_path, cell_list, dl_dir, processed_dir, yrs,
         
     for cell_id in cell_list:
         print('processing cell {}'.format(cell_id))
-        new_dict_entry = get_cell_status(dl_dir, processed_dir, cell_id, yrs, data_source='stac')
+        new_dict_entry = get_cell_status(dl_dir, processed_dir, cell_id, yrs=None, print_plot=False, out_dir=None, data_source='stac')
         if cell_id in status_dict:
             status_dict[cell_id].update(new_dict_entry)
         else:
+            #status_dict[grid_cell]={}
             status_dict[cell_id]=new_dict_entry
             
     updated_processing_info = pd.DataFrame.from_dict(status_dict,orient='index')
@@ -688,8 +707,6 @@ def update_cell_status_db(status_db_path, cell_list, dl_dir, processed_dir, yrs,
     pd.DataFrame.to_csv(updated_processing_info, status_db_path, index='cell_id')
 
     return updated_processing_info
-
-    status_dict[grid_cell]={}
             
 def get_num_valid_pix_for_stac(file_list, date_list=None):
     import geowombat as gw  #This throws an error in jupyter notebooks running on older systems, so better to import only as needed
