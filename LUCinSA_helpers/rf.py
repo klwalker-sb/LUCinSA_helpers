@@ -19,7 +19,7 @@ from sklearn.inspection import permutation_importance
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import cross_validate
-import seaborn as sn
+#import seaborn as sn
 from joblib import dump, load
 
 ## Tell GDAL to throw Python exceptions, and register all drivers
