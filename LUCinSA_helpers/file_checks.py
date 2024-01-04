@@ -650,13 +650,14 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs=None, print_plot=False
         
         ## Get ts processing stats 
         #for idx in ['evi2','gcvi','wi','kndvi','nbr','ndmi']:
-        ts_dir = Path('{}/{:06d}/brdf_ts/ms)]'.format(processed_dir,int(grid_cell)))
-        ts_indices = [x[0] for x in os.walk(ts_dir)]
-        for idx in ts_indices:
-            idx_path = os.path.join(ts_dir,'{}'.format(idx))
-            ts = sorted([f for f in os.listdir(idx_path) if f.endswith('tif')])
-            if len(ts)>0:
-                cell_dict['index_{}'.format(idx)]='{}-{}'.format(ts[0][:4],ts[-1][:4])
+        ts_dir = Path('{}/{:06d}/brdf_ts/ms'.format(processed_dir,int(grid_cell)))
+        if os.path.exists(ts_dir):
+            ts_indices = [t.name for t in os.scandir(ts_dir) if t.is_dir()]
+            for idx in ts_indices:
+                idx_path = os.path.join(ts_dir,'{}'.format(idx))
+                ts = sorted([f for f in os.listdir(idx_path) if f.endswith('tif')])
+                if len(ts)>0:
+                    cell_dict['index_{}'.format(idx)]='{}-{}'.format(ts[0][:4],ts[-1][:4])
     
     ## check status if processing db dos not exist (this is now rare unless nothing has been downloaded)
     else:
