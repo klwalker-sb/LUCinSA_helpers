@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 import argparse
+from LUCinSA_helpers.check_log_files_dl import check_dl_logs
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite
+from LUCinSA_helpers.file_checks import reconstruct_db
 from LUCinSA_helpers.file_checks import get_cell_status
 from LUCinSA_helpers.file_checks import check_valid_pixels
-from LUCinSA_helpers.file_checks import reconstruct_db
 from LUCinSA_helpers.rf import rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.version import __version__
 
 def main():
-
     ##Setup to parse lists from Bash script (need to enter as string in Bash)
     def check_for_list(arg_input):
         if arg_input.startswith('['):
@@ -27,8 +27,9 @@ def main():
     subparsers = parser.add_subparsers(dest='process')
 
     available_processes = [
-                           'version', 
-                           'get_cell_status'
+                           'version',
+                           'check_dl_logs',
+                           'get_cell_status',
                            'get_time_series', 
                            'make_ts_composite', 
                            'check_processing',
@@ -43,7 +44,13 @@ def main():
 
         if process == 'version':
             continue
-
+        if process == 'check_dl_logs':
+            subparser.add_argument('--cell_db_path', dest = 'cell_db_path', help='path to master downloading database') 
+            subparser.add_argument('--archive_path', dest = 'archive_path', help='path to location to store log files after processing)
+            subparser.add_argument('--stop_date', dest = 'stop_date', help='last date for gap search, YYYY-MM-DD', default='2022-12-31')
+            subparser.add_argument('--start_date', dest = 'start_date', help='first date for gap search, YYYY-MM-DD', default='2000-01-01') 
+            subparser.add_argument('--ignore_dates', dest = 'ignore_dates', help='dates to ignore errors for. YYYY-MM-DD,YYYY-MM-DD',default=None)
+            subparser.add_argument('--log_path', dest = 'log_path', help='location of log files before processing',default=None)
         if process == 'get_cell_status' or process == 'check_processing':
             subparser.add_argument('--raw_dir', dest ='raw_dir', help='directory containing downloaded images')
             subparser.add_argument('--processed_dir', dest ='processed_dir', help='directory containing processed images (brdf for check_processing, smooth ts for get_cell_status')
@@ -109,7 +116,15 @@ def main():
     if args.process == 'version':
       print(__version__)
       return
-
+                                   
+    if args.process == 'check_dl_logs':
+        check_dl_logs(cell_db_path = args.cell_db_path,
+                      archive_path = args.archive_path,
+                      log_path = args.log_path,
+                      stop_date = args.stop_date,
+                      start_date = args.start_date,
+                      ignore_dates = args.ignore_dates)
+                                   
     if args.process == 'get_time_series':
         get_timeseries_for_pts_multicell(out_dir = args.out_dir,
                              spec_index = args.spec_index,
@@ -126,7 +141,7 @@ def main():
                              seed = args.seed,
                              load_samp = args.load_samp,
                              ptfile = args.ptfile)
-        
+                                   
     if args.process == 'mosaic':
         moasic_cells(cell_list = args.cell_list,
                      in_dir_main = args.in_dir_main,

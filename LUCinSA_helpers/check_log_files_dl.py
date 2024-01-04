@@ -1,18 +1,5 @@
 #!/usr/bin/env python
 # coding: utf-8
-
-'''
-checks log files for errors (.err files produced from download process).
-(download process must be run with specific SLURM script that prints info)
-logs errors and gaps in time sequence to master database
-updates errors and gaps with subsequent logs for same cell
-archives all log files once there are no errors in 'dl_to_fix'
-note: there still may be gaps and unfixable errors that can be seen in database
-deletes all .out files (they contain no information)
-.out file from this script contains info on this current batch of cells for
-quick reference.
-'''
-
 import os
 import sys
 import datetime
@@ -21,19 +8,12 @@ from pathlib import Path
 import ast
 import shutil
 
-cell_db_path = sys.argv[1]
-archive_path = sys.argv[2]
-ignore_dates = sys.argv[3]
-
-ignore = [d for d in ignore_dates.split(',')]
-ignore_dt = [datetime.datetime.strptime(d,'%Y-%m-%d').date() for d in ignore]
-
-def find_gaps(ranges, start='2000-01-01', stop='2022-12-31'):
+def find_gaps(ranges, start_date, stop_date):
     if len(ranges) <= 1:
         return []
     gaps = []
     # check for gap at the beginning of range:
-    startd = datetime.datetime.strptime(start,'%Y-%m-%d').date()
+    startd = datetime.datetime.strptime(start_date,'%Y-%m-%d').date()
     if ranges[0][0] > startd:
         gaps.append([startd,ranges[0][0]])
     # Set marker at the end of the first range
@@ -51,17 +31,20 @@ def find_gaps(ranges, start='2000-01-01', stop='2022-12-31'):
         # advance "current" if the next end time is past the current end time
         current = max(pair[1], current)
     # check for gap at the end of range:
-    stopd = datetime.datetime.strptime(stop,'%Y-%m-%d').date()
+    stopd = datetime.datetime.strptime(stop_date,'%Y-%m-%d').date()
     if ranges[-1][1] < stopd:
         gaps.append([ranges[-1][1],stopd])
     return gaps
 
-def check_logfile_dl(logfile, cell_dict,ignore_dates):
+def check_logfile_dl(logfile, cell_dict,stop_date='2022-12-31', start_date='2000-01-01', ignore_dates=None):
     cell_id=None
     core_requested=None
     runtime=None
     periods = []
     errors=[]
+    if ignore_dates is not None:
+        ignore = [d for d in ignore_dates.split(',')]
+        ignore_dt = [datetime.datetime.strptime(d,'%Y-%m-%d').date() for d in ignore]
     with open(logfile) as f:
         for line in f:
             if 'cell_id' in line:
@@ -122,36 +105,42 @@ def check_logfile_dl(logfile, cell_dict,ignore_dates):
             else:
                 old_errors = cell_dict[cell_id]['dllog_errors']
             unresolved_errors = [e for e in old_errors if e in errors or e not in new_ranges]
-            new_errors = [e for e in errors if
-            datetime.datetime.strptime(e[0],'%Y-%m-%d').date() < old_start or datetime.datetime.strptime(e[1],'%Y-%m-%d').date() > old_end]
+            new_errors = [e for e in errors if datetime.datetime.strptime(e[0],'%Y-%m-%d').date() < old_start 
+                          or datetime.datetime.strptime(e[1],'%Y-%m-%d').date() > old_end]
             if len(unresolved_errors) > 0:
                 new_errors.extend(unresolved_errors)
             cell_dict[cell_id]['dllog_errors']=new_errors
-            ## error in most recent period (specifiec with ignore param) probably cant be fixed and should be ignored for now:
-            if ignore in new_errors:
-                errors_to_fix = new_errors.remove(ignore)
-            elif ignore_dt in errors:
-                errors_to_fix = new_errors.remove(ignore_dt)
-            else:
-                errors_to_fix = new_errors
+            ## error in most recent period (specific with ignore param) probably cant be fixed and should be ignored for now:
+            errors_to_fix = new_errors
+            if ignore_dates is not None:
+                if ignore in new_errors:
+                    errors_to_fix = new_errors.remove(ignore)
+                elif ignore_dt in errors:
+                    errors_to_fix = new_errors.remove(ignore_dt)
             cell_dict[cell_id]['dl_fix_now']=errors_to_fix
             ## get new gap sequence:
             orig_range = [old_start,old_end]
             ranges.append(orig_range)
-            date_gaps=find_gaps(ranges)
+            date_gaps=find_gaps(ranges, start_date, stop_date)
             ## add runtime:
             cell_dict[cell_id]['dltime']=int(cell_dict[cell_id]['dltime'])+runtime
             cell_dict[cell_id]['dlcoremin']=int(cell_dict[cell_id]['dlcoremin'])+runtime*core_requested
         else:
             print('adding cell to processing db...')
-            if ignore in errors:
-                errors_to_fix = errors.remove(ignore)
-            if ignore_dt in errors:
-                errors_to_fix = errors.remove(ignore_dt)
-            else:
-                errors_to_fix = errors
-            date_gaps = find_gaps(ranges)
-            new_dict_entry={cell_id:{'dllog_start':ranges[0][0],'dllog_end':ranges[-1][1],'dllog_gaps':date_gaps,'dllog_errors':errors,'dltime':runtime,'dlcoremin':runtime*core_requested,'dl_fix_now':errors_to_fix}}
+            errors_to_fix = errors
+            if ignore_dates is not None:
+                if ignore in errors:
+                    errors_to_fix = errors.remove(ignore)
+                if ignore_dt in errors:
+                    errors_to_fix = errors.remove(ignore_dt)
+            date_gaps = find_gaps(ranges, start_date, stop_date)
+            new_dict_entry={cell_id:{'dllog_start':ranges[0][0],
+                                     'dllog_end':ranges[-1][1],
+                                     'dllog_gaps':date_gaps,
+                                     'dllog_errors':errors,
+                                     'dltime':runtime,
+                                     'dlcoremin':runtime*core_requested,
+                                     'dl_fix_now':errors_to_fix}}
             cell_dict.update(new_dict_entry)
 
         if len(date_gaps) == 0:
@@ -182,19 +171,32 @@ def archive_logfile(logfile,cell_dict,archive_path):
     elif len(cell_dict[cell_id]['dl_fix_now']) == 0:
         shutil.move(f'./{logfile}', archive_path)
 
+def check_dl_logs(cell_db_path, archive_path, log_path='.', stop_date='2022-12-31', start_date='2000-01-01', ignore_dates=None):
+    '''
+    checks log files for errors (.err files produced from download process).
+    (download process must be run with specific SLURM script that prints info)
+    logs errors and gaps in time sequence to master database
+    updates errors and gaps with subsequent logs for same cell
+    archives all log files once there are no errors in 'dl_to_fix'
+    note: there still may be gaps and unfixable errors that can be seen in database
+    deletes all .out files (they contain no information)
+    .out file from this script contains info on this current batch of cells for
+    quick reference.
+    '''
     ## get the existing cell database as a dictionary
     if Path(cell_db_path).is_file():
+        #TODO: make a temp copy so the original does not get corrupted
         cell_dict = pd.read_csv(Path(cell_db_path),index_col=[0]).to_dict(orient='index')
     else:
         cell_dict = {}
     ## update records based on curent logfiles
     cell_batch = set([])
-    logfiles = [f for f in os.listdir('.') if f.startswith('stacdl')and f.endswith('.err')]
+    logfiles = [os.path.join(log_path,f) for f in os.listdir(log_path) if f.startswith('stacdl')and f.endswith('.err')]
     for logfile in logfiles:
-        processed = check_logfile_dl(logfile, cell_dict, ignore_dates)
+        processed = check_logfile_dl(logfile, cell_dict, stop_date, start_date, ignore_dates)
         cell_batch.add(processed[0])
     ## These output files contain no information; can just remove
-    outfiles = [f for f in os.listdir('.') if f.startswith('stacdl')and f.endswith('.out')]
+    outfiles = [os.path.join(log_path,f) for f in os.listdir(log_path) if f.startswith('stacdl')and f.endswith('.out')]
     for outfile in outfiles:
         os.remove(outfile)
     ## Archive logfiles after running all because errors in some may be removed by subsequent files
