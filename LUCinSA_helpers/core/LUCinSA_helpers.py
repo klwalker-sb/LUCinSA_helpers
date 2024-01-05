@@ -3,10 +3,8 @@ import argparse
 from LUCinSA_helpers.check_log_files_dl import check_dl_logs
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite
-from LUCinSA_helpers.file_checks import reconstruct_db
-from LUCinSA_helpers.file_checks import get_cell_status
-from LUCinSA_helpers.file_checks import check_valid_pixels
-from LUCinSA_helpers.file_checks import update_cell_status_db
+from LUCinSA_helpers.file_checks import reconstruct_db, get_cell_status, check_valid_pixels, update_cell_status_db
+from LUCinSA_helpers.file_checks import print_files_in_multiple_directories
 from LUCinSA_helpers.rf import rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.version import __version__
@@ -34,12 +32,15 @@ def main():
                            'update_summary_db',
                            'get_time_series', 
                            'make_ts_composite', 
-                           'check_processing',
+                           'check_valid_pix',
                            'reconstruct_db',
+                           'check_ts_windows',
+                           'summarize_images_multicell',
                            'rf_model', 
                            'rf_classification', 
                            'mosaic'
                           ]
+print_files_in_multiple_directories(basic_config['raw_dir'],"brdf",'.nc',print_list=True,out_dir=basic_config['local_dir'])
 
     for process in available_processes:
         subparser = subparsers.add_parser(process)
@@ -71,7 +72,7 @@ def main():
                                    help='path to master processing database') 
             subparser.add_argument('--cell_list', dest ='cell_list', 
                                    help='list of cells to process. If All, processes all in raw_dir', default='All')
-        if process == 'check_processing':
+        if process == 'check_valid_pix':
             subparser.add_argument('--image_type', dest ='image_type', 
                                    help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
         if process == 'get_cell_status':
@@ -83,6 +84,18 @@ def main():
             subparser.add_argument('--landsat_path', dest ='landsat_path', help='path to landsat download folder')
             subparser.add_argument('--senteinel2_path', dest ='sentinel2_path', help='path to sentinel2 download folder')
             subparser.add_argument('--brdf_path', dest ='brdf_path', help='path to brdf folder')
+        
+        if process == 'summarize_images_multicell':
+            subparser.add_argument('--full_dir', dest='full_dir', help='path to main directory containing all cells')
+            subparser.add_argument('--sub_dir', dest='sub-dir', help='name of subdirectory with images to summarize',default='brdf')
+            subparser.add_argument('--endstring', dest='endstring', help='endstring of files to be included in sumary',default='.nc')
+            subparser.add_argument('--print_list', dest='print_list', help='True if list is to be printed to file',default=False)
+            subparser.add_argument('--out_dir', dest='out_dir', help='directory to print list to if print_list==True', default=None)
+            
+        if process == 'check_ts_windows':
+            subparser.add_argument('--processed_dir', dest='processed_dir', help='path to main directory with ts indices') 
+            subparser.add_argument('-- grid_cell', dest='grid_cell', help='grid cell # (1 to 6 digits)')
+            subparser.add_argument('-- spec_index', dest='spec-index', help='spectral index to be processed', default='evi2')
         
         if process == 'mosaic':
             subparser.add_argument('--cell_list', dest='cell_list', help='list of cells to mosiac', default=None)
@@ -156,6 +169,12 @@ def main():
                               dl_dir = args.raw_dir, 
                               processed_dir = args.processed_dir)
         
+    if args.process == 'summarize_images_multicell':
+        print_files_in_multiple_directories(full_dir = args.full_dir,
+                                            sub_dir = args.sub_dir,
+                                            endstring = args.endstring,
+                                            print_list = args.print_list,
+                                            out_dir = args.out_dir)    
     if args.process == 'get_time_series':
         get_timeseries_for_pts_multicell(out_dir = args.out_dir,
                              spec_index = args.spec_index,
@@ -188,7 +207,7 @@ def main():
                         spec_index = args.spec_index,
                         bands_out = args.bands_out)
 
-    if args.process == 'check_processing':
+    if args.process == 'check_valid_pix':
         check_valid_pixels(raw_dir = args.raw_dir,
                          brdf_dir = args.processed_dir,
                          grid_cell = args.grid_cell,
@@ -231,6 +250,11 @@ def main():
                  importance_method = args.importance_method,
                  ran_hold = args.ran_hold,
                  out_dir = args.out_dir)
-                         
+        
+    #if process == 'check_ts_windows':
+    #    check_ts_windows(processed_dir = args.processed_dir,
+    #                     grid_cell = args.grid_cell,
+    #                     spec_index = args.spec_index)
+        
 if __name__ == '__main__':
     main()

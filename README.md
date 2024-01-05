@@ -3,12 +3,16 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 
 ## Uses
 
-### To summarize processing status and uncover errors amidst large numbers of files on HPC cluster
-* [check download logs](#check-download-logs)
-* reconstruct_db
-* check_processing
-* [get processing summary](#get-processing-summary)
+### To summarize processing status and uncover errors amidst large numbers of files in HPC environment
+#####      single cell error checking:
+* [check download logs](#check-download-logs)(`check_dl_logs`)
+* [check processing status for cell](#check-processing-status-for-cell)(`get_cell_status`)
+* [identify external image errors](#identify-external-image-errors)(
+* [identify internal image errors](#identify-internal-image-errors)
 * get_cell_status
+#####      multi-cell summarization and error checking
+* [summarize images processed](#summarize-images-processed)(`summarize_images_multicell`)
+* [get processing summary](#get-processing-summary)
 
 ### To quickly visualize inputs and outputs of time-series analysis for quality control and interactive troubleshooting
 * get_time_series 
@@ -18,10 +22,10 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 ### To set and document parameter choices and compare outputs for model optimization
 
 ### Also (temporarily) hosts functions to:
-####        create modelling features from smoothed time-series indices and segmentation outputs 
-####        create single-year random forest classification model
+###        create modelling features from smoothed time-series indices and segmentation outputs 
+###        create single-year random forest classification model
 * rf_model 
-####        apply random forest model to gridded data to create wall-to-wall ma
+###        apply random forest model to gridded data to create wall-to-wall map
 * rf_classification 
 * mosaic
 
@@ -70,16 +74,87 @@ Also make sure to use the original .gitignore file (which might be hidden) when 
 Checks the download .err logs from eostac for errors and gaps and adds these to a database for cumulative checking. (downloading from STAC catalogs can result in dropped files and timeout errors that can kill the process. By running downloads in small time chunks (e.g. monthly) in a loop over a multi-year time period, errors should be minimal, but some months will be dropped. The resulting log files are too long to open and read individually. This function provides a way to succinctly summarize errors within them.
 ```
 LUCinSA_helpers check_dl_logs \
-    --cell_db_path '/path/to/cell_processing_dl_test.csv'
-    --archive_path 'path/to/directory_for_checked_eostac_logs' 
-    --log_path '/path/to/directory_with_unchecked_logs'
-    --stop_date '2022-12-31'
-    --start_date '2000-01-01' 
-    --ignore_dates ('2022-11-01,2022-12-31')
+    --cell_db_path '/path/to/cell_processing_dl_test.csv' \
+    --archive_path 'path/to/directory_for_checked_eostac_logs' \
+    --log_path '/path/to/directory_with_unchecked_logs'   \
+    --stop_date '2022-12-31'   \
+    --start_date '2000-01-01'  \
+    --ignore_dates ('2022-11-01,2022-12-31')  
 ```
 example output:
 ![alt](/images/dl_log_check.png)
 
-## get processing summary
+## check processing status for cell
+
+The `get_cell_status` function can also be used to provide a summary for an individual cell (and is used collectively within `update_summary_db` below)
+```
+LUCinSA_helpers get_cell_status \
+      -- raw_dir = 'path/to/main_downloading_directory' \
+      -- processed_dir = 'path/to/main_processing_directory' \
+      -- grid_cell =  XXXXX \
+      -- yrs = [YYYY-YYYY] \
+      -- print_plot = True \
+      -- out_dir = path/to/local/output/directory' \
+      -- data_source = 'stac' \
+```
+The above relies on the processing database that each cell has in its main directory named `processing.info`, which has an entry for each image encountered in the STAC catalog and data regarding its status through the downloading,brdf,and coregistration processing steps.
+
+If `processing.info` is corrupted or deleted for a cell, it can be recreated with `reconstruct-db` (but note that it will not contain all of the detail of the original database):
+```
+LUCinSA_helpers reconstruct_db \
+     --processing_info_path = 'path/to/cell_directory/processing.info' \
+     --landsat_path = 'path/to/cell_directory/landsat'  \
+     --sentinel2_path = 'path/to/cell_directory/sentinel2' \
+     --brdf_path = 'path/to/cell_directory/brdf'  \
+```
+![alt](/images/images_processed_for_cell_by_sensor.jpg)
+![alt](/images/images_processed_for_cell_by_stat.jpg)
+
+## identify external image errors
+Processing errors raised within processes are noted in the `processing.info` database.
+Images not processed due to individual download failure or corrupted data are flagged with the `redownload` and `error` keys.
+
+The Notebook: `1a_ExploreData_FileContent.ipynb` provides some methods to interact with this database to summarize processing for individual grid cells and identify registered errors.
+
+## identify internal image errors
+`check_valid_pix` will return the number of unmasked pixels in an image. This is run internally during the eostac download process and output as `numpix` in the `processing.info` database. It can be rerun after brdf/coreg steps to identify discrepancies and troubleshoot errors.
+```
+LUCinSA_helpers check_valid_pix \
+     -- raw_dir = 'path/to/cell_directory'  \
+     -- brdf_dir = 'path/to/cell_directory/brdf'  \
+     -- grid_cell = XXXXXX  \
+     -- image_type = 'brdf' \
+     -- yrs = [YYYY-YYYY]  \
+     -- data_source = 'stac'  \
+```
+`check_ts_windows` will check whether there is data in all of the windows for time-series outputs.
+```
+LUCinSA_helpers check_ts_windows \
+     --processed_dir = 'path/to/main/ts_directory'  \
+     -- grid_cell = XXXXXX   \
+     -- spec_index = 'evi2'  \
+```
+## summarize images processed
+`summarize_images_multicell` will summarize all images in a given processing folder (landsat downloads, sentinel2 downloads or brdf) across multiple cells and return a database (in memory or printed to .csv) with unique image names (since a single Landsat or Sentinel2 scene covers multiple grid cells). 
+Note: in later stages of a project where some downloads have been cleaned out, this will only work with brdf folder.
+```
+LUCinSA_helpers summarize_images_multicell \
+     -- full_dir = path/to/main/processing_directory \
+     -- sub_dir = 'brdf' \
+     -- endstring = '.nc' \
+     -- print_list = False \
+     -- out_dir = None \
+```
+Graphic smmaries can be generated in the notebook: `5a_SummarizeData_ImagesProcessed.ipynb`
 ![alt](/images/processing_summary.jpg)
 ![alt](/images/processing_summary_qual.jpg)
+
+## get processing summary
+For a more nuanced check of processing status across all cells, `update_summary_db` will...
+```
+LUCinSA_helpers update_summary_db \
+      -- status_db_path = 'path/to/cell_processing_post.csv' 
+      -- cell_list = 'All' \ 
+      -- dl_dir = 'path/to/main_processing_directory' 
+      -- processed_dir = 'path/to/main/ts_directory'
+```
