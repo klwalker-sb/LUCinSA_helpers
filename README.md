@@ -9,7 +9,7 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 * [check processing status for cell](#check-processing-status-for-cell)(`get_cell_status`)
 * [identify external image errors](#identify-external-image-errors)(
 * [identify internal image errors](#identify-internal-image-errors)
-* get_cell_status
+
 #####      multi-cell summarization and error checking
 * [summarize images processed](#summarize-images-processed)(`summarize_images_multicell`)
 * [get processing summary](#get-processing-summary)
@@ -107,8 +107,8 @@ LUCinSA_helpers reconstruct_db \
      --sentinel2_path = 'path/to/cell_directory/sentinel2' \
      --brdf_path = 'path/to/cell_directory/brdf'  \
 ```
-![alt](/images/images_processed_for_cell_by_sensor.jpg)
-![alt](/images/images_processed_for_cell_by_stat.jpg)
+![alt](/images/images_processed_for_cell_by_sensor.png)
+![alt](/images/images_processed_for_cell_by_stat.png)
 
 ## identify external image errors
 Processing errors raised within processes are noted in the `processing.info` database.
