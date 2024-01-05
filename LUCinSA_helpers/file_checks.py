@@ -11,8 +11,12 @@ import pyproj
 import pickle
 import xarray as xr
 import rasterio as rio
+import math
 from shapely.geometry import box
 import matplotlib.pyplot as plt
+
+#diables all those warnings about chained assignments (which we don't care about here):
+pd.options.mode.chained_assignment = None 
 
 def print_files_in_directory(in_dir,endstring,print_list=False,out_dir=None,data_source='stac'):
     '''
@@ -575,7 +579,16 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs=None, print_plot=False
         ## Add info on images ingested per year to dict:    
         for index, row in yrdf2.iterrows():                                      
             cell_dict['images_ingested_{}'.format(index)]=int(row.ingested)
-                                              
+        
+        cell_dict['num_processed_L8']=processed[processed.index.str.startswith('LC08')].shape[0]
+        cell_dict['num_processed_L9']=processed[processed.index.str.startswith('LC09')].shape[0]
+        processed_sentinel = processed[processed.index.str.startswith('S')] #will use this df in coreg below
+        cell_dict['num_processed_s2']=processed_sentinel.shape[0]
+        processed_L5 = processed[processed.index.str.startswith('LT05')] #will use this df in coreg below
+        cell_dict['num_processed_L5']=processed_L5.shape[0]
+        processed_L7 = processed[processed.index.str.startswith('LE07')] #will use this df in coreg below
+        cell_dict['num_processed_L7']=processed_L7.shape[0]
+        
         ## Add brdf processing info to dict:
         if 'brdf' in processed:
             brdf = processed[processed['brdf']==True]
@@ -585,49 +598,45 @@ def get_cell_status(dl_dir, processed_dir, grid_cell, yrs=None, print_plot=False
             cell_dict['num_brdf']='brdf step not complete'
         ## Add coreg prcessing info to dict:
         if 'shift_x' in processed:
-            coreged = processed0[processed0['coreg'] != False] 
+            coreged = processed0[processed0['coreg'] != False]
+            cell_dict['num_coreged']=coreged.shape[0]
             yrdf3 = coreged.groupby(['yr']).size().to_frame('coreged')
             ## Add info on images images used (coreged) per year to dict:    
             for index, row in yrdf3.iterrows():                                      
                 cell_dict['images_used_{}'.format(index)]=int(row.coreged)
-            
-            cell_dict['num_coreged']=coreged.shape[0]
-            processed_sentinel = processed[processed.index.str.startswith('S')]
-            creg_sentinel = processed_sentinel[processed_sentinel['coreg']==True]
-            cell_dict['num_processed_s2']=processed_sentinel.shape[0]
-            cell_dict['num_coreg_s2']=creg_sentinel.shape[0]
+                
             if cell_dict['num_processed_s2'] > 0:
+                creg_sentinel = processed_sentinel[processed_sentinel['coreg']==True]
+                cell_dict['num_coreg_s2']=creg_sentinel.shape[0]
                 cell_dict['per_coreg_s2']=cell_dict['num_coreg_s2'] / cell_dict['num_processed_s2']
-            creg_sentinel['abs_shift_x']=creg_sentinel['shift_x'].abs()
-            creg_sentinel['abs_shift_y']=creg_sentinel['shift_y'].abs()
-            cell_dict['avg_x_shift_s2']=creg_sentinel['abs_shift_x'].mean()
-            cell_dict['avg_y_shift_s2']=creg_sentinel['abs_shift_y'].mean()
-            cell_dict['med_x_shift_s2']=creg_sentinel['abs_shift_x'].median()
-            cell_dict['med_y_shift_s2']=creg_sentinel['abs_shift_y'].median()
-            processed_L5 = processed[processed.index.str.startswith('LT05')]
-            creg_L5 = processed_L5[processed_L5['coreg']==True]
-            cell_dict['num_processed_L5']=processed_L5.shape[0]
-            cell_dict['num_coreg_L5']=creg_L5.shape[0]
+                if cell_dict['num_coreg_s2'] > 0:   
+                    creg_sentinel['shift'] =creg_sentinel.apply(lambda x: 
+                                    math.sqrt(math.pow(x['shift_x'],2)+math.pow(x['shift_y'],2)),axis=1)
+                    cell_dict['avg_shift_s2']=creg_sentinel['shift'].mean()
+                    cell_dict['max_shift_s2']=creg_sentinel['shift'].max()
+                    cell_dict['med_shift_s2']=creg_sentinel['shift'].median()
+            
             if cell_dict['num_processed_L5'] > 0:
+                creg_L5 = processed_L5[processed_L5['coreg']==True]
+                cell_dict['num_coreg_L5']=creg_L5.shape[0]
                 cell_dict['per_coreg_L5']=cell_dict['num_coreg_L5'] / cell_dict['num_processed_L5']
-            creg_L5['abs_shift_x']=creg_L5['shift_x'].abs()
-            creg_L5['abs_shift_y']=creg_L5['shift_y'].abs()
-            cell_dict['avg_x_shift_L5']=creg_L5['abs_shift_x'].mean()
-            cell_dict['avg_y_shift_L5']=creg_L5['abs_shift_y'].mean()
-            cell_dict['med_x_shift_L5']=creg_L5['abs_shift_x'].median()
-            cell_dict['med_y_shift_L5']=creg_L5['abs_shift_y'].median()
-            processed_L7 = processed[processed.index.str.startswith('LE07')]
-            creg_L7 = processed_L7[processed_L7['coreg']==True]
-            cell_dict['num_processed_L7']=processed_L7.shape[0]
-            cell_dict['num_coreg_L7']=creg_L7.shape[0]
+                if cell_dict['num_coreg_L5'] > 0:   
+                    creg_L5['shift'] =creg_L5.apply(lambda x: 
+                              math.sqrt(math.pow(x['shift_x'],2)+math.pow(x['shift_y'],2)),axis=1)
+                    cell_dict['avg_shift_L5']=creg_L5['shift'].mean()
+                    cell_dict['max_shift_L5']=creg_L5['shift'].max()
+                    cell_dict['med_shift_L5']=creg_L5['shift'].median()
+            
             if cell_dict['num_processed_L7'] > 0:
+                creg_L7 = processed_L7[processed_L7['coreg']==True]       
+                cell_dict['num_coreg_L7']=creg_L7.shape[0]
                 cell_dict['per_coreg_L7']=cell_dict['num_coreg_L7'] / cell_dict['num_processed_L7']
-            creg_L7['abs_shift_x']=creg_L7['shift_x'].abs()
-            creg_L7['abs_shift_y']=creg_L7['shift_y'].abs()
-            cell_dict['avg_x_shift_L7']=creg_L7['abs_shift_x'].mean()
-            cell_dict['avg_y_shift_L7']=creg_L7['abs_shift_y'].mean()
-            cell_dict['med_x_shift_L7']=creg_L7['abs_shift_x'].median()
-            cell_dict['med_y_shift_L7']=creg_L7['abs_shift_y'].median()
+                if cell_dict['num_coreg_L7'] > 0:
+                    creg_L7['shift'] =creg_L7.apply(lambda x: 
+                                    math.sqrt(math.pow(x['shift_x'],2)+math.pow(x['shift_y'],2)),axis=1)
+                    cell_dict['avg_shift_L7']=creg_L7['shift'].mean()
+                    cell_dict['max_shift_L7']=creg_L7['shift'].max()
+                    cell_dict['med_shift_L7']=creg_L7['shift'].median()
         else:
             cell_dict['num_coreged']='coreg step not complete'
             # TODO: fix this. This allows processing to go through, but not right for these cells.

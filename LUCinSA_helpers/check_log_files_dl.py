@@ -8,6 +8,8 @@ from pathlib import Path
 import ast
 import shutil
 
+pd.options.mode.chained_assignment = None
+
 def find_gaps(ranges, start_date, stop_date):
     if len(ranges) <= 1:
         return []
