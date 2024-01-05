@@ -151,6 +151,8 @@ def check_logfile_dl(logfile, cell_dict,stop_date='2022-12-31', start_date='2000
     return cell_id, cell_dict
 
 def archive_logfile(logfile,cell_dict,archive_path):
+    if not os.path.exists(archive_path):
+        os.mkdir(archive_path)
     cell_id = None
     with open(logfile) as f:
         for line in f:
@@ -209,6 +211,6 @@ def check_dl_logs(cell_db_path, archive_path, log_path='.', stop_date='2022-12-3
     ## Print just the current batch of cells to logfile for easy error checking
     print(f'all cells prcessed in this batch:{cell_batch}')
     batch_status = new_processing_info[new_processing_info.index.isin(cell_batch)].sort_index()
-    pd.set_option("max_columns", None)
+    pd.set_option("display.max_columns", None)
     pd.set_option('display.max_rows', 500)
     print(batch_status)
