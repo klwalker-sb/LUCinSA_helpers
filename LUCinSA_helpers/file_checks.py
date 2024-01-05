@@ -700,7 +700,6 @@ def update_cell_status_db(status_db_path, cell_list, dl_dir, processed_dir):
         if cell_id in status_dict:
             status_dict[cell_id].update(new_dict_entry)
         else:
-            #status_dict[grid_cell]={}
             status_dict[cell_id]=new_dict_entry
             
     updated_processing_info = pd.DataFrame.from_dict(status_dict,orient='index')

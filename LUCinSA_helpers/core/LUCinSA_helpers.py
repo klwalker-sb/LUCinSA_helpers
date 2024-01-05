@@ -66,11 +66,11 @@ def main():
             subparser.add_argument('--yrs', dest ='yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
             subparser.add_argument('--data_source', dest ='data_source', 
                                    help='stac or GEE', default='stac')
-        if process == 'check_dl_logs':
+        if process == 'update_summary_db':
             subparser.add_argument('--status_db_path', dest = 'status_db_path', 
                                    help='path to master processing database') 
             subparser.add_argument('--cell_list', dest ='cell_list', 
-                                   help='list of cells to process. If None, processes all in raw_dir', default=None)
+                                   help='list of cells to process. If All, processes all in raw_dir', default='All')
         if process == 'check_processing':
             subparser.add_argument('--image_type', dest ='image_type', 
                                    help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
@@ -149,11 +149,13 @@ def main():
                       stop_date = args.stop_date,
                       start_date = args.start_date,
                       ignore_dates = args.ignore_dates)
+        
     if args.process == 'update_summary_db':
         update_cell_status_db(status_db_path = args.status_db_path, 
                               cell_list = args.cell_list, 
                               dl_dir = args.raw_dir, 
                               processed_dir = args.processed_dir)
+        
     if args.process == 'get_time_series':
         get_timeseries_for_pts_multicell(out_dir = args.out_dir,
                              spec_index = args.spec_index,
