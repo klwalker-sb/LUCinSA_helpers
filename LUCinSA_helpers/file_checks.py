@@ -72,7 +72,8 @@ def print_files_in_multiple_directories(full_dir,sub_dir,endstring,print_list=Fa
     #   (if an image is used for any cell it is used for the total product)
     fullfile_df.sort_values(by='quality',inplace=True)
     unique_imgs = fullfile_df.drop_duplicates(subset=['base'],keep='first')
-    print('There are {} processed images from {} unique Sentinel/Landsat images over {} cells.'.format(len_orig,len(unique_imgs),num_cells))
+    print('There are {} processed images from {} unique Sentinel/Landsat images over {} cells.'
+          .format(len_orig,len(unique_imgs),num_cells))
     
     if print_list == True:
         pd.DataFrame.to_csv(unique_imgs, os.path.join(out_dir,'ALLFileList.csv'), sep=',', na_rep='.', index=False)   

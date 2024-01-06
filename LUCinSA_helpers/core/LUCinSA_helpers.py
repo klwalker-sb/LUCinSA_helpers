@@ -5,6 +5,7 @@ from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite
 from LUCinSA_helpers.file_checks import reconstruct_db, get_cell_status, check_valid_pixels, update_cell_status_db
 from LUCinSA_helpers.file_checks import print_files_in_multiple_directories
+from LUCinSA_helpers.var_dataframe import make_var_dataframe
 from LUCinSA_helpers.rf import rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.version import __version__
@@ -36,11 +37,11 @@ def main():
                            'reconstruct_db',
                            'check_ts_windows',
                            'summarize_images_multicell',
+                           'make_var_dataframe',
                            'rf_model', 
                            'rf_classification', 
                            'mosaic'
                           ]
-print_files_in_multiple_directories(basic_config['raw_dir'],"brdf",'.nc',print_list=True,out_dir=basic_config['local_dir'])
 
     for process in available_processes:
         subparser = subparsers.add_parser(process)
@@ -131,13 +132,36 @@ print_files_in_multiple_directories(basic_config['raw_dir'],"brdf",'.nc',print_l
             subparser.add_argument('--bands_out', dest ='bands_out', 
                                    help='bands to create. Currently only 3 allowed. Current options are              Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate, MinDateCos,Jan,Apr,Jun,Aug,Nov')
             subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed')
+           
+        if process == 'make_var_dataframe':
+            subparser.add_argument('--out_dir', dest='out_dir',help='out directory for final dataframes')
+            subparser.add_argument('--spec_indices', dest='spec_indices', help='',
+                                  default = ['evi2','gcvi','wi','kndvi','nbr','ndmi'])
+            subparser.add_argument('--si_vars', dest='si_vars', help = '',
+                                   default='[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]')
+            subparser.add_argument('--in_dir', dest='in_dir', help='')
+            subparser.add_argument('--grid_file', dest='grid_file', help='path to grid file geojson')
+            subparser.add_argument('--cell_list', dest='cell_list', 
+                                   help='list of cells to look for points/poys in. (list or path to .csv file with list, no header', 
+                                   default=None)
+            subparser.add_argument('--ground_polys', dest='ground_polys', 
+                                   help='path to sample polygon file (=None if sample is points)', default=None)
+            subparser.add_argument('--oldest', dest='oldest', 
+                                   help='Oldest polygon to use if yr is in polygon file. =None if ground_polys = None', default=None)
+            subparser.add_argument('--newest', dest='newest',
+                                   help='Newest polygon to use if yr is in polygon file. =None if ground_polys = None', default=None)
+            subparser.add_argument('--npts', dest='npts', 
+                                   help='number of points to sample for each polygon. =None if ground_polys = None', default=None)
+            subparser.add_argument('--seed', dest='seed', help='seed to stabilize random point assignment', default=0)
+            subparser.add_argument('--load_samp', dest='load_samp', help='True if sample is point file', default=False)
+            subparser.add_argument('--ptfile', dest='ptfile', help='path to point file if load_samp == True', default=None)
             
         if process == 'rf_model' or process == 'rf_classification': 
             subparser.add_argument('--df_in', dest ='df_in', help='path to sample dataframe with extracted variable data')
             subparser.add_argument('--classification', dest ='classification', help='Permultation | Inference | None')
             subparser.add_argument('--importance_method', dest ='importance_method', help="All(=LC17),...", default='All')
             subparser.add_argument('--ran_hold', dest ='ran_hold', 
-                                   help='fixed random number, for repetition of same dataset', type=int, default=29)
+                                   help='fixed random number, for repetition of same dataset', type=int, default=0)
             subparser.add_argument('--model_name', dest ='model_name', help='name of model')
                                   
         if process == 'rf_classification':
@@ -223,13 +247,25 @@ print_files_in_multiple_directories(basic_config['raw_dir'],"brdf",'.nc',print_l
                         print_plot = arge.print_plot,
                         out_dir = args.out_dir, 
                         data_source = args.data_source)
-        
     if args.process == 'reconstruct_db':           
         reconstruct_db(processing_info_path = args.processing_info_path,
                  landsat_path = args.landsat_path,
                  sentinel2_path = args.sentinel2_path,
                  brdf_path = args.brdf_path)
-    
+    if args.process == 'make_var_dataframe':
+        make_var_dataframe (out_dir = args.out_dir, 
+                            spec_indices = args.spec_indices,
+                            si_vars = args.si_vars,
+                            in_dir = args.in_dir,
+                            grid_file = args.grid_file,
+                            cell_list = args.cell_list,
+                            ground_polys = args.ground_polys,
+                            oldest = args.oldest,
+                            newest = args.newest,
+                            npts = args.npts,
+                            seed = args.seed,
+                            load_samp = args.load_samp,
+                            ptfile = args.ptfile)
     if args.process == 'rf_model':
         rf_model(df_in = args.df_in, 
                  out_dir = args.out_dir,
