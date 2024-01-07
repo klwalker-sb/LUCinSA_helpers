@@ -11,9 +11,15 @@ from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.version import __version__
 
 def main():
-    ##Setup to parse lists from Bash script (need to enter as string in Bash)
+       
     def check_for_list(arg_input):
-        if arg_input.startswith('['):
+        '''lists passed from Bash will not be parsed correctly. 
+           This function converts variables in Bash scripts that are 
+           entered as strings "[X,X,X]" into lists in Python.
+        '''
+        if isinstance(arg_input, list):
+            arg_input = arg_input
+        elif arg_input.startswith('['):
             arg_input = arg_input[1:-1].split(',')
             try:
                 arg_input = list(map(int, arg_input))
@@ -83,7 +89,7 @@ def main():
             subparser.add_argument('--processing_info_path', dest ='processing_info_path', 
                                    help='path to processing.info file for cell')
             subparser.add_argument('--landsat_path', dest ='landsat_path', help='path to landsat download folder')
-            subparser.add_argument('--senteinel2_path', dest ='sentinel2_path', help='path to sentinel2 download folder')
+            subparser.add_argument('--sentinel2_path', dest ='sentinel2_path', help='path to sentinel2 download folder')
             subparser.add_argument('--brdf_path', dest ='brdf_path', help='path to brdf folder')
         
         if process == 'summarize_images_multicell':
@@ -114,23 +120,24 @@ def main():
         if process == 'get_time_series':
             subparser.add_argument('--end_yr', dest ='end_yr', help='end year', default=2020, type=int)
             subparser.add_argument('--image_type', dest ='image_type', help='.nc or TS currently supported', default='TS')
+        if process in['get_time_series','make_var_dataframe']:
             subparser.add_argument('--grid_file', dest ='grid_file', help='path to grid file')
-            subparser.add_argument('--cell_list', dest ='cell_list', help='list of cells to process', type=int, nargs='+')
+            subparser.add_argument('--cell_list', dest ='cell_list',
+                                   help='list of cells to look for points/poys in. (list or path to .csv file with list, no header' )
             subparser.add_argument('--ground_polys', dest='ground_polys',
-                                   help='path to polygons to sample from; only needed if loadSamp =False')
-            subparser.add_argument('--oldest', dest ='oldest', help='if using groundPolys, oldest poly to use', default=2010)
-            subparser.add_argument('--newest', dest ='newest', help='if using groundPolys, oldest poly to use', default=2020)
-            subparser.add_argument('--npts', dest ='npts', help='if using groundPolys, number of pts per poly to sample', default=2)
-            subparser.add_argument('--seed', dest ='seed', help='if using groundPolys, seed for random sampling within', default=888)
+                                   help='path to polygons to sample from; only needed if load_samp =False')
+            subparser.add_argument('--oldest', dest ='oldest', help='if using ground_polys, oldest poly to use', default=2010)
+            subparser.add_argument('--newest', dest ='newest', help='if using groun_Polys, oldest poly to use', default=2020)
+            subparser.add_argument('--npts', dest ='npts', help='if using ground_olys, number of pts per poly to sample', default=2)
+            subparser.add_argument('--seed', dest ='seed', help='if using ground_olys, seed for random sampling within', default=888)
             subparser.add_argument('--load_samp', dest ='load_samp',
                                    help='whether to load point sample directly instead of sampling from polygons', 
                                    type=bool, default=True)
-            subparser.add_argument('--pt_file', dest ='pt_file', 
+            subparser.add_argument('--ptfile', dest ='ptfile', 
                                    help='Path to file containing points, if load_samp=True', default=None)
 
         if process == 'make_ts_composite':
-            subparser.add_argument('--bands_out', dest ='bands_out', 
-                                   help='bands to create. Currently only 3 allowed. Current options are              Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate, MinDateCos,Jan,Apr,Jun,Aug,Nov')
+            subparser.add_argument('--bands_out', dest ='bands_out', help='bands to create')
             subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed')
            
         if process == 'make_var_dataframe':
@@ -140,23 +147,8 @@ def main():
             subparser.add_argument('--si_vars', dest='si_vars', help = '',
                                    default='[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]')
             subparser.add_argument('--in_dir', dest='in_dir', help='')
-            subparser.add_argument('--grid_file', dest='grid_file', help='path to grid file geojson')
-            subparser.add_argument('--cell_list', dest='cell_list', 
-                                   help='list of cells to look for points/poys in. (list or path to .csv file with list, no header', 
-                                   default=None)
-            subparser.add_argument('--ground_polys', dest='ground_polys', 
-                                   help='path to sample polygon file (=None if sample is points)', default=None)
-            subparser.add_argument('--oldest', dest='oldest', 
-                                   help='Oldest polygon to use if yr is in polygon file. =None if ground_polys = None', default=None)
-            subparser.add_argument('--newest', dest='newest',
-                                   help='Newest polygon to use if yr is in polygon file. =None if ground_polys = None', default=None)
-            subparser.add_argument('--npts', dest='npts', 
-                                   help='number of points to sample for each polygon. =None if ground_polys = None', default=None)
-            subparser.add_argument('--seed', dest='seed', help='seed to stabilize random point assignment', default=0)
-            subparser.add_argument('--load_samp', dest='load_samp', help='True if sample is point file', default=False)
-            subparser.add_argument('--ptfile', dest='ptfile', help='path to point file if load_samp == True', default=None)
             
-        if process == 'rf_model' or process == 'rf_classification': 
+        if process in ['rf_model','rf_classification']: 
             subparser.add_argument('--df_in', dest ='df_in', help='path to sample dataframe with extracted variable data')
             subparser.add_argument('--classification', dest ='classification', help='Permultation | Inference | None')
             subparser.add_argument('--importance_method', dest ='importance_method', help="All(=LC17),...", default='All')
@@ -169,7 +161,7 @@ def main():
             subparser.add_argument('--rf_mod', dest='rf_mod',
                                    help='path to existing random forest model, or None if model is to be created')
             subparser.add_argument('--img_out', dest='img_out',help='Full path name of classified image to be created')
-            subparser.add_argument('--spec_indices', dest ='spec_indices', 
+            subparser.add_argument('--spec_indices', dest ='spec_indices', nargs='+',
                                    help='bands to create. Currently hardcoded as Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Apr,Jun,Aug,Nov')
             subparser.add_argument('--stats', dest ='stats', help='currently = [evi2,gcv,wi,kndvi,nbr,ndmi]')
 
@@ -207,7 +199,7 @@ def main():
                              img_dir = args.img_dir,
                              image_type = args.image_type,
                              grid_file = args.grid_file,
-                             cell_list = args.cell_list,
+                             cell_list = check_for_list(args.cell_list),
                              ground_polys = args.ground_polys,
                              oldest = args.oldest,
                              newest = args.newest,
@@ -229,7 +221,7 @@ def main():
                         out_dir = args.out_dir,
                         start_yr = args.start_yr,
                         spec_index = args.spec_index,
-                        bands_out = args.bands_out)
+                        bands_out = check_for_list(args.bands_out))
 
     if args.process == 'check_valid_pix':
         check_valid_pixels(raw_dir = args.raw_dir,
@@ -247,18 +239,20 @@ def main():
                         print_plot = arge.print_plot,
                         out_dir = args.out_dir, 
                         data_source = args.data_source)
+        
     if args.process == 'reconstruct_db':           
         reconstruct_db(processing_info_path = args.processing_info_path,
                  landsat_path = args.landsat_path,
                  sentinel2_path = args.sentinel2_path,
                  brdf_path = args.brdf_path)
+        
     if args.process == 'make_var_dataframe':
         make_var_dataframe (out_dir = args.out_dir, 
-                            spec_indices = args.spec_indices,
-                            si_vars = args.si_vars,
+                            spec_indices = check_for_list(args.spec_indices),
+                            si_vars = check_for_list(args.si_vars),
                             in_dir = args.in_dir,
                             grid_file = args.grid_file,
-                            cell_list = args.cell_list,
+                            cell_list = check_for_list(args.cell_list),
                             ground_polys = args.ground_polys,
                             oldest = args.oldest,
                             newest = args.newest,
@@ -266,6 +260,7 @@ def main():
                             seed = args.seed,
                             load_samp = args.load_samp,
                             ptfile = args.ptfile)
+        
     if args.process == 'rf_model':
         rf_model(df_in = args.df_in, 
                  out_dir = args.out_dir,

@@ -20,34 +20,35 @@ import geopandas as gpd
 from pyproj import Proj, transform
 from pyproj import CRS
 import xarray as xr
+import csv
 from LUCinSA_helpers.ts_profile import get_pts_in_grid, get_polygons_in_grid
 
-
-def get_variables_at_pts(out_dir, in_dir, spec_indices, si_vars, polys, numpts, seed, load_samp=False, ptgdb=None):
+def get_variables_at_pts(out_dir, in_dir, polys, spec_indices, si_vars, numpts, seed, load_samp=False, ptgdb=None):
     '''
     Gets values for all sampled points {'numpts'} in all polygons {'polys'} for all images in {'in_dir'}
     OR gets values for points in a previously generated dataframe {ptgdb} using loadSamp=True.
     output is a dataframe with a pt (named polygonID_pt#)
     on each row and an image index value(named YYYYDDD) in each column
     '''
-    
-    if load_samp == 'False':
+    if load_samp == False:
         if polys:
             ptsgdb = get_ran_pts_in_polys (polys, numpts, seed)
         else:
             print('There are no polygons or points to process in this cell')
             return None
-    elif load_samp == 'True':
+    elif load_samp == True:
         ptsgdb = ptgdb
 
     xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
     coords = list(map(list, zip(*xy)))
     
+    print(spec_indices)
     for vi in spec_indices:
         sys.stdout.write("working on {} \n".format(vi))
+        print(in_dir)
         for img in os.listdir(in_dir):
-            if img.endswith(rf_vars.tif) and vi in img:
-                sys.stdout.write('Extracing variables from: {} \n'.format(img))
+            if img.endswith('RFVars.tif') and vi in img:
+                sys.stdout.write('Extracting variables from: {} \n'.format(img))
                 comp = rio.open(os.path.join(in_dir,img),'r')
                 #Open each band and get values
                 for b, var in enumerate(si_vars):
@@ -60,9 +61,8 @@ def get_variables_at_pts(out_dir, in_dir, spec_indices, si_vars, polys, numpts, 
 
 def make_var_dataframe(out_dir, spec_indices, si_vars, in_dir, grid_file, cell_list,
                             ground_polys, oldest, newest, npts, seed, load_samp, ptfile):
-                                        
-    all_pts = pd.DataFrame()
     
+    all_pts = pd.DataFrame()
     if isinstance(cell_list, list):
         cells = cell_list
     elif cell_list.endswith('.csv'): 
@@ -72,9 +72,9 @@ def make_var_dataframe(out_dir, spec_indices, si_vars, in_dir, grid_file, cell_l
                 cells.append (row[0])
     else:
         print('cell_list needs to be a list or path to .csv file with list')
-    for cell in cell_list:
+    for cell in cells:
         print ('working on cell {}'.format(cell))
-        if load_samp == 'True':
+        if load_samp == True:
             sys.stdout.write('loading sample from points for cell {} \n'.format(cell))
             points = get_pts_in_grid (grid_file, cell, ptfile)
             polys = None
@@ -86,14 +86,14 @@ def make_var_dataframe(out_dir, spec_indices, si_vars, in_dir, grid_file, cell_l
         if isinstance(points, gpd.GeoDataFrame) or polys is not None:
             var_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)),'comp')
            
-            if load_samp == 'True':
+            if load_samp == True:
                 polys=None
                 pts = get_variables_at_pts(out_dir, var_dir, polys, spec_indices, si_vars, npts, seed=88, load_samp=True, ptgdb=points)
             else:
                 pts = get_variables_at_pts(out_dir, var_dir, polys, spec_indices, si_vars, npts, seed=88, load_samp=False, ptgdb=None)
 
-                pts.drop(columns=['geometry'], inplace=True)
-                all_pts = pd.concat([all_pts, pts])
+            pts.drop(columns=['geometry'], inplace=True)
+            all_pts = pd.concat([all_pts, pts])
           
         else:
             sys.stdout.write('skipping this cell \n')

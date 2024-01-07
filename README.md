@@ -92,23 +92,23 @@ example output:
 The `get_cell_status` function can also be used to provide a summary for an individual cell (and is used collectively within `update_summary_db` below)
 ```
 LUCinSA_helpers get_cell_status \
-      -- raw_dir = 'path/to/main_downloading_directory' \
-      -- processed_dir = 'path/to/main_processing_directory' \
-      -- grid_cell =  XXXXX \
-      -- yrs = [YYYY-YYYY] \
-      -- print_plot = True \
-      -- out_dir = path/to/local/output/directory' \
-      -- data_source = 'stac' 
+      -- raw_dir 'path/to/main_downloading_directory' \
+      -- processed_dir 'path/to/main_processing_directory' \
+      -- grid_cell  XXXXX \
+      -- yrs [YYYY-YYYY] \
+      -- print_plot True \
+      -- out_dir path/to/local/output/directory' \
+      -- data_source 'stac' 
 ```
 The above relies on the processing database that each cell has in its main directory named `processing.info`, which has an entry for each image encountered in the STAC catalog and data regarding its status through the downloading,brdf,and coregistration processing steps.
 
 If `processing.info` is corrupted or deleted for a cell, it can be recreated with `reconstruct-db` (but note that it will not contain all of the detail of the original database):
 ```
 LUCinSA_helpers reconstruct_db \
-     --processing_info_path = 'path/to/cell_directory/processing.info' \
-     --landsat_path = 'path/to/cell_directory/landsat'  \
-     --sentinel2_path = 'path/to/cell_directory/sentinel2' \
-     --brdf_path = 'path/to/cell_directory/brdf'  
+     --processing_info_path 'path/to/cell_directory/processing.info' \
+     --landsat_path 'path/to/cell_directory/landsat'  \
+     --sentinel2_path 'path/to/cell_directory/sentinel2' \
+     --brdf_path 'path/to/cell_directory/brdf'  
 ```
 ![alt](/images/images_processed_for_cell_by_sensor.png)
 ![alt](/images/images_processed_for_cell_by_stat.png)
@@ -123,30 +123,30 @@ The Notebook: `1a_ExploreData_FileContent.ipynb` provides some methods to intera
 `check_valid_pix` will return the number of unmasked pixels in an image. This is run internally during the eostac download process and output as `numpix` in the `processing.info` database. It can be rerun after brdf/coreg steps to identify discrepancies and troubleshoot errors.
 ```
 LUCinSA_helpers check_valid_pix \
-     -- raw_dir = 'path/to/cell_directory'  \
-     -- brdf_dir = 'path/to/cell_directory/brdf'  \
-     -- grid_cell = XXXXXX  \
-     -- image_type = 'brdf' \
-     -- yrs = [YYYY-YYYY]  \
-     -- data_source = 'stac'  
+     -- raw_dir 'path/to/cell_directory'  \
+     -- brdf_dir 'path/to/cell_directory/brdf'  \
+     -- grid_cell XXXXXX  \
+     -- image_type 'brdf' \
+     -- yrs [YYYY-YYYY]  \
+     -- data_source 'stac'  
 ```
 `check_ts_windows` will check whether there is data in all of the windows for time-series outputs.
 ```
 LUCinSA_helpers check_ts_windows \
-     --processed_dir = 'path/to/main/ts_directory'  \
-     -- grid_cell = XXXXXX   \
-     -- spec_index = 'evi2'  
+     --processed_dir 'path/to/main/ts_directory'  \
+     -- grid_cell XXXXXX   \
+     -- spec_index 'evi2'  
 ```
 ## summarize images processed for all cells
 `summarize_images_multicell` will summarize all images in a given processing folder (landsat downloads, sentinel2 downloads or brdf) across multiple cells and return a database (in memory or printed to .csv) with unique image names (since a single Landsat or Sentinel2 scene covers multiple grid cells). 
 Note: in later stages of a project where some downloads have been cleaned out, this will only work with brdf folder.
 ```
 LUCinSA_helpers summarize_images_multicell \
-     -- full_dir = path/to/main/processing_directory \
-     -- sub_dir = 'brdf' \
-     -- endstring = '.nc' \
-     -- print_list = False \
-     -- out_dir = None 
+     -- full_dir path/to/main/processing_directory \
+     -- sub_dir 'brdf' \
+     -- endstring '.nc' \
+     -- print_list False \
+     -- out_dir None 
 ```
 Graphic smmaries can be generated in the notebook: `5a_SummarizeData_ImagesProcessed.ipynb`
 ![alt](/images/processing_summary.jpg)
@@ -156,47 +156,47 @@ Graphic smmaries can be generated in the notebook: `5a_SummarizeData_ImagesProce
 For a more nuanced check of processing status across all cells, `update_summary_db` will...
 ```
 LUCinSA_helpers update_summary_db \
-      -- status_db_path = 'path/to/cell_processing_post.csv' \
-      -- cell_list = 'All' \ 
-      -- dl_dir = 'path/to/main_processing_directory' \
-      -- processed_dir = 'path/to/main/ts_directory'
+      -- status_db_path 'path/to/cell_processing_post.csv' \
+      -- cell_list 'All' \ 
+      -- dl_dir 'path/to/main_processing_directory' \
+      -- processed_dir 'path/to/main/ts_directory'
 ```
 ## make time series composite
 The bash script: `make_ts_composite.sh` allows the `make_ts_composite` function to be run over multiple grid cells in parallel (as an array).
 ```
 LUCinSA_helpers make_ts_composite \
-     --grid_cell = XXXX  \   
-     --spec_index = 'evi2' \
-     --img_dir = 'path/to/ts_directory_for/cell/and/index'  \
-     --out_dir = 'path/to/output_variable_directory/for/cell' \
-     --start_yr = YYYY \
-     --bands_out = '[Max,Min,Amp]'
+     --grid_cell XXXX  \   
+     --spec_index 'evi2' \
+     --img_dir 'path/to/ts_directory_for/cell/and/index'  \
+     --out_dir 'path/to/output_variable_directory/for/cell' \
+     --start_yr YYYY \
+     --bands_out '[Max,Min,Amp]'
 ```
 ## make raster variable stack
 The bash script: `raster_var_stack.sh` contains the configuration to run the function `make_ts_composite` in a loop over all desired spectral indices and in parallel for multiple grid cells (as an array).
 ```
 LUCinSA_helpers make_ts_composite \
-     --grid_cell = XXXX ## (run as array in bash script) \   
-     --spec_index = 'evi2' ## but run from loop over multiple indices in bash script \
-     --img_dir = 'path/to/ts_directory_for/cell/and/index' ##(cell and index are informed by --grid-cell and --spec_index in bash script) \
-     --out_dir = 'path/to/output_variable_directory/for/cell' ##(cell is informed by --grid-cell in bash script) \
-     --start_yr = YYYY \
-     --bands_out = '[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]'
+     --grid_cell XXXX ## (run as array in bash script) \   
+     --spec_index 'evi2' ## but run from loop over multiple indices in bash script \
+     --img_dir 'path/to/ts_directory_for/cell/and/index' ##(cell and index are informed by --grid-cell and --spec_index in bash script) \
+     --out_dir 'path/to/output_variable_directory/for/cell' ##(cell is informed by --grid-cell in bash script) \
+     --start_yr YYYY \
+     --bands_out '[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]'
 ```
 ## make variable dataframe for sample points
 input point file is in the form of .csv with 'XCoord' and 'YCoord' columns in same coord system as grid_file
 ```
 LUCinSA_helpers make_var_dataframe \
-    --out_dir = path/to/directory_for_final_dataframe \ 
-    --spec_indices = ["evi2","gcvi","wi","kndvi","nbr","ndmi"] \
-    --si_vars = ["Max","Min","Amp","Avg","CV","Std","Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"] \
-    --in_dir = path/to/main_ts_directory \
-    --grid_file = path/to/gridcell_geojson \
-    --cell_list = \
-    --ground_polys = None \
-    --oldest = None \
-    --newest = None \
-    --npts = None \
-    --seed = 88 \
-    --load_samp = True
-    --ptfile = path/to/file/with/samplepts
+    --out_dir 'path/to/directory_for_final_dataframe' \ 
+    --spec_indices '[evi2,gcvi,wi,kndvi,nbr,ndmi]' \
+    --si_vars '[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]' \
+    --in_dir 'path/to/main_ts_directory' \
+    --grid_file  'path/to/gridcell_geojson' \
+    --cell_list '[XXXX,XXXX,XXXX]' #or 'path/to/SampleCells.csv'
+    --ground_polys '' \
+    --oldest 2020 \
+    --newest 2022 \
+    --npts 2\
+    --seed 888 \
+    --load_samp 'True'
+    --ptfile 'path/to/file/with/samplepts'
