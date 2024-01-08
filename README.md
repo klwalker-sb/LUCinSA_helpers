@@ -9,7 +9,8 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 * [check processing status for cell](#check-processing-status-for-cell)(`get_cell_status`)
 * [identify external image errors](#identify-external-image-errors)(`processing.info` with notebook `1a_ExploreData_FileContent.ipynb`)
 * [identify internal image errors](#identify-internal-image-errors)(`check_valid_pix`, `check_ts_windows`)
-* [generate thumbnails and select images to include/exclude](#make-thumbails-for-quality-control)
+* [view effects of coregistration](#view-coregistration-effects)(Notebook `1p_ExploreProcessing_coregistration.ipynb`)
+* [generate thumbnails and select images to include/exclude](#make-thumbails-for-quality-control)(Notebook `2b_ViewTimeSeriesComposite.ipynb`)
 
 #####      multi-cell summarization and error checking
 * [summarize images processed](#summarize-images-processed-for-all-cells)(`summarize_images_multicell`)
@@ -18,7 +19,7 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 
 ### To quickly visualize inputs and outputs of time-series analysis for quality control and interactive troubleshooting
 * [get_time_series_at_point](#get-time-series-at-point)(`get_time_series` and notebook `2b.TimeSeriesSignatures.ipynb`)
-* [make_ts_composite raster](#make_ts_composite_raster)(`make_ts_composite` with optional bash script `make_ts_composite.sh`)
+* [make_ts_composite raster](#make-ts-composite-raster)(`make_ts_composite` with optional bash script `make_ts_composite.sh`)
 * [interactively select points and view time-series data on cluster](#interactive-time-series-feedback)
  
 ### To set and document parameter choices and compare outputs for model optimization
@@ -138,6 +139,7 @@ LUCinSA_helpers check_ts_windows \
      -- grid_cell XXXXXX   \
      -- spec_index 'evi2'  
 ```
+## view coregistration effects
 
 ## make thumbnails for quality control
 
@@ -152,7 +154,7 @@ LUCinSA_helpers summarize_images_multicell \
      -- print_list False \
      -- out_dir None 
 ```
-Graphic smmaries can be generated in the notebook: `5a_SummarizeData_ImagesProcessed.ipynb`
+Graphic summaries can be generated in the notebook: `5a_SummarizeData_ImagesProcessed.ipynb`
 ![alt](/images/processing_summary.jpg)
 ![alt](/images/processing_summary_qual.jpg)
 
@@ -206,7 +208,7 @@ LUCinSA_helpers make_ts_composite \
      --start_yr YYYY \
      --bands_out '[Max,Min,Amp]'
 ```
-## interactive time-series feedback
+## interactive time series feedback
 The notebook, `2b_ViewTimeSeriesComposite.ipynb` allows a user to build and view a time-series composite for given cell and year without the need to transfer any data from the HPC cluster. Both smoothed and raw time series can be viewed for up to four points selected interactively from the image. This is useful for troubleshooting as well as quick feedback on variables and useful for mapping targeted classes and the effect of different smoothing functions on the final dataset.
 
 ![alt](/images/ts_example.jpg)
