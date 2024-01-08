@@ -13,12 +13,13 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 #####      multi-cell summarization and error checking
 * [summarize images processed](#summarize-images-processed-for-all-cells)(`summarize_images_multicell`)
 * [get processing summary](#get-processing-summary)(`update_summary_db` and notebook `5a_SummarizeData_ImagesProcessed.ipynb`)
+* [mosaic rasters](#mosaic-rasters-from-multiple-cells)(`moaic`)
 
 ### To quickly visualize inputs and outputs of time-series analysis for quality control and interactive troubleshooting
-* get_time_series 
-* [make_ts_composite](#make_ts_composite)(`make_ts_composite` with optional bash script `make_ts_composite.sh`)
+* [get_time_series_at_point](#get-time-series-at-point)(`get_time_series` and notebook `2b.TimeSeriesSignatures.ipynb`)
+* [make_ts_composite raster](#make_ts_composite_raster)(`make_ts_composite` with optional bash script `make_ts_composite.sh`)
 * interactive notebooks
-
+ 
 ### To set and document parameter choices and compare outputs for model optimization
 
 ### Also (temporarily) hosts functions to:
@@ -27,10 +28,9 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 * [make raster variable stack](#make-raster-variable-stack)(`make_ts_composite` within bash script `raster_var_stack.sh`)
 * [make variable dataframe for sample points](#make-variable-dataframe-for-sample-points)
 ###        create single-year random forest classification model
-* rf_model 
+* [build random forest model](#bulid-rf-model)(`rf_model`) 
 ###        apply random forest model to gridded data to create wall-to-wall map
-* rf_classification 
-* mosaic
+* [classify_cell](#apply-rf-model-to-classify-cell)(`rf_classification`)
 
 ## to install:
 with your LUCinLA pipeline environment activated (see [this page of the LUCinLA_stac guide](https://klwalker-sb.github.io/LUCinLA_sta/Pipeline.html))
@@ -161,7 +161,29 @@ LUCinSA_helpers update_summary_db \
       -- dl_dir 'path/to/main_processing_directory' \
       -- processed_dir 'path/to/main/ts_directory'
 ```
-## make time series composite
+
+## get time series at point
+
+```
+LUCinSA_helpers get_time_series \
+    --out_dir \
+    --spec_index 'evi2'\
+    --start_yr '2010'
+    --end_yr '2022'                        
+    --img_dir 'path/to/main_ts_dir'
+    --image_type  
+    --grid_file  
+    --cell_list 
+    --ground_polys = args.ground_polys,
+    --oldest args.oldest,
+    --newest args.newest,
+    --npts 2
+    --seed 0
+    --load_samp 'True'
+    --ptfile 
+```
+
+## make time series composite raster
 The bash script: `make_ts_composite.sh` allows the `make_ts_composite` function to be run over multiple grid cells in parallel (as an array).
 ```
 LUCinSA_helpers make_ts_composite \
@@ -172,6 +194,16 @@ LUCinSA_helpers make_ts_composite \
      --start_yr YYYY \
      --bands_out '[Max,Min,Amp]'
 ```
+
+## mosaic rasters from multiple cells
+```
+LUCinSA_helpers mosaic \
+     --cell_list `'path/to/cellList.csv'\ #no header in csv file
+     -- in_dir_main 'path/to/main_ts_directory'\
+     -- in_dir_local 'folder_within_cell_directory_with_item_to_mosaic'\
+     -- common_str 'common_string_to_identify_image_within_dir`\
+     -- out_dir 'path/to/directory_for_final_mosaic'\
+```                     
 ## make raster variable stack
 The bash script: `raster_var_stack.sh` contains the configuration to run the function `make_ts_composite` in a loop over all desired spectral indices and in parallel for multiple grid cells (as an array).
 ```
@@ -200,3 +232,27 @@ LUCinSA_helpers make_var_dataframe \
     --seed 888 \
     --load_samp 'True'
     --ptfile 'path/to/file/with/samplepts'
+```    
+## build rf model
+```
+LUCinSA_helpers rf_model \
+   -- out_dir 'path/to/directory_for_rf_model' \
+   -- classification \
+   -- importance_method \
+   -- ran_hold \
+   -- model_name \
+```
+## classified raster
+```
+LUCinSA_helpers rf_classification \
+    -- in_dir   \
+    -- df_in  \
+    -- spec_indices \
+    -- stats \
+    -- rf_mod \
+    -- img_out \
+    -- classification \
+    -- importance_method \
+    -- ran_hold \
+    -- out-dir 'path/to/directory_for_classified_raster'\
+```      
