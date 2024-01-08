@@ -334,7 +334,7 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
                 #xr_swir2 = xrimg['swir2'].map({>9999: np.nan, < 10000: xrimg['swir2']})
             elif spec_index in ['nir']:
                  pass
-            else: print('{} is not specified or does not have current method'.format(spec_index))
+            #else: print('{} is not specified or does not have current method'.format(spec_index))
 
             pt_vals = []
             for index, row in ptsgdb.iterrows():

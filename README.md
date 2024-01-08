@@ -3,12 +3,13 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 
 ## Uses
 
-### To summarize processing status and uncover errors amidst large numbers of files in HPC environment
+### To summarize processing status, uncover errors and conduct quality control amist a large numbers of files in HPC environment
 #####      single cell error checking:
 * [check download logs](#check-download-logs)(`check_dl_logs`)
 * [check processing status for cell](#check-processing-status-for-cell)(`get_cell_status`)
 * [identify external image errors](#identify-external-image-errors)(`processing.info` with notebook `1a_ExploreData_FileContent.ipynb`)
 * [identify internal image errors](#identify-internal-image-errors)(`check_valid_pix`, `check_ts_windows`)
+* [generate thumbnails and select images to include/exclude](#make-thumbails-for-quality-control)
 
 #####      multi-cell summarization and error checking
 * [summarize images processed](#summarize-images-processed-for-all-cells)(`summarize_images_multicell`)
@@ -18,7 +19,7 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 ### To quickly visualize inputs and outputs of time-series analysis for quality control and interactive troubleshooting
 * [get_time_series_at_point](#get-time-series-at-point)(`get_time_series` and notebook `2b.TimeSeriesSignatures.ipynb`)
 * [make_ts_composite raster](#make_ts_composite_raster)(`make_ts_composite` with optional bash script `make_ts_composite.sh`)
-* interactive notebooks
+* [interactively select points and view time-series data on cluster](#interactive-time-series-feedback)
  
 ### To set and document parameter choices and compare outputs for model optimization
 
@@ -137,6 +138,9 @@ LUCinSA_helpers check_ts_windows \
      -- grid_cell XXXXXX   \
      -- spec_index 'evi2'  
 ```
+
+## make thumbnails for quality control
+
 ## summarize images processed for all cells
 `summarize_images_multicell` will summarize all images in a given processing folder (landsat downloads, sentinel2 downloads or brdf) across multiple cells and return a database (in memory or printed to .csv) with unique image names (since a single Landsat or Sentinel2 scene covers multiple grid cells). 
 Note: in later stages of a project where some downloads have been cleaned out, this will only work with brdf folder.
@@ -161,7 +165,15 @@ LUCinSA_helpers update_summary_db \
       -- dl_dir 'path/to/main_processing_directory' \
       -- processed_dir 'path/to/main/ts_directory'
 ```
-
+## mosaic rasters from multiple cells
+```
+LUCinSA_helpers mosaic \
+     --cell_list `'path/to/cellList.csv'\ #no header in csv file
+     -- in_dir_main 'path/to/main_ts_directory'\
+     -- in_dir_local 'folder_within_cell_directory_with_item_to_mosaic'\
+     -- common_str 'common_string_to_identify_image_within_dir`\
+     -- out_dir 'path/to/directory_for_final_mosaic'\
+```        
 ## get time series at point
 
 ```
@@ -194,18 +206,13 @@ LUCinSA_helpers make_ts_composite \
      --start_yr YYYY \
      --bands_out '[Max,Min,Amp]'
 ```
+## interactive time-series feedback
+The notebook, `2b_ViewTimeSeriesComposite.ipynb` allows a user to build and view a time-series composite for given cell and year without the need to transfer any data from the HPC cluster. Both smoothed and raw time series can be viewed for up to four points selected interactively from the image. This is useful for troubleshooting as well as quick feedback on variables and useful for mapping targeted classes and the effect of different smoothing functions on the final dataset.
 
-## mosaic rasters from multiple cells
-```
-LUCinSA_helpers mosaic \
-     --cell_list `'path/to/cellList.csv'\ #no header in csv file
-     -- in_dir_main 'path/to/main_ts_directory'\
-     -- in_dir_local 'folder_within_cell_directory_with_item_to_mosaic'\
-     -- common_str 'common_string_to_identify_image_within_dir`\
-     -- out_dir 'path/to/directory_for_final_mosaic'\
-```                     
+![alt](/images/ts_example.jpg)
+           
 ## make raster variable stack
-The bash script: `raster_var_stack.sh` contains the configuration to run the function `make_ts_composite` in a loop over all desired spectral indices and in parallel for multiple grid cells (as an array).
+Once a set of raster variables has been selected for a model, a variable stack can be produced for each index using the `make_ts_composite` function with more than three variables. The bash script: `raster_var_stack.sh` contains the configuration to run the function in a loop over all desired spectral indices and in parallel for multiple grid cells (as an array).
 ```
 LUCinSA_helpers make_ts_composite \
      --grid_cell XXXX ## (run as array in bash script) \   
