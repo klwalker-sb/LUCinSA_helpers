@@ -20,8 +20,8 @@ SIVARS="[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]
 SING="forest_strata"
 MODNAME='base_noseg'
 POLYVARS=''
-SINGDICT='../singleton_var_dict.json'
-MODDICT='../Feature_Models.json'
+SINGDICT='/home/downspout-cel/paraguay_lc/singleton_var_dict.json'
+MODDICT='/home/downspout-cel/paraguay_lc/Feature_Models.json'
 STARTYR=2021
 
 # ####################################################

@@ -33,7 +33,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
             img_yr = int(img[:4])
             img_doy = int(img[4:7])
             if hemis == 'S':
-                if (img_yr == start_yr and img_doy >= 182) or (img_yr == (start_yr+1) and img_doy <= 182):
+                if (img_yr == int(start_yr) and img_doy >= 182) or (img_yr == (int(start_yr)+1) and img_doy <= 182):
                     ts_stack.append(os.path.join(img_dir,img))
                     ds_stack.append(img_doy)
             elif hemis == 'N':
@@ -124,7 +124,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
         min_date_cos.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
 
     for img in sorted(os.listdir(img_dir)):
-        if (hemis == 'N' and img.startswith(str(start_yr))) or (hemis == 'S' and img.startswith(str(start_yr+1))):
+        if (hemis == 'N' and img.startswith(str(start_yr))) or (hemis == 'S' and img.startswith(str(int(start_yr)+1))):
             if img.endswith('020.tif') and 'Jan' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
             if img.endswith('051.tif') and 'Feb' in bands_out:

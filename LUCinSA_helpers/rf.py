@@ -279,17 +279,21 @@ def getset_variable_model(mod_dict,feature_model,spec_indices,si_vars,singleton_
             spec_indices = dic[feature_model]['spec_indices']
             si_vars = dic[feature_model]['si_vars']
             singleton_vars = dic[feature_model]['singleton_vars']
-            print('using existing model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars={}'.format(feature_model,spec_indices,si_vars,singleton_vars))
+            poly_vars = dic[feature_model]['poly_vars']
+            print('using existing model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars={} \n, poly_vars = {}'
+                  .format(feature_model, spec_indices, si_vars, singleton_vars, poly_vars))
         else:
             dic[feature_model] = {}
             dic[feature_model]['spec_indices'] = spec_indices
             dic[feature_model]['si_vars'] = si_vars
             dic[feature_model]['singleton_vars'] = singleton_vars
+            dic[feature_model]['poly_vars'] = poly_vars
             with open(mod_dict, 'w') as new_feature_model_dict:
                 json.dump(dic, new_feature_model_dict)
-            print('created new model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars = {}' .format(feature_model,spec_indices,si_vars,global_vars))
+            print('created new model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars = {} \n poly_vars = {}'
+                  .format(feature_model, spec_indices, si_vars, singleton_vars, poly_vars))
         
-    return spec_indices,si_vars,singleton_vars
+    return spec_indices,si_vars,singleton_vars,poly_vars
     
 def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,feature_mod_dict,
                         singleton_vars=None, singleton_var_dict=None, poly_vars=None):
@@ -307,6 +311,7 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
         sys.stderr.write('making variable stack for cell {}'.format(cell))
         for vi in spec_indices:
             img_dir = os.path.join(in_dir,'brdf_ts','ms',vi)
+            out_dir = os.path.join(in_dir,'comp')
             new_bands = make_ts_composite(cell, img_dir, out_dir, start_yr, vi, si_vars)
             stack_paths.append(new_bands)
             with rio.open(new_bands) as src:
