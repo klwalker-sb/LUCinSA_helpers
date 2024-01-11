@@ -13,7 +13,6 @@
 GRID_ID="$(($SLURM_ARRAY_TASK_ID + 3000))"
 
 # Settables:
-COUNTRY='paraguay'
 MODNAME='ClassifiedLC17_soy20new'
 VARDF="/home/downspout-cel/paraguay_lc/classification/RF/pixdf_lessSoy.csv"
 
@@ -26,10 +25,7 @@ BANDS="['Max','Min','Amp','Avg','CV','Std','Jan','Feb','Mar','Apr','May','Jun','
 OUTIMG="${INDIR}/00${GRID_ID}_${MODNAME}.tif"
 
 # activate the virtual environment
-conda activate venv.lucinsa38_test3
-
-# if running from rf2_classify_image.py:
-#python RF2_ClassifyImage2.py $INDIR $VARS $BANDS $VARDF $MODPATH $OUTIMG
+conda activate venv.lucinsa38_pipe
 
 # if running from installed module:
 LUCinSA_helpers rf_classification --in_dir $INDIR --df_in $VARDF --spec_indices $VARS --stats $BANDS --model_name $MODNAME --rf_mod $MODPATH --img_out $OUTIMG --classification None --importance_method None --ran_hold 0 --out_dir None

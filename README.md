@@ -3,36 +3,37 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 
 ## Uses
 
-### To summarize processing status, uncover errors and conduct quality control amist a large numbers of files in HPC environment
-#####      single cell error checking:
-* [check download logs](#check-download-logs)(`check_dl_logs`)
-* [check processing status for cell](#check-processing-status-for-cell)(`get_cell_status`)
-* [identify external image errors](#identify-external-image-errors)(`processing.info` with notebook `1a_ExploreData_FileContent.ipynb`)
-* [identify internal image errors](#identify-internal-image-errors)(`check_valid_pix`, `check_ts_windows`)
-* [view effects of coregistration](#view-coregistration-effects)(Notebook `1p_ExploreProcessing_coregistration.ipynb`)
-* [generate thumbnails and select images to include/exclude](#make-thumbails-for-quality-control)(Notebook `2b_ViewTimeSeriesComposite.ipynb`)
+### To summarize processing status, uncover errors and conduct quality control amidst a large numbers of files in HPC environment
+#####      single cell error checking / quality control:
+* [check download logs ](#check-download-logs)(`check_dl_logs`)
+* [check processing status for cell ](#check-processing-status-for-cell)(`get_cell_status`)
+* [identify external image errors ](#identify-external-image-errors)(`processing.info` with notebook `1a_ExploreData_FileContent.ipynb`)
+* [identify internal image errors ](#identify-internal-image-errors)(`check_valid_pix`, `check_ts_windows`)
+* [view effects of coregistration ](#view-coregistration-effects)(Notebook `1p_ExploreProcessing_coregistration.ipynb`)
+* [interactively select images to include/exclude from thumbnails ](#make-thumbails-for-quality-control)(Notebook `2b_ViewTimeSeriesComposite.ipynb`)
 
 #####      multi-cell summarization and error checking
-* [summarize images processed](#summarize-images-processed-for-all-cells)(`summarize_images_multicell`)
-* [get processing summary](#get-processing-summary)(`update_summary_db` and notebook `5a_SummarizeData_ImagesProcessed.ipynb`)
-* [mosaic rasters](#mosaic-rasters-from-multiple-cells)(`moaic`)
+* [summarize images processed ](#summarize-images-processed-for-all-cells)(`summarize_images_multicell`)
+* [get processing summary ](#get-processing-summary)(`update_summary_db` and notebook `5a_SummarizeData_ImagesProcessed.ipynb`)
+* [mosaic rasters ](#mosaic-rasters-from-multiple-cells)(`moaic`)
 
 ### To quickly visualize inputs and outputs of time-series analysis for quality control and interactive troubleshooting
-* [get_time_series_at_point](#get-time-series-at-point)(`get_time_series` and notebook `2b.TimeSeriesSignatures.ipynb`)
-* [make_ts_composite raster](#make-ts-composite-raster)(`make_ts_composite` with optional bash script `make_ts_composite.sh`)
-* [interactively select points and view time-series data on cluster](#interactive-time-series-feedback)
+* [get_time_series_at_point ](#get-time-series-at-point)(`get_time_series` and notebook `2b.TimeSeriesSignatures.ipynb`)
+* [make_ts_composite raster ](#make-ts-composite-raster)(`make_ts_composite` with optional bash script `make_ts_composite.sh`)
+* [interactively select points and view time-series data on cluster ](#interactive-time-series-feedback)
  
 ### To set and document parameter choices and compare outputs for model optimization
+* [compare single-year rf models](#compare-rf-models)(Notebook `6b_RandomForest_ModelComparisons.ipynb`)
 
 ### Also (temporarily) hosts functions to:
 
 ###        create modelling features from smoothed time-series indices and segmentation outputs 
-* [make raster variable stack](#make-raster-variable-stack)(`make_ts_composite` within bash script `raster_var_stack.sh`)
-* [make variable dataframe for sample points](#make-variable-dataframe-for-sample-points)
+* [make raster variable stack ](#make-raster-variable-stack)(`make_ts_composite` within bash script `raster_var_stack.sh`)
+* [make variable dataframe for sample points ](#make-variable-dataframe-for-sample-points)
 ###        create single-year random forest classification model
-* [build random forest model](#bulid-rf-model)(`rf_model`) 
+* [build random forest model ](#bulid-rf-model)(`rf_model`) 
 ###        apply random forest model to gridded data to create wall-to-wall map
-* [classify_cell](#apply-rf-model-to-classify-cell)(`rf_classification`)
+* [classify_cell ](#apply-rf-model-to-classify-cell)(`rf_classification`)
 
 ## to install:
 with your LUCinLA pipeline environment activated (see [this page of the LUCinLA_stac guide](https://klwalker-sb.github.io/LUCinLA_sta/Pipeline.html))
@@ -247,17 +248,17 @@ LUCinSA_helpers make_var_dataframe \
 LUCinSA_helpers rf_model \
    -- out_dir 'path/to/directory_for_rf_model' \
    -- classification \
-   -- importance_method \
-   -- ran_hold \
-   -- model_name \
+   -- importance_method 'Impurity'\
+   -- ran_hold 99 \
+   -- model_name 'test'\
 ```
 ## classified raster
 ```
 LUCinSA_helpers rf_classification \
     -- in_dir   \
-    -- df_in  \
-    -- spec_indices \
-    -- stats \
+    -- df_in \
+    -- spec_indices '[evi2,gcvi,wi,kndvi,nbr,ndmi]' \
+    -- stats '[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]'\
     -- rf_mod \
     -- img_out \
     -- classification \

@@ -39,7 +39,7 @@ def get_val_at_XY(img, spec_index, xcoord,ycoord):
 def get_polygons_in_aoi(out_dir, aoi_file, poly_path, oldest=2018, newest=2020):
     '''
     Filters polygon layer to contain only those overlapping selected AOI
-    Allows filtering by 'first_yr_obs' to remove DLs constructed before or after period of interest
+   Allows filtering by 'FirstYrObs','ObsYr','Year'or'Acquired' to remove polygons obseserved during years outside the period of interest
     Outputs new polygon set to a .json file
     '''
     all_polys = gpd.read_file(poly_path)
@@ -53,13 +53,21 @@ def get_polygons_in_aoi(out_dir, aoi_file, poly_path, oldest=2018, newest=2020):
     polys_in_aoi = gpd.clip(all_polys, aoi)
 
     print("Of the {} polygons, {} are in AOI". format (all_polys.shape[0], polys_in_aoi.shape[0]))
-
+    if 'FirstYrObs' in polys_in_aoi.columns:
+        yr_filter = polys_in_aoi['FirstYrObs']
+    elif 'ObsYr' in polys_in_aoi.columns:
+        yr_filter = polys_in_aoi['ObsYr']
+    elif 'Year' in polys_in_aoi.columns:
+        yr_filter = polys_in_aoi['Year']
+    elif 'Acquired' in polys_in_aoi.columns:
+        yr_filter = polys_in_aoi['Acquired'][:4]
+    
     ##Filter out polygons that were observed before year set as 'oldest' or after year set as 'newest'
     if oldest > 0:
-        polys_in_aoi = polys_in_aoi[polys_in_aoi['FirstYrObs'] >= oldest]
+        polys_in_aoi = polys_in_aoi[int(yr_filter) >= oldest]
     if newest > 0:
-        polys_in_aoi = polys_in_aoi[polys_in_aoi['FirstYrObs'] <= newest]
-        print("{} DLs first seen between {} and {} in AOI".format(len(polys_in_aoi),oldest,newest))
+        polys_in_aoi = polys_in_aoi[int(yr_filter) <= newest]
+        print("{} polygons observed between {} and {} in AOI".format(len(polys_in_aoi),oldest,newest))
 
     poly_clip = Path(os.path.join(out_dir,'polysInAOI.json'))
     polys_in_aoi.to_file(poly_clip, driver="GeoJSON")
@@ -112,7 +120,7 @@ def get_pts_in_grid (grid_file, grid_cell, ptfile):
 def get_polygons_in_grid (grid_file, grid_cell, poly_path, oldest=2018, newest=2020):
     '''
     Filters polygon layer to contain only those overlapping selected grid cell (allows for iteration through grid)
-    Allows filtering by 'FirstYObs' to remove DLs constructed before or after period of interest
+    Allows filtering by 'FirstYrObs','ObsYr','Year'or'Acquired' to remove polygons obseserved during years outside the period of interest
     Outputs new polygon set to a .json file stored in the gridcell directory
     '''
     polys = gpd.read_file(poly_path)
@@ -133,11 +141,20 @@ def get_polygons_in_grid (grid_file, grid_cell, poly_path, oldest=2018, newest=2
     print("Of the {} polygons, {} are in grid_cell {}". format (polys.shape[0], polys_in_grid.shape[0],grid_cell))
 
     ##Filter out polygons that were observed before year set as 'oldest' or after year set as 'newest'
+    if 'FirstYrObs' in polys_in_grid.columns:
+        yr_filter = polys_in_grid['FirstYrObs']
+    elif 'ObsYr' in polys_in_grid.columns:
+        yr_filter = polys_in_grid['ObsYr']
+    elif 'Year' in polys_in_grid.columns:
+        yr_filter = polys_in_grid['Year']
+    elif 'Acquired' in polys_in_grid.columns:
+        yr_filter = polys_in_grid['Acquired'][:4]
+        
     if oldest > 0:
-        polys_in_grid = polys_in_grid[polys_in_grid['FirstYrObs'] >= oldest]
+        polys_in_grid = polys_in_grid[int(yr_filter) >= oldest]
     if newest > 0:
-        polys_in_grid = polys_in_grid[polys_in_grid['FirstYrObs'] <= newest]
-        print("{} DLs first seen between {} and {} in AOI".format(len(polys_in_grid),oldest,newest))
+        polys_in_grid = polys_in_grid[int(yr_filter) <= newest]
+        print("{} polygons first observed between {} and {} in AOI".format(len(polys_in_grid),oldest,newest))
 
     #Write to geojson file
     if polys_in_grid.shape[0] > 0:
@@ -223,7 +240,7 @@ def get_coords_for_poly_samp_in_AOI(out_dir, polygons, aoi, oldest=2018, newest=
     '''
     Gets random points in all polygons in AOI. returns a csv file with X and Y coords
     '''
-    polys = get_polygons_in_AOI(out_dir, aoi, polygons, oldest, newest)
+    polys = (out_dir, aoi, polygons, oldest, newest)
     pts = get_ran_pts_in_polys(polys, nPts, seed)
     pts.crs = "epsg:32632"
     print(pts.crs)

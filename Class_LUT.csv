@@ -1,4 +1,4 @@
-LC_UNQ,USE_NAME,Segmentation,LCTrans,LCTrans_name,LC5_name,LC5,LC17,perLC17E,LC17_name,LC3,LC3_name,LC4,LC4_name,LC2,LC2_name,LC_crops,LC_crops_name,Description
+LC_UNQ,USE_NAME,Segmentation,LCTrans,LCTrans_name,LC5_name,LC5,LC25,perLC17E,LC17_name,LC3,LC3_name,LC4,LC4_name,LC2,LC2_name,LC_crops,LC_crops_name,Description
 1,NoVeg,NoVeg,1,NoVeg,NoVeg,10,99,,unknown,0,nocrop,0,nocrop,0,nocrop,10,Not crop,"nonvegetated area (unkown if water, bare or built)"
 2,NoVeg_Bare,,2,NoVeg_Bare,NoVeg,10,2,0.005302312,NoVeg_Bare,0,nocrop,0,nocrop,0,nocrop,10,Not crop,Bare soil/rock/sand throughout the year (NOT part of crop cycle)
 3,NoVeg_Built,,3,NoVeg_Built,NoVeg,10,3,0.003224395,NoVeg_Built,0,nocrop,0,nocrop,0,nocrop,10,Not crop,
