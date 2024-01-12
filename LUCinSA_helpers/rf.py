@@ -280,7 +280,7 @@ def getset_variable_model(mod_dict,feature_model,spec_indices,si_vars,singleton_
             si_vars = dic[feature_model]['si_vars']
             singleton_vars = dic[feature_model]['singleton_vars']
             poly_vars = dic[feature_model]['poly_vars']
-            print('using existing model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars={} \n, poly_vars = {}'
+            print('using existing model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars={} \n poly_vars = {}'
                   .format(feature_model, spec_indices, si_vars, singleton_vars, poly_vars))
         else:
             dic[feature_model] = {}
@@ -325,7 +325,7 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
             sys.stderr.write('ERROR: did not find ts data for all the requested spec_indices')
             sys.exit()
 
-        if singleton_vars is not 'None':
+        if singleton_vars is not None and singleton_vars != 'None':
             # Clips portion of singleton raster corresponding to gridcell and saves with stack files (if doesn't already exist there)
             for sf in singleton_vars:
                 with open(singleton_var_dict, 'r+') as singleton_feat_dict:
