@@ -296,12 +296,12 @@ def getset_variable_model(mod_dict,feature_model,spec_indices,si_vars,singleton_
     return spec_indices,si_vars,singleton_vars,poly_vars
     
 def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,feature_mod_dict,
-                        singleton_vars=None, singleton_var_dict=None, poly_vars=None):
+                        singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None):
     
     # get model paramaters if model already exists in dict. Else create new dict entry for this model
     spec_indices, si_vars, singleton_vars, poly_vars = getset_variable_model(
         feature_mod_dict, feature_model, spec_indices, si_vars, singleton_vars,poly_vars)
-    stack_path = os.path.join(in_dir,'comp','{}_stack.tif'.format(feature_model))
+    stack_path = os.path.join(in_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
     if os.path.isfile(stack_path):
         sys.stderr.write('stack file already exists for model {}'.format(feature_model))
     else:
@@ -309,14 +309,17 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
         num_bands_all = 0
         cell = int(os.path.basename(in_dir))
         sys.stderr.write('making variable stack for cell {}'.format(cell))
-        for vi in spec_indices:
-            img_dir = os.path.join(in_dir,'brdf_ts','ms',vi)
-            out_dir = os.path.join(in_dir,'comp')
-            new_bands = make_ts_composite(cell, img_dir, out_dir, start_yr, vi, si_vars)
+        for si in spec_indices:
+            img_dir = os.path.join(in_dir,'brdf_ts','ms',si)
+            if scratch_dir:
+                out_dir = scratch_dir
+            else:
+                out_dir = os.path.join(in_dir,'comp')
+            new_bands = make_ts_composite(cell, img_dir, out_dir, start_yr, si, si_vars)
             stack_paths.append(new_bands)
             with rio.open(new_bands) as src:
                 num_bands = src.count
-                sys.stdout.write('Added {} with {} bands \n'.format(vi,num_bands))
+                sys.stdout.write('Added {} with {} bands \n'.format(si,num_bands))
                 if num_bands < len(si_vars):
                     sys.stderr.write('ERROR: number of bands does not match requested number')
                     sys.exit()
@@ -324,7 +327,6 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
         if len(stack_paths) < len(spec_indices):
             sys.stderr.write('ERROR: did not find ts data for all the requested spec_indices')
             sys.exit()
-
         if singleton_vars is not None and singleton_vars != 'None':
             # Clips portion of singleton raster corresponding to gridcell and saves with stack files (if doesn't already exist there)
             for sf in singleton_vars:
@@ -333,7 +335,7 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
                     if sf in dic: 
                         sf_path = dic[sf]['path']
                         sf_col = dic[sf]['col']
-                        sys.stderr.write('getting {} from {}'.fortmat(sf,sf_path))    
+                        sys.stderr.write('getting {} from {}'.format(sf,sf_path))    
                     else:
                         sys.stderr.write('ERROR: do not know path for {}. Add to singleton_var_dict and rerun'.format(sf))
                         sys.exit()
@@ -342,27 +344,30 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
                 if os.path.isfile(singleton_clipped):
                     stack_paths.append(singleton_clipped)
                 else:
-                    # clip large singleton raster to extent of other rasters in stack for grid cell
+                    ## clip large singleton raster to extent of other rasters in stack for grid cell
                     small_ras = stack_paths[0]
                     src_small = gdal.Open(small_ras)
                     ulx, xres, xskew, uly, yskew, yres  = src_small.GetGeoTransform()
-                    lrx = ulx + (src.RasterXSize * xres)
-                    lry = uly + (src.RasterYSize * yres)
+                    lrx = ulx + (src_small.RasterXSize * xres)
+                    lry = uly + (src_small.RasterYSize * yres)
                     geometry = [[ulx,lry], [ulx,uly], [lrx,uly], [lrx,lry]]
                     roi = [Polygon(geometry)]
                     with rio.open(small_ras) as src0:
                         out_meta = src0.meta.copy()
                     out_meta.update({"count":1})
-                
-                with rio.open(sf_path) as big_src:
-                    out_img,transform = mask.mask(big_src, roi, crop = True)
-                    with rio.open(singleton_clipped, "w", **out_meta) as dest:
-                        dest.write(out_img)
-                stack_paths.append(singleton_clipped)
-    
-        ##Add polygon data
+                    with rio.open(sf_path) as src:
+                        out_image, transformed = rio.mask.mask(src, roi, crop = True)
+                    with rio.open(singleton_clipped, 'w', **out_meta) as dst:
+                        dst.write(out_image)
+                    stack_paths.append(singleton_clipped)
+                num_bands_all = num_bands_all + 1
+        if poly_vars is not None and poly_vars != 'None':
+            for pv in poly_vars:
+                poly_path = os.path.join(poly_var_path,'{}_{}.tif'.format(pv,cell))
+                stack_paths.append(poly_path)
+                num_bands_all = num_bands_all + 1
         
-        sys.stdout.write('Final stack will have {} bands\n'.format(len(stack_paths)))
+        sys.stdout.write('Final stack will have {} bands\n'.format(num_bands_all))
         sys.stderr.write('making variable stack...')
 
         output_count = 0
@@ -377,7 +382,7 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
             kwargs = src0.meta
             kwargs.update(count = output_count)
 
-        with rio.open(os.path.join(ts_dir,'comp','{}_stack.tif'),'w',**kwargs) as dst:
+        with rio.open(os.path.join(in_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr)),'w',**kwargs) as dst:
             dst_idx = 1
             for path, index in zip(stack_paths, indexes):
                 with rio.open(path) as src:

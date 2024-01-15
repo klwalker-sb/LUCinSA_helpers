@@ -155,6 +155,10 @@ def main():
             subparser.add_argument('--start_yr', dest='start_yr', help='year to model (first year if using split calendar)')
             subparser.add_argument('--singleton_vars', dest='singleton_vars', help='list of singleton variables to include', default=None)
             subparser.add_argument('--poly_vars', dest='poly_vars', help='list of polygon-level variables to include', default=None)
+            subparser.add_argument('--poly_var_path', dest='poly_var_path', 
+                                   help='path to directory containing polygon-level variables (i.e. segmentation', default=None)
+            subparser.add_argument('--scratch_dir', dest='scratch_dir', 
+                                   help = 'path to scratch directory to same temp files without backup', default=None
             subparser.add_argument('--singleton_var_dict', dest='singleton_var_dict', default=None,
                                    help='path to json describing singleton vars. (see example in main folder of this repo)')
             subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
@@ -266,9 +270,11 @@ def main():
                              si_vars = check_for_list(args.si_vars),
                              feature_mod_dict = args.feature_mod_dict,
                              singleton_vars = check_for_list(args.singleton_vars),
+                             singleton_var_dict = args.singleton_var_dict,
                              poly_vars = check_for_list(args.poly_vars),
-                             singleton_var_dict = args.singleton_var_dict)      
-        
+                             poly_var_path = args.poly_var_path,
+                             scratch_dir = args.scratch_dir)
+                                   
     if args.process == 'make_var_dataframe':
         make_var_dataframe (out_dir = args.out_dir, 
                             spec_indices = check_for_list(args.spec_indices),
