@@ -11,12 +11,13 @@
 #Settables:
 COUNTRY='paraguay'
 OUTDIR='/home/downspout-cel/${COUNRTY}_lc/vector'
-SI="[evi2,gcvi,wi,kndvi,nbr,ndmi]"
-SIVARS="[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]"
 INDIR='/home/downspout-cel/{COUNTRY}_lc/stac/grids'
 GRID='/home/sandbox-cel/LUCinLA_grid_8858.gpkg'
 #CELLS="[3010,3022,3023]"
 CELLS="/home/downspout-cel/${COUNTRY}_lc/vector/sampleData/Sample_cells.csv"
+MODEL='testing'
+MODDICT='/home/downspout-cel/paraguay_lc/Feature_Models.json'
+YR=2021
 POLYS=''
 NEWEST=2022
 OLDEST=2010
@@ -27,6 +28,6 @@ PTFILE='/home/downspout-cel/paraguay_lc/vector/sampleData/SamplePts_Dec2023_ALL.
 
 conda activate venv.lucinsa38_pipe
 
-LUCinSA_helpers make_var_dataframe --out_dir $OUTDIR --spec_indices $SI --si_vars $SIVARS --in_dir $INDIR --grid_file $GRID --cell_list $CELLS --ground_polys $POLYS --oldest $OLDEST --newest $NEWEST --npts $NPTS --seed $SEED --load_samp $LOADSAMP --ptfile $PTFILE
+LUCinSA_helpers make_var_dataframe --in_dir $INDIR --out_dir $OUTDIR --grid_file $GRID --cell_list $CELLS --feature_model $MODEL --feature_mod_dict $MODDICT --start_yr $YR --polyfile $POLYS --oldest $OLDEST --newest $NEWEST --npts $NPTS --seed $SEED --load_samp $LOADSAMP --ptfile $PTFILE
 
 conda deactivate

@@ -21,46 +21,50 @@ from pyproj import Proj, transform
 from pyproj import CRS
 import xarray as xr
 import csv
-from LUCinSA_helpers.ts_profile import get_pts_in_grid, get_polygons_in_grid
+from LUCinSA_helpers.ts_profile import get_pts_in_grid, get_polygons_in_grid, get_ran_pts_in_polys
+from LUCinSA_helpers.rf import getset_feature_model
 
-def get_variables_at_pts(out_dir, in_dir, polys, spec_indices, si_vars, numpts, seed, load_samp=False, ptgdb=None):
+def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start_yr, polys, numpts, seed, load_samp=False, ptgdb=None):
     '''
     Gets values for all sampled points {'numpts'} in all polygons {'polys'} for all images in {'in_dir'}
     OR gets values for points in a previously generated dataframe {ptgdb} using loadSamp=True.
     output is a dataframe with a pt (named polygonID_pt#)
     on each row and an image index value(named YYYYDDD) in each column
     '''
-    if load_samp == False:
-        if polys:
-            ptsgdb = get_ran_pts_in_polys (polys, numpts, seed)
-        else:
-            print('There are no polygons or points to process in this cell')
-            return None
-    elif load_samp == True:
-        ptsgdb = ptgdb
-
-    xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
-    coords = list(map(list, zip(*xy)))
+    stack_path = os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr))
+    if not os.path.isfile(stack_path):
+        print('need to create variable stack for {}_{} first.'.format(feature_model, start_yr))
+        ptsgdb = None
     
-    print(spec_indices)
-    for vi in spec_indices:
-        sys.stdout.write("working on {} \n".format(vi))
-        print(in_dir)
-        for img in os.listdir(in_dir):
-            if img.endswith('RFVars.tif') and vi in img:
-                sys.stdout.write('Extracting variables from: {} \n'.format(img))
-                comp = rio.open(os.path.join(in_dir,img),'r')
-                #Open each band and get values
-                for b, var in enumerate(si_vars):
-                    sys.stdout.write('{}:{}, '.format(b,var))
-                    comp.np = comp.read(b+1)
-                    varn = ('var_{}_{}'.format(vi,var))
-                    ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
-    #pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
+    else:
+        band_names = getset_feature_model(feature_mod_dict, feature_model)[4]
+    
+        if load_samp == False:
+            if polys:
+                ptsgdb = get_ran_pts_in_polys (polys, numpts, seed)
+            else:
+                print('There are no polygons or points to process in this cell')
+                return None
+        elif load_samp == True:
+            ptsgdb = ptgdb
+
+        xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
+        coords = list(map(list, zip(*xy)))
+    
+        sys.stdout.write('Extracting variables from stack')
+        comp = rio.open(os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr)),'r')
+        #Open each band and get values
+        for b, band in enumerate(band_names):
+            sys.stdout.write('{}:{}'.format(b,band))
+            comp.np = comp.read(b+1)
+            varn = ('var_{}'.format(band))
+            ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
+            #pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
+    
     return ptsgdb
 
-def make_var_dataframe(out_dir, spec_indices, si_vars, in_dir, grid_file, cell_list,
-                            ground_polys, oldest, newest, npts, seed, load_samp, ptfile):
+def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, feature_mod_dict, start_yr,
+                            polyfile, oldest, newest, npts, seed, load_samp, ptfile):
     
     all_pts = pd.DataFrame()
     if isinstance(cell_list, list):
@@ -80,7 +84,7 @@ def make_var_dataframe(out_dir, spec_indices, si_vars, in_dir, grid_file, cell_l
             polys = None
         else:
             sys.stdout.write('loading sample from polygons for cell {} \n'.format(cell))
-            polys = get_polygons_in_grid (grid_file, cell, ground_polys, oldest, newest)
+            polys = get_polygons_in_grid (grid_file, cell, polyfile, oldest, newest)
             points = None
           
         if isinstance(points, gpd.GeoDataFrame) or polys is not None:
@@ -88,12 +92,16 @@ def make_var_dataframe(out_dir, spec_indices, si_vars, in_dir, grid_file, cell_l
            
             if load_samp == True:
                 polys=None
-                pts = get_variables_at_pts(out_dir, var_dir, polys, spec_indices, si_vars, npts, seed=88, load_samp=True, ptgdb=points)
+                pts = get_variables_at_pts(var_dir, out_dir, 
+                                           feature_model, feature_mod_dict, start_yr, 
+                                           polys, npts, seed=88, load_samp=True, ptgdb=points)
             else:
-                pts = get_variables_at_pts(out_dir, var_dir, polys, spec_indices, si_vars, npts, seed=88, load_samp=False, ptgdb=None)
-
-            pts.drop(columns=['geometry'], inplace=True)
-            all_pts = pd.concat([all_pts, pts])
+                pts = get_variables_at_pts(var_dir, out_dir, 
+                                           feature_model, feature_mod_dict, start_yr,
+                                           polys, npts, seed=88, load_samp=False, ptgdb=None)
+            if pts is not None:
+                pts.drop(columns=['geometry'], inplace=True)
+                all_pts = pd.concat([all_pts, pts])
           
         else:
             sys.stdout.write('skipping this cell \n')
@@ -103,8 +111,8 @@ def make_var_dataframe(out_dir, spec_indices, si_vars, in_dir, grid_file, cell_l
 
     pts_in = pd.read_csv(ptfile, index_col=0)
     rfdf = all_pts.merge(pts_in, left_index=True, right_index=True)
-    pd.DataFrame.to_csv(rfdf,os.path.join(out_dir,'RFdf.csv'), sep=',', index=True)
-    pd.DataFrame.to_csv(all_pts,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
+    pd.DataFrame.to_csv(rfdf,os.path.join(out_dir,'RFdf_{}_{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
+    pd.DataFrame.to_csv(all_pts,os.path.join(out_dir,'ptsgdb_{}-{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
 
 def get_variables_at_pts_external(out_dir, ras_in,ptfile):
 

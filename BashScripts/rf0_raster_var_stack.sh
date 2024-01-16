@@ -14,7 +14,7 @@
 GRID_ID="$(($SLURM_ARRAY_TASK_ID + 4000))"
 
 COUNTRY='paraguay'
-IMGDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}"
+TSDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}"
 
 MODNAME='base_noseg'
 VIs="[evi2,gcvi,wi,kndvi,nbr,ndmi]"
@@ -31,6 +31,6 @@ SCRATCH=''
 # activate the virtual environment
 conda activate venv.lucinsa38_pipe
 
-LUCinSA_helpers make_var_stack --in_dir $IMGDIR --feature_model $MODNAME --start_yr $STARTYR --spec_indices $VIs --si_vars $SIVARS --feature_mod_dict $MODDICT --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
+LUCinSA_helpers make_var_stack --in_dir $TSDIR --feature_model $MODNAME --start_yr $STARTYR --spec_indices $VIs --si_vars $SIVARS --feature_mod_dict $MODDICT --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
 
 conda deactivate

@@ -398,7 +398,7 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
     return ptsgdb
 
 def get_timeseries_for_pts_multicell(out_dir, spec_index, start_yr, end_yr, img_dir, image_type, grid_file, cell_list,
-                            ground_polys, oldest, newest, npts, seed, load_samp, ptfile):
+                            polyfile, oldest, newest, npts, seed, load_samp, ptfile):
     '''
     Returns datetime dataframe of values for sampled pts (n={'npts}) for each polygon in {'polys'}
     OR for previously generated points with {load_samp}=True and {pt_file}=path to .csv file
@@ -417,7 +417,7 @@ def get_timeseries_for_pts_multicell(out_dir, spec_index, start_yr, end_yr, img_
             points = get_pts_in_grid (grid_file, cell, ptfile)
             polys = None
         else:
-            polys = get_polygons_in_grid (grid_file, cell, ground_polys, oldest, newest)
+            polys = get_polygons_in_grid (grid_file, cell, polyfile, oldest, newest)
             points = None
         if isinstance(points, gpd.GeoDataFrame) or polys is not None:
             if 'Smooth' in image_type:

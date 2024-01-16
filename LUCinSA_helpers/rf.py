@@ -272,14 +272,15 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir):
    
     return holdout_fields
 
-def getset_variable_model(mod_dict,feature_model,spec_indices,si_vars,singleton_vars,poly_vars):
-    with open(mod_dict, 'r+') as feature_model_dict:
+def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_vars=None,singleton_vars=None,poly_vars=None):
+    with open(feature_mod_dict, 'r+') as feature_model_dict:
         dic = json.load(feature_model_dict)
         if feature_model in dic:
             spec_indices = dic[feature_model]['spec_indices']
             si_vars = dic[feature_model]['si_vars']
             singleton_vars = dic[feature_model]['singleton_vars']
             poly_vars = dic[feature_model]['poly_vars']
+            band_names = dic[feature_model]['band_names']
             print('using existing model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars={} \n poly_vars = {}'
                   .format(feature_model, spec_indices, si_vars, singleton_vars, poly_vars))
         else:
@@ -288,19 +289,30 @@ def getset_variable_model(mod_dict,feature_model,spec_indices,si_vars,singleton_
             dic[feature_model]['si_vars'] = si_vars
             dic[feature_model]['singleton_vars'] = singleton_vars
             dic[feature_model]['poly_vars'] = poly_vars
-            with open(mod_dict, 'w') as new_feature_model_dict:
+            band_names = []
+            for si in spec_indices:
+                for sv in si_vars:
+                    band_names.append('{}_{}'.format(si,sv))
+            if singleton_vars is not None and singleton_vars != 'None':
+                for sin in singleton_vars:
+                    band_names.append('sing_{}'.format(sin))
+            if poly_vars is not None and poly_vars != 'None':       
+                for pv in poly_vars:
+                    band_names.append('poly_{}'.format(pv))
+            dic[feature_model]['band_names'] = band_names
+            with open(feature_mod_dict, 'w') as new_feature_model_dict:
                 json.dump(dic, new_feature_model_dict)
             print('created new model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars = {} \n poly_vars = {}'
                   .format(feature_model, spec_indices, si_vars, singleton_vars, poly_vars))
         
-    return spec_indices,si_vars,singleton_vars,poly_vars
+    return spec_indices,si_vars,singleton_vars,poly_vars,band_names
     
 def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,feature_mod_dict,
                         singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None):
     
     # get model paramaters if model already exists in dict. Else create new dict entry for this model
-    spec_indices, si_vars, singleton_vars, poly_vars = getset_variable_model(
-        feature_mod_dict, feature_model, spec_indices, si_vars, singleton_vars,poly_vars)
+    spec_indices, si_vars, singleton_vars, poly_vars, band_names = getset_feature_model(
+        feature_mod_dict, feature_model, spec_indices, si_vars, singleton_vars, poly_vars)
     stack_path = os.path.join(in_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
     if os.path.isfile(stack_path):
         sys.stderr.write('stack file already exists for model {}'.format(feature_model))
@@ -364,10 +376,14 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
         if poly_vars is not None and poly_vars != 'None':
             for pv in poly_vars:
                 poly_path = os.path.join(poly_var_path,'{}_{}.tif'.format(pv,cell))
-                stack_paths.append(poly_path)
-                num_bands_all = num_bands_all + 1
-        
-        sys.stdout.write('Final stack will have {} bands\n'.format(num_bands_all))
+                if os.path.isfile(poly_path): 
+                    stack_paths.append(poly_path)
+                    num_bands_all = num_bands_all + 1
+                else:
+                    sys.stderr.write('variable {} does not exist for cell {}'.format(pv,cell))
+                                      
+        sys.stdout.write('Final stack will have {} bands \n'.format(num_bands_all))
+        sys.stdout.write('band names = {}'.format(band_names))
         sys.stderr.write('making variable stack...')
 
         output_count = 0
@@ -394,6 +410,7 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
                         data = src.read(index)
                         dst.write(data, range(dst_idx, dst_idx + len(index)))
                         dst_idx += len(index)
+            dst.descriptions = tuple(band_names)
                 
 def classify_raster(var_stack,rf_path,class_img_out):
 
@@ -481,21 +498,24 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
     
     return rf, score
 
-def rf_classification(ts_dir, df_in, feature_model, start_yr, samp_mod_name, feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, singleton_vars=None, lc_mod=None, importance_method=None, ran_hold=29, out_dir=None):
+def rf_classification(in_dir, df_in, feature_model, start_yr, samp_mod_name, feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, lc_mod=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
     
-    #feature_mod_dict = '../Feature_Models.json'
-    spec_indices,si_vars,singleton_vars = getset_variable_model(feature_mod_dict,feature_model,spec_indices,si_vars,singleton_vars)
+    spec_indices,si_vars,singleton_vars,poly_vars,band_names = getset_feature_model(
+                                                                  feature_mod_dict,
+                                                                  feature_model,
+                                                                  spec_indices,
+                                                                  si_vars,
+                                                                  singleton_vars,
+                                                                  poly_vars)
     
-    var_stack = os.path.join(ts_dir,'comp','{}_stack.tif'.format(feature_model))
-    if os.path.isfile(var_stack):
-        sys.stdout.write('variable stack already exists \n')
-    else:
-        sys.stdout.write('making variable stack... \n')
-        make_variable_stack(ts_dir,feature_model,start_yr,spec_indices,si_vars,
-                        singleton_vars='None', singleton_var_dict='None', poly_vars='None')    
-    model_name = '{}_{}'.format(feature_model, samp_mod_name)                        
+    # make variable stack if it does not exist (for example for cells without sample pts)
+    # -- will not be remade if a file named {feature_model}_{start_year}_stack.tif already exists in ts_dir/comp
+    make_variable_stack(ts_dir,feature_model,start_yr,spec_indices,si_vars,feature_mod_dict,
+                        singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None)
+        
+    model_name = '{}_{}_{}'.format(feature_model, samp_mod_name,start_yr)                        
     if img_out == None:
-        class_img_out = os.path.join(ts_dir,'comp','{}_{}.tif'.format(model_name))
+        class_img_out = os.path.join(in_dir,'comp','{}.tif'.format(model_name))
     else:
         class_img_out = img_out
     if rf_mod != None and os.path.isfile(rf_mod):

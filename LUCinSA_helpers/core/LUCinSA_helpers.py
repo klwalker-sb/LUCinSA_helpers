@@ -125,7 +125,7 @@ def main():
             subparser.add_argument('--grid_file', dest ='grid_file', help='path to grid file')
             subparser.add_argument('--cell_list', dest ='cell_list',
                                    help='list of cells to look for points/poys in. (list or path to .csv file with list, no header' )
-            subparser.add_argument('--ground_polys', dest='ground_polys',
+            subparser.add_argument('--polyfile', dest='polyfile',
                                    help='path to polygons to sample from; only needed if load_samp =False')
             subparser.add_argument('--oldest', dest ='oldest', help='if using ground_polys, oldest poly to use', default=2010)
             subparser.add_argument('--newest', dest ='newest', help='if using groun_Polys, oldest poly to use', default=2020)
@@ -139,20 +139,22 @@ def main():
 
         if process == 'make_ts_composite':
             subparser.add_argument('--bands_out', dest ='bands_out', help='bands to create')
-            subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed')
-  
-        if process in ['make_var_dataframe','make_var_stack']:
+            subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed') 
+
+        if process in ['make_var_dataframe','make_var_stack','rf_classification']:
+            subparser.add_argument('--in_dir', dest='in_dir', help='')
             subparser.add_argument('--out_dir', dest='out_dir',help='out directory for final dataframes')
+            subparser.add_argument('--start_yr', dest='start_yr', help='year to model (first year if using split calendar)')
+            subparser.add_argument('--feature_model', dest = 'feature_model', 
+                                   help='unique name for variable combo (start_Yr (spec_indices*si_vars + singleton_vars + poly_vars))')
+            subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
+                                   help='path to dict defining variable model names. (see example in main folder of this repo)')
+  
+        if process in ['make_var_stack', 'rf_classification']:
             subparser.add_argument('--spec_indices', dest='spec_indices', help='',
                                   default = ['evi2','gcvi','wi','kndvi','nbr','ndmi'])
             subparser.add_argument('--si_vars', dest='si_vars', help = '',
                                    default='[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]')
-            subparser.add_argument('--in_dir', dest='in_dir', help='')
-        
-        if process == 'make_var_stack':
-            subparser.add_argument('--feature_model', dest = 'feature_model', 
-                                   help='unique name for variable combo (start_Yr (spec_indices*si_vars + singleton_vars + poly_vars))')
-            subparser.add_argument('--start_yr', dest='start_yr', help='year to model (first year if using split calendar)')
             subparser.add_argument('--singleton_vars', dest='singleton_vars', help='list of singleton variables to include', default=None)
             subparser.add_argument('--poly_vars', dest='poly_vars', help='list of polygon-level variables to include', default=None)
             subparser.add_argument('--poly_var_path', dest='poly_var_path', 
@@ -161,25 +163,20 @@ def main():
                                    help = 'path to scratch directory to same temp files without backup', default=None
             subparser.add_argument('--singleton_var_dict', dest='singleton_var_dict', default=None,
                                    help='path to json describing singleton vars. (see example in main folder of this repo)')
-            subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
-                                   help='path to dict defining variable model names. (see example in main folder of this repo)')
-            
+                    
         if process in ['rf_model','rf_classification']: 
             subparser.add_argument('--df_in', dest ='df_in', help='path to sample dataframe with extracted variable data')
-            subparser.add_argument('--classification', dest ='classification', help='Permultation | Inference | None')
+            subparser.add_argument('--lc_mod', dest ='lc_mod', help='Permultation | Inference | None')
             subparser.add_argument('--importance_method', dest ='importance_method', help="All(=LC17),...", default='All')
             subparser.add_argument('--ran_hold', dest ='ran_hold', 
                                    help='fixed random number, for repetition of same dataset', type=int, default=0)
-            subparser.add_argument('--model_name', dest ='model_name', help='name of model')
-                                  
+            subparser.add_argument('--samp_model_name', dest ='samp_model_name', 
+                                   help='name of sample model')                          
         if process == 'rf_classification':
-            subparser.add_argument('--ts_dir', dest='ts_dir',help='path to time series variables (within cell)')
             subparser.add_argument('--rf_mod', dest='rf_mod',
                                    help='path to existing random forest model, or None if model is to be created')
             subparser.add_argument('--img_out', dest='img_out',help='Full path name of classified image to be created')
-            subparser.add_argument('--spec_indices', dest ='spec_indices',
-                                   help='indices used.')
-            subparser.add_argument('--stats', dest ='stats', help='raster variables used')
+                                  
 
     args = parser.parse_args()
 
@@ -216,7 +213,7 @@ def main():
                              image_type = args.image_type,
                              grid_file = args.grid_file,
                              cell_list = check_for_list(args.cell_list),
-                             ground_polys = args.ground_polys,
+                             polyfile = args.polyfile,
                              oldest = args.oldest,
                              newest = args.newest,
                              npts = args.npts,
@@ -276,41 +273,50 @@ def main():
                              scratch_dir = args.scratch_dir)
                                    
     if args.process == 'make_var_dataframe':
-        make_var_dataframe (out_dir = args.out_dir, 
-                            spec_indices = check_for_list(args.spec_indices),
-                            si_vars = check_for_list(args.si_vars),
-                            in_dir = args.in_dir,
+        make_var_dataframe (in_dir = args.in_dir,
+                            out_dir = args.out_dir, 
                             grid_file = args.grid_file,
                             cell_list = check_for_list(args.cell_list),
-                            ground_polys = args.ground_polys,
+                            feature_model = args.feature_model,
+                            feature_mod_dict = args.feature_mod_dict,
+                            start_yr = args.start_yr,
+                            polyfile = args.polyfile,
                             oldest = args.oldest,
                             newest = args.newest,
                             npts = args.npts,
                             seed = args.seed,
                             load_samp = args.load_samp,
                             ptfile = args.ptfile)
-        
+                                   
     if args.process == 'rf_model':
         rf_model(df_in = args.df_in, 
                  out_dir = args.out_dir,
-                 classification = args.classification,
+                 lc_mod = args.lc_mod,
                  importance_method = args.importance_method,
                  ran_hold = args.ran_hold,
                  model_name = args.model_name)
                                    
     if args.process == 'rf_classification':
-        rf_classification(ts_dir = args.ts_dir,
+        rf_classification(in_dir = args.in_dir,
                  df_in = args.df_in,
-                 spec_indices = args.spec_indices,
-                 stats = args.stats,
-                 model_name = args.model_name,
+                 feature_model = args.feature_model,
+                 start_yr = args.start_yr,
+                 samp_model_name = args.samp_model_name,
+                 feature_model_dict = args.feature_model_dict,
+                 singleton_var_dict = args.singleton_var_dict,
                  rf_mod = args.rf_mod,
                  img_out = args.img_out,
-                 classification = args.classification,
+                 spec_indices = args.spec_indices,
+                 si_vars = args.si_vars,
+                 singleton_vars = args.singleton_vars,
+                 poly_vars = args.poly_vars,
+                 poly_var_path = args.poly_var_path,
+                 lc_mod = args.lc_mod,
                  importance_method = args.importance_method,
                  ran_hold = args.ran_hold,
-                 out_dir = args.out_dir)
-        
+                 out_dir = args.out_dir,
+                 scratch_dir = args.scratch_dir)
+
     #if process == 'check_ts_windows':
     #    check_ts_windows(processed_dir = args.processed_dir,
     #                     grid_cell = args.grid_cell,
