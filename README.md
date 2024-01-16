@@ -28,8 +28,8 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 ### Also (temporarily) hosts functions to:
 
 ###        create modelling features from smoothed time-series indices and segmentation outputs 
-* [make raster variable stack ](#make-raster-variable-stack)(`make_ts_composite` within bash script `raster_var_stack.sh`)
-* [make variable dataframe for sample points ](#make-variable-dataframe-for-sample-points)
+* [make raster variable stack ](#make-raster-variable-stack)(`make_variable_stack` with bash script `rf0_raster_var_stack.sh`)
+* [make variable dataframe for sample points ](#make-variable-dataframe-for-sample-points)(`make_var_dataframe` with bash script `rf1_var_data_frame.sh`
 ###        create single-year random forest classification model
 * [build random forest model ](#bulid-rf-model)(`rf_model`) 
 ###        apply random forest model to gridded data to create wall-to-wall map
