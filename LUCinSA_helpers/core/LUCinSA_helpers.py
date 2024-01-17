@@ -112,16 +112,17 @@ def main():
             subparser.add_argument('--common_str', dest='common_str', help='unique string in file name for mosaic', default=None)
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
         
-        if process in ['get_time_series','make_ts_composite','rf_model','rf_classification']:
+        if process in ['get_time_series','make_ts_composite','rf_model','rf_classification','make_var_dataframe','make_var_stack']:
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
-            subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
             subparser.add_argument('--start_yr', dest ='start_yr', help='start year', default=2010, type=int)
-            subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
 
         if process == 'get_time_series':
+            subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
             subparser.add_argument('--end_yr', dest ='end_yr', help='end year', default=2020, type=int)
             subparser.add_argument('--image_type', dest ='image_type', help='.nc or TS currently supported', default='TS')
-        if process in['get_time_series','make_var_dataframe']:
+            subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
+            
+        if process in ['get_time_series','make_var_dataframe']:
             subparser.add_argument('--grid_file', dest ='grid_file', help='path to grid file')
             subparser.add_argument('--cell_list', dest ='cell_list',
                                    help='list of cells to look for points/poys in. (list or path to .csv file with list, no header' )
@@ -138,13 +139,13 @@ def main():
                                    help='Path to file containing points, if load_samp=True', default=None)
 
         if process == 'make_ts_composite':
+            subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
             subparser.add_argument('--bands_out', dest ='bands_out', help='bands to create')
             subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed') 
+            subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
 
         if process in ['make_var_dataframe','make_var_stack','rf_classification']:
             subparser.add_argument('--in_dir', dest='in_dir', help='')
-            subparser.add_argument('--out_dir', dest='out_dir',help='out directory for final dataframes')
-            subparser.add_argument('--start_yr', dest='start_yr', help='year to model (first year if using split calendar)')
             subparser.add_argument('--feature_model', dest = 'feature_model', 
                                    help='unique name for variable combo (start_Yr (spec_indices*si_vars + singleton_vars + poly_vars))')
             subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
@@ -152,7 +153,7 @@ def main():
   
         if process in ['make_var_stack', 'rf_classification']:
             subparser.add_argument('--spec_indices', dest='spec_indices', help='',
-                                  default = ['evi2','gcvi','wi','kndvi','nbr','ndmi'])
+                                  default = '[evi2,gcvi,wi,kndvi,nbr,ndmi]')
             subparser.add_argument('--si_vars', dest='si_vars', help = '',
                                    default='[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]')
             subparser.add_argument('--singleton_vars', dest='singleton_vars', help='list of singleton variables to include', default=None)
@@ -160,7 +161,7 @@ def main():
             subparser.add_argument('--poly_var_path', dest='poly_var_path', 
                                    help='path to directory containing polygon-level variables (i.e. segmentation', default=None)
             subparser.add_argument('--scratch_dir', dest='scratch_dir', 
-                                   help = 'path to scratch directory to same temp files without backup', default=None
+                                   help = 'path to scratch directory to same temp files without backup', default=None)
             subparser.add_argument('--singleton_var_dict', dest='singleton_var_dict', default=None,
                                    help='path to json describing singleton vars. (see example in main folder of this repo)')
                     

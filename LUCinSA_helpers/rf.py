@@ -320,7 +320,7 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
         stack_paths = []
         num_bands_all = 0
         cell = int(os.path.basename(in_dir))
-        sys.stderr.write('making variable stack for cell {}'.format(cell))
+        sys.stdout.write('making variable stack for cell {}'.format(cell))
         for si in spec_indices:
             img_dir = os.path.join(in_dir,'brdf_ts','ms',si)
             if scratch_dir:
@@ -347,7 +347,7 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
                     if sf in dic: 
                         sf_path = dic[sf]['path']
                         sf_col = dic[sf]['col']
-                        sys.stderr.write('getting {} from {}'.format(sf,sf_path))    
+                        sys.stdout.write('getting {} from {}'.format(sf,sf_path))    
                     else:
                         sys.stderr.write('ERROR: do not know path for {}. Add to singleton_var_dict and rerun'.format(sf))
                         sys.exit()
@@ -384,7 +384,7 @@ def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,featu
                                       
         sys.stdout.write('Final stack will have {} bands \n'.format(num_bands_all))
         sys.stdout.write('band names = {}'.format(band_names))
-        sys.stderr.write('making variable stack...')
+        sys.stdout.write('making variable stack...')
 
         output_count = 0
         indexes = []

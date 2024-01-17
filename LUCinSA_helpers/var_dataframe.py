@@ -77,6 +77,7 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
     else:
         print('cell_list needs to be a list or path to .csv file with list')
     for cell in cells:
+        var_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)),'comp')
         print ('working on cell {}'.format(cell))
         if load_samp == True:
             sys.stdout.write('loading sample from points for cell {} \n'.format(cell))
@@ -86,11 +87,10 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
             sys.stdout.write('loading sample from polygons for cell {} \n'.format(cell))
             polys = get_polygons_in_grid (grid_file, cell, polyfile, oldest, newest)
             points = None
-          
+        
+        sys.stdout.write('looking for {}_{}_stack.tif in {} to extract variables'.format(feature_model,start_yr,var_dir))
         if isinstance(points, gpd.GeoDataFrame) or polys is not None:
-            var_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)),'comp')
-           
-            if load_samp == True:
+             if load_samp == True:
                 polys=None
                 pts = get_variables_at_pts(var_dir, out_dir, 
                                            feature_model, feature_mod_dict, start_yr, 
