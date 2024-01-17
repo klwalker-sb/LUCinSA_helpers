@@ -21,6 +21,7 @@ from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import cross_validate
 #import seaborn as sn
 from joblib import dump, load
+import csv
 from LUCinSA_helpers.ts_composite import make_ts_composite
 
 ## Tell GDAL to throw Python exceptions, and register all drivers
@@ -318,14 +319,15 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,spec_indices,si_
                                                                    poly_vars)
     
     cells = []
-    if isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
-        cells.append(cell_list) 
-    elif isinstance(cell_list, list):
+    if isinstance(cell_list, list):
         cells = cell_list
     elif cell_list.endswith('.csv'): 
         with open(cell_list, newline='') as cell_file:
             for row in csv.reader(cell_file):
                 cells.append (row[0])
+    elif isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
+        cells.append(cell_list) 
+    
     for cell in cells:
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
@@ -529,14 +531,14 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, samp_mo
     model_name = '{}_{}_{}'.format(feature_model, samp_mod_name,start_yr)
     
     cells = []
-    if isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
-        cells.append(cell_list) 
-    elif isinstance(cell_list, list):
+    if isinstance(cell_list, list):
         cells = cell_list
     elif cell_list.endswith('.csv'): 
         with open(cell_list, newline='') as cell_file:
             for row in csv.reader(cell_file):
                 cells.append (row[0])
+    elif isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
+        cells.append(cell_list) 
                 
     for cell in cells:            
     # make variable stack if it does not exist (for example for cells without sample pts)
