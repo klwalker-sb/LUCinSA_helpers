@@ -90,7 +90,7 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
         
         sys.stdout.write('looking for {}_{}_stack.tif in {} to extract variables'.format(feature_model,start_yr,var_dir))
         if isinstance(points, gpd.GeoDataFrame) or polys is not None:
-             if load_samp == True:
+            if load_samp == True:
                 polys=None
                 pts = get_variables_at_pts(var_dir, out_dir, 
                                            feature_model, feature_mod_dict, start_yr, 

@@ -218,7 +218,6 @@ def multiclass_rf(trainfeatures, out_dir, mod_name, lc_mod, importance_method, r
     X = X.values
     y = y.values
     X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, test_size = .01, random_state=ran_hold)
-    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = .02, random_state=ran_hold)
 
     rf = RandomForestClassifier(n_estimators=500, oob_score=True)
     rf = rf.fit(X_train,y_train)
@@ -236,7 +235,6 @@ def multiclass_rf(trainfeatures, out_dir, mod_name, lc_mod, importance_method, r
             pd.Series.to_csv(var_importances,os.path.join(out_dir,'VarImportance_{}.csv'.format(mod_name)),sep=',', index=True)
 
     return rf, cm
-
 
 def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir):
     ## Save info for extra columns and drop (model is expecting only variable input columns)
@@ -307,110 +305,130 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
         
     return spec_indices,si_vars,singleton_vars,poly_vars,band_names
     
-def make_variable_stack(in_dir,feature_model,start_yr,spec_indices,si_vars,feature_mod_dict,
+def make_variable_stack(in_dir,cell_list,feature_model,start_yr,spec_indices,si_vars,feature_mod_dict,
                         singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None):
     
     # get model paramaters if model already exists in dict. Else create new dict entry for this model
     spec_indices, si_vars, singleton_vars, poly_vars, band_names = getset_feature_model(
-        feature_mod_dict, feature_model, spec_indices, si_vars, singleton_vars, poly_vars)
-    stack_path = os.path.join(in_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
-    if os.path.isfile(stack_path):
-        sys.stderr.write('stack file already exists for model {}'.format(feature_model))
-    else:
-        stack_paths = []
-        num_bands_all = 0
-        cell = int(os.path.basename(in_dir))
-        sys.stdout.write('making variable stack for cell {}'.format(cell))
-        for si in spec_indices:
-            img_dir = os.path.join(in_dir,'brdf_ts','ms',si)
-            if scratch_dir:
-                out_dir = scratch_dir
-            else:
-                out_dir = os.path.join(in_dir,'comp')
-            new_bands = make_ts_composite(cell, img_dir, out_dir, start_yr, si, si_vars)
-            stack_paths.append(new_bands)
-            with rio.open(new_bands) as src:
-                num_bands = src.count
-                sys.stdout.write('Added {} with {} bands \n'.format(si,num_bands))
-                if num_bands < len(si_vars):
-                    sys.stderr.write('ERROR: number of bands does not match requested number')
-                    sys.exit()
-            num_bands_all = num_bands_all + num_bands
-        if len(stack_paths) < len(spec_indices):
-            sys.stderr.write('ERROR: did not find ts data for all the requested spec_indices')
-            sys.exit()
-        if singleton_vars is not None and singleton_vars != 'None':
-            # Clips portion of singleton raster corresponding to gridcell and saves with stack files (if doesn't already exist there)
-            for sf in singleton_vars:
-                with open(singleton_var_dict, 'r+') as singleton_feat_dict:
-                    dic = json.load(singleton_feat_dict)
-                    if sf in dic: 
-                        sf_path = dic[sf]['path']
-                        sf_col = dic[sf]['col']
-                        sys.stdout.write('getting {} from {}'.format(sf,sf_path))    
-                    else:
-                        sys.stderr.write('ERROR: do not know path for {}. Add to singleton_var_dict and rerun'.format(sf))
+                                                                   feature_mod_dict, 
+                                                                   feature_model, 
+                                                                   spec_indices, 
+                                                                   si_vars, 
+                                                                   singleton_vars, 
+                                                                   poly_vars)
+    
+    cells = []
+    if isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
+        cells.append(cell_list) 
+    elif isinstance(cell_list, list):
+        cells = cell_list
+    elif cell_list.endswith('.csv'): 
+        with open(cell_list, newline='') as cell_file:
+            for row in csv.reader(cell_file):
+                cells.append (row[0])
+    for cell in cells:
+        cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
+        stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
+        
+        if os.path.isfile(stack_path):
+            sys.stderr.write('stack file already exists for model {}'.format(feature_model))
+        
+        else:
+            stack_paths = []
+            num_bands_all = 0
+            sys.stdout.write('making variable stack for cell {}'.format(cell))
+            for si in spec_indices:
+                img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
+                if scratch_dir:
+                    out_dir = scratch_dir
+                else:
+                    out_dir = os.path.join(cell_dir,'comp')
+                new_bands = make_ts_composite(cell, img_dir, out_dir, start_yr, si, si_vars)
+                stack_paths.append(new_bands)
+                with rio.open(new_bands) as src:
+                    num_bands = src.count
+                    sys.stdout.write('Added {} with {} bands \n'.format(si,num_bands))
+                    if num_bands < len(si_vars):
+                        sys.stderr.write('ERROR: number of bands does not match requested number')
                         sys.exit()
+                num_bands_all = num_bands_all + num_bands
+            if len(stack_paths) < len(spec_indices):
+                sys.stderr.write('ERROR: did not find ts data for all the requested spec_indices')
+                sys.exit()
+            if singleton_vars is not None and singleton_vars != 'None':
+                # Clips portion of singleton raster corresponding to gridcell and saves with stack files (if doesn't already exist there)
+                for sf in singleton_vars:
+                    with open(singleton_var_dict, 'r+') as singleton_feat_dict:
+                        dic = json.load(singleton_feat_dict)
+                        if sf in dic: 
+                            sf_path = dic[sf]['path']
+                            sf_col = dic[sf]['col']
+                            sys.stdout.write('getting {} from {}'.format(sf,sf_path))    
+                        else:
+                            sys.stderr.write('ERROR: do not know path for {}. Add to singleton_var_dict and rerun'.format(sf))
+                            sys.exit()
 
-                singleton_clipped = os.path.join(in_dir,'comp','{}.tif'.format(sf))
-                if os.path.isfile(singleton_clipped):
-                    stack_paths.append(singleton_clipped)
-                else:
-                    ## clip large singleton raster to extent of other rasters in stack for grid cell
-                    small_ras = stack_paths[0]
-                    src_small = gdal.Open(small_ras)
-                    ulx, xres, xskew, uly, yskew, yres  = src_small.GetGeoTransform()
-                    lrx = ulx + (src_small.RasterXSize * xres)
-                    lry = uly + (src_small.RasterYSize * yres)
-                    geometry = [[ulx,lry], [ulx,uly], [lrx,uly], [lrx,lry]]
-                    roi = [Polygon(geometry)]
-                    with rio.open(small_ras) as src0:
-                        out_meta = src0.meta.copy()
-                    out_meta.update({"count":1})
-                    with rio.open(sf_path) as src:
-                        out_image, transformed = rio.mask.mask(src, roi, crop = True)
-                    with rio.open(singleton_clipped, 'w', **out_meta) as dst:
-                        dst.write(out_image)
-                    stack_paths.append(singleton_clipped)
-                num_bands_all = num_bands_all + 1
-        if poly_vars is not None and poly_vars != 'None':
-            for pv in poly_vars:
-                poly_path = os.path.join(poly_var_path,'{}_{}.tif'.format(pv,cell))
-                if os.path.isfile(poly_path): 
-                    stack_paths.append(poly_path)
+                    singleton_clipped = os.path.join(cell_dir,'comp','{}.tif'.format(sf))
+                    if os.path.isfile(singleton_clipped):
+                        stack_paths.append(singleton_clipped)
+                    else:
+                        ## clip large singleton raster to extent of other rasters in stack for grid cell
+                        small_ras = stack_paths[0]
+                        src_small = gdal.Open(small_ras)
+                        ulx, xres, xskew, uly, yskew, yres  = src_small.GetGeoTransform()
+                        lrx = ulx + (src_small.RasterXSize * xres)
+                        lry = uly + (src_small.RasterYSize * yres)
+                        geometry = [[ulx,lry], [ulx,uly], [lrx,uly], [lrx,lry]]
+                        roi = [Polygon(geometry)]
+                        with rio.open(small_ras) as src0:
+                            out_meta = src0.meta.copy()
+                        out_meta.update({"count":1})
+                        with rio.open(sf_path) as src:
+                            out_image, transformed = rio.mask.mask(src, roi, crop = True)
+                        with rio.open(singleton_clipped, 'w', **out_meta) as dst:
+                            dst.write(out_image)
+                        stack_paths.append(singleton_clipped)
                     num_bands_all = num_bands_all + 1
-                else:
-                    sys.stderr.write('variable {} does not exist for cell {}'.format(pv,cell))
+            if poly_vars is not None and poly_vars != 'None':
+                for pv in poly_vars:
+                    poly_path = os.path.join(poly_var_path,'{}_{}.tif'.format(pv,cell))
+                    if os.path.isfile(poly_path): 
+                        stack_paths.append(poly_path)
+                        num_bands_all = num_bands_all + 1
+                    else:
+                        sys.stderr.write('variable {} does not exist for cell {}'.format(pv,cell))
                                       
-        sys.stdout.write('Final stack will have {} bands \n'.format(num_bands_all))
-        sys.stdout.write('band names = {}'.format(band_names))
-        sys.stdout.write('making variable stack...')
+            sys.stdout.write('Final stack will have {} bands \n'.format(num_bands_all))
+            sys.stdout.write('band names = {}'.format(band_names))
+            sys.stdout.write('making variable stack...')
 
-        output_count = 0
-        indexes = []
-        for path in stack_paths:
-            with rio.open(path) as src:
-                src_indexes = src.indexes
-                indexes.append(src_indexes)
-                output_count += len(src_indexes)
-
-        with rio.open(stack_paths[0],'r') as src0:
-            kwargs = src0.meta
-            kwargs.update(count = output_count)
-
-        with rio.open(os.path.join(in_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr)),'w',**kwargs) as dst:
-            dst_idx = 1
-            for path, index in zip(stack_paths, indexes):
+            output_count = 0
+            indexes = []
+            for path in stack_paths:
                 with rio.open(path) as src:
-                    if isinstance(index, int):
-                        data = src.read(index)
-                        dst.write(data, dst_idx)
-                        dst_idx += 1
-                    elif isinstance(index, Iterable):
-                        data = src.read(index)
-                        dst.write(data, range(dst_idx, dst_idx + len(index)))
-                        dst_idx += len(index)
-            dst.descriptions = tuple(band_names)
+                    src_indexes = src.indexes
+                    indexes.append(src_indexes)
+                    output_count += len(src_indexes)
+
+            with rio.open(stack_paths[0],'r') as src0:
+                kwargs = src0.meta
+                kwargs.update(count = output_count)
+
+            with rio.open(os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr)),'w',**kwargs) as dst:
+                dst_idx = 1
+                for path, index in zip(stack_paths, indexes):
+                    with rio.open(path) as src:
+                        if isinstance(index, int):
+                            data = src.read(index)
+                            dst.write(data, dst_idx)
+                            dst_idx += 1
+                        elif isinstance(index, Iterable):
+                            data = src.read(index)
+                            dst.write(data, range(dst_idx, dst_idx + len(index)))
+                            dst_idx += len(index)
+                dst.descriptions = tuple(band_names)
+                
+        return stack_path        
                 
 def classify_raster(var_stack,rf_path,class_img_out):
 
@@ -498,7 +516,7 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
     
     return rf, score
 
-def rf_classification(in_dir, df_in, feature_model, start_yr, samp_mod_name, feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, lc_mod=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
+def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, samp_mod_name, feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, lc_mod=None, lut=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
     
     spec_indices,si_vars,singleton_vars,poly_vars,band_names = getset_feature_model(
                                                                   feature_mod_dict,
@@ -508,20 +526,32 @@ def rf_classification(in_dir, df_in, feature_model, start_yr, samp_mod_name, fea
                                                                   singleton_vars,
                                                                   poly_vars)
     
+    model_name = '{}_{}_{}'.format(feature_model, samp_mod_name,start_yr)
+    
+    cells = []
+    if isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
+        cells.append(cell_list) 
+    elif isinstance(cell_list, list):
+        cells = cell_list
+    elif cell_list.endswith('.csv'): 
+        with open(cell_list, newline='') as cell_file:
+            for row in csv.reader(cell_file):
+                cells.append (row[0])
+                
+    for cell in cells:            
     # make variable stack if it does not exist (for example for cells without sample pts)
     # -- will not be remade if a file named {feature_model}_{start_year}_stack.tif already exists in ts_dir/comp
-    make_variable_stack(ts_dir,feature_model,start_yr,spec_indices,si_vars,feature_mod_dict,
+        var_stack = make_variable_stack(in_dir,cell,feature_model,start_yr,spec_indices,si_vars,feature_mod_dict,
                         singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None)
-        
-    model_name = '{}_{}_{}'.format(feature_model, samp_mod_name,start_yr)                        
-    if img_out == None:
-        class_img_out = os.path.join(in_dir,'comp','{}.tif'.format(model_name))
-    else:
-        class_img_out = img_out
-    if rf_mod != None and os.path.isfile(rf_mod):
-        sys.stdout.write('using existing model... \n')
-        classify_raster(var_stack, rf_mod,class_img_out)
-    else:
-        sys.stdout.write('creating rf model... \n')
-        rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name)
-        classify_raster(var_stack, rf_mod,class_img_out)
+        cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
+        if img_out == None:
+            class_img_out = os.path.join(cell_dir,'comp','{}.tif'.format(model_name))
+        else:
+            class_img_out = img_out
+        if rf_mod != None and os.path.isfile(rf_mod):
+            sys.stdout.write('using existing model... \n')
+            classify_raster(var_stack, rf_mod, class_img_out)
+        else:
+            sys.stdout.write('creating rf model... \n')
+            rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut)
+            classify_raster(var_stack, rf_mod,class_img_out)

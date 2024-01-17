@@ -152,6 +152,8 @@ def main():
                                    help='path to dict defining variable model names. (see example in main folder of this repo)')
   
         if process in ['make_var_stack', 'rf_classification']:
+            subparser.add_argument('--cell_list', dest ='cell_list',
+                                   help='list of cells to look for points/poys in. (list or path to .csv file with list, no header' )
             subparser.add_argument('--spec_indices', dest='spec_indices', help='',
                                   default = '[evi2,gcvi,wi,kndvi,nbr,ndmi]')
             subparser.add_argument('--si_vars', dest='si_vars', help = '',
@@ -167,8 +169,9 @@ def main():
                     
         if process in ['rf_model','rf_classification']: 
             subparser.add_argument('--df_in', dest ='df_in', help='path to sample dataframe with extracted variable data')
-            subparser.add_argument('--lc_mod', dest ='lc_mod', help='Permultation | Inference | None')
-            subparser.add_argument('--importance_method', dest ='importance_method', help="All(=LC17),...", default='All')
+            subparser.add_argument('--lc_mod', dest ='lc_mod', help="All(=LC25),...", default='All' )
+            subparser.add_argument('--lut', dest ='lut', help='path to lut for land cover classificaitons', default=None)
+            subparser.add_argument('--importance_method', dest ='importance_method', help='Permultation | Inference | None')
             subparser.add_argument('--ran_hold', dest ='ran_hold', 
                                    help='fixed random number, for repetition of same dataset', type=int, default=0)
             subparser.add_argument('--samp_model_name', dest ='samp_model_name', 
@@ -262,6 +265,7 @@ def main():
         
     if args.process ==  'make_var_stack':
         make_variable_stack (in_dir = args.in_dir,
+                             cell_list = args.cell_list,
                              feature_model = args.feature_model,
                              start_yr = args.start_yr,
                              spec_indices = check_for_list(args.spec_indices),
@@ -295,10 +299,12 @@ def main():
                  lc_mod = args.lc_mod,
                  importance_method = args.importance_method,
                  ran_hold = args.ran_hold,
-                 model_name = args.model_name)
+                 model_name = args.model_name,
+                 lut = args.lut)
                                    
     if args.process == 'rf_classification':
         rf_classification(in_dir = args.in_dir,
+                 cell_list = args.cell_list,
                  df_in = args.df_in,
                  feature_model = args.feature_model,
                  start_yr = args.start_yr,
@@ -313,6 +319,7 @@ def main():
                  poly_vars = args.poly_vars,
                  poly_var_path = args.poly_var_path,
                  lc_mod = args.lc_mod,
+                 lut = args.lut,
                  importance_method = args.importance_method,
                  ran_hold = args.ran_hold,
                  out_dir = args.out_dir,

@@ -213,12 +213,24 @@ LUCinSA_helpers make_ts_composite \
 The notebook, `2b_ViewTimeSeriesComposite.ipynb` allows a user to build and view a time-series composite for given cell and year without the need to transfer any data from the HPC cluster. Both smoothed and raw time series can be viewed for up to four points selected interactively from the image. This is useful for troubleshooting as well as quick feedback on variables and useful for mapping targeted classes and the effect of different smoothing functions on the final dataset.
 
 ![alt](/images/ts_example.jpg)
-           
+
+# machine-learning classification models and surface-level classification
+from smoothed time-series outputs to final land-cover classification is a multi-step process involving:
+  * selecting summary variables and stacking all variables into a single stack for each cell
+  * extracting values from this stack to sample points to create a sample dataframe
+  * building a random forest model with the sample points
+  * optimizing the feature space, sample properties and paramaters of model
+  * applying model to all pixels of each cell and mosaicking to create a wall-to-wall map
+  
+More detail on each step is provided [here, in the LUCinSA guide](https://klwalker-sb.github.io/LUCinLA_stac/Classification_rf.html)
+
+
 ## make raster variable stack
-Once a set of raster variables has been selected for a model, a variable stack can be produced for each index using the `make_variable_stack` function. The bash script: `raster_var_stack.sh` contains the configuration to run the function as an array over multiple grid cells.
+Once a set of raster variables has been selected for a model, a variable stack can be produced for each index using the `make_variable_stack` function. The bash script: `rf0_raster_var_stack.sh` contains the configuration to run the function as an array over multiple grid cells or an array of lists of grid cells (as .csv files with no header)
 ```
 LUCinSA_helpers make_variable_stack \
      --in_dir path/to/cell_ts_dir \  
+     --cell_list path/to/cell_list.csv \
      --feature_model 'default' \
      --start_yr 2021 \
      --spec_indices '[evi2,gcvi,wi,kndvi,ndmi,nbr]' \
@@ -268,11 +280,13 @@ LUCinSA_helpers rf_model \
    --importance_method 'Impurity'\
    --ran_hold 99 \
    --model_name 'test'\
+   --lut 'path/to/lut.csv' \
 ```
 ## classified raster
 ```
 LUCinSA_helpers rf_classification \
     --in_dir  path/to/ts_comp_dir \
+    --cell_list path/to/cell_list.csv \
     --df_in path/to/pt-feature_dataframe \
     --feature_model 'base' \
     --start_yr 2021 \
@@ -296,6 +310,7 @@ LUCinSA_helpers rf_classification \
     --lc_mod \
     --ran_hold 99\
     --importance_method 'Impurity'\
-    --out-dir 'path/to/directory_for_rf_mod'
+    --out-dir 'path/to/directory_for_rf_mod' \
+    --lut 'path/to/lut.csv' \
     
 ```      

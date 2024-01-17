@@ -10,7 +10,13 @@
 #SBATCH --array=979
 
 ################################################################
-GRID_ID="$(($SLURM_ARRAY_TASK_ID + 3000))"
+## If a running smallish number of cells, can enter in array above and use these values as the cell input:
+#CELLS="${SLURM_ARRAY_TASK_ID}"
+CELLS="$(($SLURM_ARRAY_TASK_ID + 3000))"
+
+## If running a lot of cells, can use a list. To parallelize, can split list into multiple lists in a directory:
+#CELLS="/home/downspout-cel/paraguay_lc/vector/sampleData/Training_cells.csv"
+#CELLS="/home/downspout-cel/paraguay_lc/vector/sampleData/TrainingCells/${SLURM_ARRAY_TASK_ID}.csv"
 
 # Settables:
 FEATUREMOD='base'
@@ -19,16 +25,17 @@ VARDF="/home/downspout-cel/paraguay_lc/classification/RF/pixdf_lessSoy.csv"
 YR=2021
 #################################################################
 # Probably do not change:
-INDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}/comp"
+INDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids"
 MODPATH="/home/downspout-cel/${COUNTRY}_lc/classification/RF/test/${MODNAME}_RFmod.joblib"
 SINGDICT='/home/downspout-cel/paraguay_lc/singleton_var_dict.json'
 MODDICT='/home/downspout-cel/paraguay_lc/Feature_Models.json'
-OUTIMG="${INDIR}/00${GRID_ID}_${MODNAME}.tif"
+OUTIMG="None"
+LUT="../Class_LUT.csv"
 
 # activate the virtual environment
 conda activate venv.lucinsa38_pipe
 
 # if running from installed module:
-LUCinSA_helpers rf_classification --in_dir $INDIR --df_in $VARDF --feature_model $FEATUREMOD --start_yr $YR --sample_model $SAMPLEMOD --feature_mod_dict $MODDICT --singleton_var_dict $SINGDICT --rf_mod $MODPATH  --img_out $OUTIMG --spec_indices None --si_vars None --singleton_vars None --poly_vars None --poly_var_path None --lc_mod None --importance_method None --ran_hold 0 --out_dir None --scratch_dir None
+LUCinSA_helpers rf_classification --in_dir $INDIR --cell_list $CELLS --df_in $VARDF --feature_model $FEATUREMOD --start_yr $YR --sample_model $SAMPLEMOD --feature_mod_dict $MODDICT --singleton_var_dict $SINGDICT --rf_mod $MODPATH  --img_out $OUTIMG --spec_indices None --si_vars None --singleton_vars None --poly_vars None --poly_var_path None --lc_mod None --importance_method None --ran_hold 0 --out_dir None --scratch_dir None
 
 conda deactivate

@@ -7,14 +7,19 @@
 #SBATCH -o rfstack.%N.%a.%j.out # STDOUT
 #SBATCH -e rfstack.%N.%a.%j.err # STDERR
 #SBATCH --job-name="rfstack"
-#SBATCH --array=26-29
+##SBATCH --array=1-8
 ################################################################
 
-#GRID_ID="${SLURM_ARRAY_TASK_ID}"
-GRID_ID="$(($SLURM_ARRAY_TASK_ID + 4000))"
+## If a running smallish number of cells, can enter in array above and use these values as the cell input:
+#CELLS="${SLURM_ARRAY_TASK_ID}"
+#CELLS="$(($SLURM_ARRAY_TASK_ID + 4000))"
+
+## If running a lot of cells, can use a list. To parallelize, can split list into multiple lists in a directory:
+#CELLS="/home/downspout-cel/paraguay_lc/vector/sampleData/Training_cells.csv"
+CELLS="/home/downspout-cel/paraguay_lc/vector/sampleData/TrainingCells/${SLURM_ARRAY_TASK_ID}.csv"
 
 COUNTRY='paraguay'
-TSDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}"
+TSDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/"
 
 MODNAME='base_noseg'
 VIs="[evi2,gcvi,wi,kndvi,nbr,ndmi]"
@@ -22,8 +27,8 @@ SIVARS="[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]
 SING="forest_strata"
 POLYVARS="[pred_ext,pred_dst,pred_area,pred_APR,AvgNovDec_FieldStd]"
 POLYPATH="/home/downspout-cel/paraguay_lc/Segmentations/RF_feats/"
-SINGDICT='/home/downspout-cel/paraguay_lc/singleton_var_dict.json'
-MODDICT='/home/downspout-cel/paraguay_lc/Feature_Models.json'
+SINGDICT="/home/downspout-cel/paraguay_lc/singleton_var_dict.json"
+MODDICT="/home/downspout-cel/paraguay_lc/Feature_Models.json"
 STARTYR=2021
 SCRATCH=''
 # ####################################################
@@ -31,6 +36,6 @@ SCRATCH=''
 # activate the virtual environment
 conda activate venv.lucinsa38_pipe
 
-LUCinSA_helpers make_var_stack --in_dir $TSDIR --feature_model $MODNAME --start_yr $STARTYR --spec_indices $VIs --si_vars $SIVARS --feature_mod_dict $MODDICT --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
+LUCinSA_helpers make_var_stack --in_dir $TSDIR --cell_list $CELLS --feature_model $MODNAME --start_yr $STARTYR --spec_indices $VIs --si_vars $SIVARS --feature_mod_dict $MODDICT --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
 
 conda deactivate

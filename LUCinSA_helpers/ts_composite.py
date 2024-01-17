@@ -151,7 +151,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
             if (img.endswith('354.tif') | img.endswith('355.tif')) and 'Dec' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
     
-    print(ras_list)
+    #print(ras_list)
     if len(ras_list)<len(bands_out):
         print('oops--got an unknown band; Current Band options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec')
 
