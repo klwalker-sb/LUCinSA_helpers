@@ -8,11 +8,11 @@ import datetime
 import rasterio as rio
 import numpy as np
 
-def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,spec_index,bands_out):
+def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,bands_out):
     import geowombat as gw
 
     ##bands_out shoud be list. If fed via bash script, will be string; need to reparse as list:
-    # (now in main)
+    # (this is now in main)
     #if isinstance(bands_out, list):
     #    bands_out == bands_out
     #elif bands_out.startswith('['):
