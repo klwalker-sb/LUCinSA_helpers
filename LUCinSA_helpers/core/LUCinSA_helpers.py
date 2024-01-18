@@ -114,7 +114,9 @@ def main():
         
         if process in ['get_time_series','make_ts_composite','rf_model','rf_classification','make_var_dataframe','make_var_stack']:
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
-            subparser.add_argument('--start_yr', dest ='start_yr', help='start year', default=2010, type=int)
+            subparser.add_argument('--start_yr', dest ='start_yr', help='year to map (first if spans two)', default=2010, type=int)
+            subparser.add_argument('--start_mo', dest ='start_mo', default=2010, type=int,
+                                   help='month to start calendar (e.g 1 if mapping Jan-Dec; 7 if mapping July-Jun')
 
         if process == 'get_time_series':
             subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
@@ -237,6 +239,7 @@ def main():
                         img_dir = args.img_dir,
                         out_dir = args.out_dir,
                         start_yr = args.start_yr,
+                        start_mo = args.start_mo,
                         spec_index = args.spec_index,
                         bands_out = check_for_list(args.bands_out))
 
@@ -268,6 +271,7 @@ def main():
                              cell_list = args.cell_list,
                              feature_model = args.feature_model,
                              start_yr = args.start_yr,
+                             start_mo = args.start_mo,
                              spec_indices = check_for_list(args.spec_indices),
                              si_vars = check_for_list(args.si_vars),
                              feature_mod_dict = args.feature_mod_dict,
@@ -308,6 +312,7 @@ def main():
                  df_in = args.df_in,
                  feature_model = args.feature_model,
                  start_yr = args.start_yr,
+                 start_mo = args.start_mo,
                  samp_model_name = args.samp_model_name,
                  feature_model_dict = args.feature_model_dict,
                  singleton_var_dict = args.singleton_var_dict,

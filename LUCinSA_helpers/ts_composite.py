@@ -32,14 +32,10 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,ban
         if img.endswith('.tif'):
             img_yr = int(img[:4])
             img_doy = int(img[4:7])
-            if hemis == 'S':
-                if (img_yr == int(start_yr) and img_doy >= 182) or (img_yr == (int(start_yr)+1) and img_doy <= 182):
-                    ts_stack.append(os.path.join(img_dir,img))
-                    ds_stack.append(img_doy)
-            elif hemis == 'N':
-                if img_yr == start_yr:
-                    ts_stack.append(os.path.join(img_dir,img))
-                    ds_stack.append(img_doy)
+            start_doy = int (30.5 * start_mo) - 30
+            if (img_yr == int(start_yr) and img_doy >= start_doy) or (img_yr == (int(start_yr)+1) and img_doy < start_doy):
+                ts_stack.append(os.path.join(img_dir,img))
+                ds_stack.append(img_doy)
     with gw.open(ts_stack, time_names= ds_stack) as src:
         attrs = src.attrs.copy()
 
@@ -124,30 +120,40 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,ban
         min_date_cos.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
 
     for img in sorted(os.listdir(img_dir)):
-        if (hemis == 'N' and img.startswith(str(start_yr))) or (hemis == 'S' and img.startswith(str(int(start_yr)+1))):
+        if (start_mo == 1 and img.startswith(str(start_yr))) or (start_mo > 1 and img.startswith(str(int(start_yr)+1))):
             if img.endswith('020.tif') and 'Jan' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 2 and img.startswith(str(start_yr))) or (start_mo > 2 and img.startswith(str(int(start_yr)+1))):
             if img.endswith('051.tif') and 'Feb' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 3 and img.startswith(str(start_yr))) or (start_mo > 3 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('079.tif') | img.endswith('080.tif')) and 'Mar' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 4 and img.startswith(str(start_yr))) or (start_mo > 4 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('110.tif') | img.endswith('111.tif')) and 'Apr' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 5 and img.startswith(str(start_yr))) or (start_mo > 5 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('140.tif') | img.endswith('141.tif')) and 'May' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 6 and img.startswith(str(start_yr))) or (start_mo > 6 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('171.tif') | img.endswith('172.tif')) and 'Jun' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
-        if img.startswith(str(start_yr)):
+        if (start_mo <= 7 and img.startswith(str(start_yr))) or (start_mo > 7 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('201.tif') | img.endswith('202.tif')) and 'Jul' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 8 and img.startswith(str(start_yr))) or (start_mo > 8 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('232.tif') | img.endswith('233.tif')) and 'Aug' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 9 and img.startswith(str(start_yr))) or (start_mo > 9 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('263.tif') | img.endswith('264.tif')) and 'Sep' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 10 and img.startswith(str(start_yr))) or (start_mo > 10 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('293.tif') | img.endswith('294.tif')) and 'Oct' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <= 11 and img.startswith(str(start_yr))) or (start_mo > 11 and img.startswith(str(int(start_yr)+1))):
             if (img.endswith('324.tif') | img.endswith('325.tif')) and 'Nov' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
+        if (start_mo <=12 and img.startswith(str(start_yr))):
             if (img.endswith('354.tif') | img.endswith('355.tif')) and 'Dec' in bands_out:
                 ras_list.append(os.path.join(img_dir,img))
     
