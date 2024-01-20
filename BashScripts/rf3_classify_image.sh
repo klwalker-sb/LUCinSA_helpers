@@ -23,6 +23,7 @@ FEATUREMOD='base'
 SAMPLEMOD='bal1000'
 VARDF="/home/downspout-cel/paraguay_lc/classification/RF/pixdf_lessSoy.csv"
 YR=2021
+STARTMO=7
 #################################################################
 # Probably do not change:
 INDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids"
@@ -36,6 +37,6 @@ LUT="../Class_LUT.csv"
 conda activate venv.lucinsa38_pipe
 
 # if running from installed module:
-LUCinSA_helpers rf_classification --in_dir $INDIR --cell_list $CELLS --df_in $VARDF --feature_model $FEATUREMOD --start_yr $YR --sample_model $SAMPLEMOD --feature_mod_dict $MODDICT --singleton_var_dict $SINGDICT --rf_mod $MODPATH  --img_out $OUTIMG --spec_indices None --si_vars None --singleton_vars None --poly_vars None --poly_var_path None --lc_mod None --importance_method None --ran_hold 0 --out_dir None --scratch_dir None
+LUCinSA_helpers rf_classification --in_dir $INDIR --cell_list $CELLS --df_in $VARDF --feature_model $FEATUREMOD --start_yr $YR --start_mo $STARTMO --sample_model $SAMPLEMOD --feature_mod_dict $MODDICT --singleton_var_dict $SINGDICT --rf_mod $MODPATH  --img_out $OUTIMG --spec_indices None --si_vars None --singleton_vars None --poly_vars None --poly_var_path None --lc_mod None --importance_method None --ran_hold 0 --out_dir None --scratch_dir None
 
 conda deactivate

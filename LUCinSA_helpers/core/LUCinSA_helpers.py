@@ -6,6 +6,7 @@ from LUCinSA_helpers.ts_composite import make_ts_composite
 from LUCinSA_helpers.file_checks import reconstruct_db, get_cell_status, check_valid_pixels, update_cell_status_db
 from LUCinSA_helpers.file_checks import print_files_in_multiple_directories
 from LUCinSA_helpers.var_dataframe import make_var_dataframe
+from LUCinSA_helpers.var_dataframe import append_feature_dataframe
 from LUCinSA_helpers.rf import make_variable_stack, rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.version import __version__
@@ -45,6 +46,7 @@ def main():
                            'summarize_images_multicell',
                            'make_var_stack',
                            'make_var_dataframe',
+                           'append_feature_dataframe',
                            'rf_model', 
                            'rf_classification', 
                            'mosaic'
@@ -112,7 +114,8 @@ def main():
             subparser.add_argument('--common_str', dest='common_str', help='unique string in file name for mosaic', default=None)
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
         
-        if process in ['get_time_series','make_ts_composite','rf_model','rf_classification','make_var_dataframe','make_var_stack']:
+        if process in ['get_time_series','make_ts_composite','rf_model','rf_classification',
+                       'make_var_dataframe','make_var_stack','append_feature_dataframe']:
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
             subparser.add_argument('--start_yr', dest ='start_yr', help='year to map (first if spans two)', default=2010, type=int)
             subparser.add_argument('--start_mo', dest ='start_mo', default=2010, type=int,
@@ -153,7 +156,7 @@ def main():
             subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
                                    help='path to dict defining variable model names. (see example in main folder of this repo)')
   
-        if process in ['make_var_stack', 'rf_classification']:
+        if process in ['make_var_stack', 'rf_classification','append_feature_dataframe']:
             subparser.add_argument('--cell_list', dest ='cell_list',
                                    help='list of cells to look for points/poys in. (list or path to .csv file with list, no header' )
             subparser.add_argument('--spec_indices', dest='spec_indices', help='',
@@ -168,7 +171,14 @@ def main():
                                    help = 'path to scratch directory to same temp files without backup', default=None)
             subparser.add_argument('--singleton_var_dict', dest='singleton_var_dict', default=None,
                                    help='path to json describing singleton vars. (see example in main folder of this repo)')
-                    
+
+        if process == 'append_feature_dataframe':
+            subparser.add_argument('--in_dir', dest='in_dir', help='path to main directory for ts data')
+            subparser.add_argument('--ptfile', dest ='ptfile', 
+                                   help='Path to file containing all points in original dataframe')
+            subparser.add_argument('--feat_df', dest ='feat_df', help='path to dataframe to append features to')
+            subparser.add_argument('--grid_file', dest ='grid_file', help='path to grid file')
+          
         if process in ['rf_model','rf_classification']: 
             subparser.add_argument('--df_in', dest ='df_in', help='path to sample dataframe with extracted variable data')
             subparser.add_argument('--lc_mod', dest ='lc_mod', help="All(=LC25),...", default='All' )
@@ -296,7 +306,24 @@ def main():
                             seed = args.seed,
                             load_samp = args.load_samp,
                             ptfile = args.ptfile)
-                                   
+    
+    if args.process ==  'append_feature_dataframe':
+        append_feature_dataframe (in_dir = args.in_dir,
+                                  pt_file = args.pt_file,
+                                  feat_df = args.feat_df,
+                                  cell_list = args.cell_list,
+                                  grid_file = args.grid_file,
+                                  out_dir = args.out_dir,
+                                  start_yr = args.start_yr,
+                                  start_mo = args.start_mo,
+                                  spec_indices = check_for_list(args.spec_indices),
+                                  si_vars = check_for_list(args.si_vars),
+                                  singleton_vars = check_for_list(args.singleton_vars),
+                                  singleton_var_dict = args.singleton_var_dict,
+                                  poly_vars = check_for_list(args.poly_vars),
+                                  poly_var_path = args.poly_var_path,
+                                  scratch_dir = args.scratch_dir)
+    
     if args.process == 'rf_model':
         rf_model(df_in = args.df_in, 
                  out_dir = args.out_dir,

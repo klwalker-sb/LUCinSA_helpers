@@ -389,7 +389,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                             roi = [Polygon(geometry)]
                             with rio.open(small_ras) as src0:
                                 out_meta = src0.meta.copy()
-                            out_meta.update({"count":1})
+                                out_meta.update({"count":1})
                             with rio.open(sf_path) as src:
                                 out_image, transformed = rio.mask.mask(src, roi, crop = True)
                             with rio.open(singleton_clipped, 'w', **out_meta) as dst:
@@ -449,7 +449,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                 dst.write(data, range(dst_idx, dst_idx + len(index)))
                                 dst_idx += len(index)
                     dst.descriptions = tuple(band_names)
-            print('done writing {}_{}_stack.tif for cell {}'.format(feature_model,start_yr,cell)
+            print('done writing {}_{}_stack.tif for cell {}'.format(feature_model,start_yr,cell))
             return stack_path        
                 
 def classify_raster(var_stack,rf_path,class_img_out):

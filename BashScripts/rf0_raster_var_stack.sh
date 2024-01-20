@@ -30,12 +30,13 @@ POLYPATH="/home/downspout-cel/paraguay_lc/Segmentations/RF_feats/"
 SINGDICT="/home/downspout-cel/paraguay_lc/singleton_var_dict.json"
 MODDICT="/home/downspout-cel/paraguay_lc/Feature_Models.json"
 STARTYR=2021
+STARTMO=7
 SCRATCH=''
 # ####################################################
 
 # activate the virtual environment
 conda activate venv.lucinsa38_pipe
 
-LUCinSA_helpers make_var_stack --in_dir $TSDIR --cell_list $CELLS --feature_model $MODNAME --start_yr $STARTYR --spec_indices $VIs --si_vars $SIVARS --feature_mod_dict $MODDICT --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
+LUCinSA_helpers make_var_stack --in_dir $TSDIR --cell_list $CELLS --feature_model $MODNAME --start_yr $STARTYR --start_mo $STARTMO --spec_indices $VIs --si_vars $SIVARS --feature_mod_dict $MODDICT --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
 
 conda deactivate
