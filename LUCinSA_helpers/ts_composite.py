@@ -97,8 +97,8 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,ban
             print('making maxDate raster')
             max_date.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'MaxDateCos' in bands_out:
-        max_date_360 = max_date * max_date/360
-        max_date_cos = np.cos(max_date_360)
+        max_date_360 = 2 * np.pi * max_date/365
+        max_date_cos = 100 * np.cos(max_date_360)
         max_date_cos.attrs = attrs
         ras = os.path.join(out_dir,'max_date_cos.tif')
         ras_list.append(ras)
@@ -112,8 +112,8 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,ban
             print('making minDate raster')
             min_date.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'MinDateCos' in bands_out:
-        min_date_360 = min_date * min_date/360
-        min_date_cos = np.cos(min_date_360)
+        min_date_360 = 2 * np.pi * min_date/365
+        min_date_cos = 100*np.cos(min_date_360)
         min_date_cos.attrs = attrs
         ras = os.path.join(out_dir,'MinDateCos.tif')
         ras_list.append(ras)

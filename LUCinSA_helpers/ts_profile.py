@@ -1,5 +1,6 @@
 
 import os
+import sys
 from pathlib import Path
 import rasterio as rio
 from rasterio import plot
@@ -89,16 +90,18 @@ def get_pts_in_grid (grid_file, grid_cell, ptfile):
         shutil.copy(grid_file, temp_file)
         df = gpd.read_file(temp_file)
         crs_grid = df.crs
-    print('grid is in: ', crs_grid)  #ESRI:102033
+    #sys.stderr.write('grid is in: {}'.format(crs_grid))  #ESRI:102033
+    #sys.stderr.write('{}'.format(df))
 
     ptsdf = pd.read_csv(ptfile, index_col=0)
     pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=crs_grid)
-
+    
     if df.shape[0] > 1:
         bb = df.query(f'UNQ == {grid_cell}').geometry.total_bounds
     else:
         bb = df.geometry.total_bounds
-
+    sys.stderr.write('bb = {} \n'.format(bb))
+    
     grid_bbox = box(bb[0],bb[1],bb[2],bb[3])
     grid_bounds = gpd.GeoDataFrame(gpd.GeoSeries(grid_bbox), columns=['geometry'], crs=crs_grid)
     print(grid_bounds)

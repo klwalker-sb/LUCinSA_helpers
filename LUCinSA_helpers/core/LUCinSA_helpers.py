@@ -309,9 +309,9 @@ def main():
     
     if args.process ==  'append_feature_dataframe':
         append_feature_dataframe (in_dir = args.in_dir,
-                                  pt_file = args.pt_file,
+                                  ptfile = args.ptfile,
                                   feat_df = args.feat_df,
-                                  cell_list = args.cell_list,
+                                  cell_list = check_for_list(args.cell_list),
                                   grid_file = args.grid_file,
                                   out_dir = args.out_dir,
                                   start_yr = args.start_yr,

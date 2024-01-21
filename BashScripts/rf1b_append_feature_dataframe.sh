@@ -18,6 +18,7 @@
 #CELLS="/home/downspout-cel/paraguay_lc/vector/sampleData/Training_cells.csv"
 #CELLS="/home/downspout-cel/paraguay_lc/vector/sampleData/TrainingCells/${SLURM_ARRAY_TASK_ID}.csv"
 CELLS="[3737,3738]"
+OUTDIR="~/data"
 COUNTRY='paraguay'
 TSDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids"
 MODNAME='append'
@@ -28,7 +29,7 @@ SIVARS="[MaxDateCos, MinDateCos]"
 SING="forest_strata"
 PTFILE="/home/downspout-cel/paraguay_lc/vector/sampleData/SamplePts_Dec2023_ALL.csv"
 FEATDF="/home/downspout-cel/paraguay_lc/vector/ptsgdb_Dec18.csv"
-GRIDFILE="/home/sandbox-cel/paraguay_lc/vector/pry_grids.gpkg"
+GRIDFILE="/home/sandbox-cel/LUCinLA_grid_8858.gpkg"
 POLYVARS="[pred_ext,pred_dst,pred_area,pred_APR,AvgNovDec_FieldStd]"
 POLYPATH="/home/downspout-cel/paraguay_lc/Segmentations/RF_feats/"
 SINGDICT='/home/downspout-cel/paraguay_lc/singleton_var_dict.json'
@@ -41,6 +42,6 @@ SCRATCH="/home/scratch-cel"
 # activate the virtual environment
 conda activate venv.lucinsa38_pipe
 
-LUCinSA_helpers append_feature_dataframe --in_dir $TSDIR --ptfile $PTFILE --feat_df $FEATDF --cell_list $CELLS --grid_file $GRIDFILE  --start_yr $STARTYR --start_mo $STARTMO --spec_indices $VIs --si_vars $SIVARS --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
+LUCinSA_helpers append_feature_dataframe --in_dir $TSDIR --ptfile $PTFILE --feat_df $FEATDF --cell_list $CELLS --grid_file $GRIDFILE --out_dir $OUTDIR --start_yr $STARTYR --start_mo $STARTMO --spec_indices $VIs --si_vars $SIVARS --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
 
 conda deactivate

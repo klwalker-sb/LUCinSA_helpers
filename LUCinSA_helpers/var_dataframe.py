@@ -23,6 +23,7 @@ import xarray as xr
 import csv
 from LUCinSA_helpers.ts_profile import get_pts_in_grid, get_polygons_in_grid, get_ran_pts_in_polys
 from LUCinSA_helpers.rf import getset_feature_model
+from LUCinSA_helpers.ts_composite import make_ts_composite
 
 def clip_singleton_feat_to_cell(singleton_feat,singleton_feat_dict,out_dir,clip_to_ras):
     with open(singleton_feat_dict, 'r+') as singleton_feat_dict:
@@ -142,20 +143,24 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
     pd.DataFrame.to_csv(rfdf,os.path.join(out_dir,'RFdf_{}_{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
     pd.DataFrame.to_csv(all_pts,os.path.join(out_dir,'ptsgdb_{}-{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
     
-def append_feature_dataframe(in_dir,pt_file,feat_df,cell_list,grid_file,out_dir,start_yr,start_mo,spec_indices,si_vars,singleton_vars=None,
+def append_feature_dataframe(in_dir,ptfile,feat_df,cell_list,grid_file,out_dir,start_yr,start_mo,spec_indices,si_vars,singleton_vars=None,
                               singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None):
     all_pts = pd.DataFrame()
 
+    cells = []
     if isinstance(cell_list, list):
         cells = cell_list
     elif cell_list.endswith('.csv'): 
-        cells = []
         with open(cell_list, newline='') as cell_file:
             for row in csv.reader(cell_file):
-                cells.append (row[0])                
+                cells.append (row[0])   
+    elif isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
+        cells.append(cell_list) 
+        
     for cell in cells:
+        sys.stderr.write('working on cell {}... \n'.format(cell))
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
-        ptsgdb = get_pts_in_grid (grid_file, cell, ptfile)
+        ptsgdb = get_pts_in_grid (grid_file, int(cell), ptfile)
         if scratch_dir:
             out_dir_int = os.path.join(scratch_dir,'{}'.format(cell))
         else:
@@ -164,7 +169,7 @@ def append_feature_dataframe(in_dir,pt_file,feat_df,cell_list,grid_file,out_dir,
         xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
         coords = list(map(list, zip(*xy)))
         for pv in poly_vars:
-            ppath = os.path.join(poly_path,'{}_{}.tif'.format(pv,cell))
+            ppath = os.path.join(poly_var_path,'{}_{}.tif'.format(pv,cell))
             if os.path.isfile(ppath):
                 with rio.open(ppath, 'r') as src:
                     vals = src.read(1)
@@ -173,6 +178,7 @@ def append_feature_dataframe(in_dir,pt_file,feat_df,cell_list,grid_file,out_dir,
             else: 
                 sys.stderr.write ('no var {} created for {} \n'.format(pv,cell))   
         for si in spec_indices:
+            sys.stderr.write('extracting {}... \n'.format(si))
             img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
             if os.path.isdir(img_dir):
                 new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
@@ -185,6 +191,7 @@ def append_feature_dataframe(in_dir,pt_file,feat_df,cell_list,grid_file,out_dir,
             else:
                 sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
         for sing in singleton_vars:
+            sys.stderr.write('extracting {}... \n'.format(sing))
             with open(singleton_var_dict, 'r+') as singleton_feat_dict:
                 dic = json.load(singleton_feat_dict)
             if not sing in dic:
@@ -192,7 +199,6 @@ def append_feature_dataframe(in_dir,pt_file,feat_df,cell_list,grid_file,out_dir,
             else: 
                 sf_path = dic[sing]['path']
                 sf_col = dic[sing]['col']
-                sys.stdout.write('getting {} from {}'.format(sing,sf_path))
                 with rio.open(sf_path, 'r') as src2:
                     vals = src2.read(1)
                     varn = 'var_sing_{}'.format(sing)
