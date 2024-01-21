@@ -145,7 +145,7 @@ def main():
 
         if process == 'make_ts_composite':
             subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
-            subparser.add_argument('--bands_out', dest ='bands_out', help='bands to create')
+            subparser.add_argument('--si_vars', dest ='si_vars', help='spectral variables to calculate - in order of band output')
             subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed') 
             subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
 
@@ -251,7 +251,7 @@ def main():
                         start_yr = args.start_yr,
                         start_mo = args.start_mo,
                         spec_index = args.spec_index,
-                        bands_out = check_for_list(args.bands_out))
+                        si_vars = check_for_list(args.si_vars))
 
     if args.process == 'check_valid_pix':
         check_valid_pixels(raw_dir = args.raw_dir,

@@ -20,11 +20,11 @@ IMGDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}/brdf_ts/ms/${V
 STARTYR=2021
 OUT_DIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/00${GRID_ID}/comp"
 
-BANDS="[Max,Min,Amp]"
+SIVARS="[Max,Min,Amp]"
 # ####################################################
 # activate the virtual environment
 conda activate venv.lucinsa38_pipe
 
-LUCinSA_helpers make_ts_composite --grid_cell $GRID_ID  --img_dir $IMGDIR --out_dir $OUT_DIR --start_yr $STARTYR --spec_index $VI --bands_out $BANDS
+LUCinSA_helpers make_ts_composite --grid_cell $GRID_ID  --img_dir $IMGDIR --out_dir $OUT_DIR --start_yr $STARTYR --spec_index $VI --si_vars $SIVARS
 done
 conda deactivate
