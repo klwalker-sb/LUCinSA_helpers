@@ -52,7 +52,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     with gw.open(ts_stack, time_names= ds_stack) as src:
         attrs = src.attrs.copy()
 
-    if 'Max_yr' in si_vars or 'Amp_yr' in si_vars or 'Maxd_yr' in si_vars or 'Maxdc_yr' in si_vars:
+    if any(v in si_vars for v in ['Max_yr','Amp_yr, Maxd_yr','Maxdc_yr']):
         mmax = src.max(dim='time')
         if 'Max_yr' in si_vars:
             mmax.attrs = attrs
@@ -60,7 +60,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
             print('making max raster')
             mmax.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
             ras_list.append(ras)
-    if 'Min_yr' in si_vars or 'Amp_yr' in si_vars or 'Mind_yr' in si_vars or 'Mindc_yr' in si_vars:
+    if any(v in si_vars for v in ['Min_yr','Amp_yr, Mind_yr','Mindc_yr']):
         mmin = src.min(dim='time')
         if 'Min_yr' in si_vars:
             mmin.attrs = attrs
@@ -76,7 +76,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         ras_list.append(ras)
         aamp.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
     if 'Avg_yr' in si_vars or 'CV_yr' in si_vars:
-        aavg = src.mean(dim='time')
+        aavg = src.mean(dim='time').astype('int16')
         if 'Avg_yr' in si_vars:
             aavg.attrs = attrs
             ras = os.path.join(out_dir,'Avg_yr.tif')
@@ -110,6 +110,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     if 'Maxdc_yr' in si_vars:
         max_date_360 = 2 * np.pi * max_date/365
         max_date_cos = 100 * (np.cos(max_date_360) + 1)
+        max_date_cos = max_date_cos.astype('int16')
         max_date_cos.attrs = attrs
         ras = os.path.join(out_dir,'Maxdc_yr.tif')
         ras_list.append(ras)
@@ -125,6 +126,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     if 'Mindc_yr' in si_vars:
         min_date_360 = 2 * np.pi * min_date/365
         min_date_cos = 100 * (np.cos(min_date_360) + 1)
+        min_date_cos = min_date_cos.astype('int16')
         min_date_cos.attrs = attrs
         ras = os.path.join(out_dir,'Mindc_yr.tif')
         ras_list.append(ras)
@@ -135,7 +137,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         with gw.open(ts_stack_wet, time_names= ds_stack_wet) as src_wet:
             attrs_wet = src_wet.attrs.copy()
             
-        if 'Max_wet' in si_vars or 'Amp_wet' in si_vars or 'Maxd_wet' in si_vars or 'Maxdc_wet' in si_vars:
+        if any(v in si_vars for v in ['Max_wet','Amp_wet,Maxd_wet','Maxdc_wet','ROG_wet','ROS_wet']):
             mmax_wet = src_wet.max(dim='time')
             if 'Max_wet' in si_vars:
                 mmax_wet.attrs = attrs_wet
@@ -143,7 +145,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
                 print('making max wet raster')
                 mmax_wet.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
                 ras_list.append(ras)
-        if 'Min_wet' in si_vars or 'Amp_wet' in si_vars or 'Mind_wet' in si_vars or 'Mindc_wet' in si_vars:
+        if any(v in si_vars for v in ['Min_wet','Amp_wet,Mind_wet','Mindc_wet']):
             mmin_wet = src_wet.min(dim='time')
             if 'Min_wet' in si_vars:
                 mmin_wet.attrs = attrs_wet
@@ -158,7 +160,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
             ras = os.path.join(out_dir,'Amp_wet.tif')
             ras_list.append(ras)
             aamp_wet.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
-        if 'Maxd_wet' in si_vars or 'Maxdc_wet' in si_vars or 'SOS_wet' in si_vars:
+        if any(v in si_vars for v in ['Maxd_wet','Maxd_cwet','SOS_wet','ROG_wet','ROS_wet']):
             max_date_wet = src_wet.idxmax(dim='time',skipna=True)
             if 'Maxd_wet' in si_vars:
                 max_date_wet.attrs = attrs_wet
@@ -169,6 +171,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         if 'Maxdc_wet' in si_vars:
             max_date_360_wet = 2 * np.pi * max_date_wet/365
             max_date_cos_wet = 100 * (np.cos(max_date_360_wet) + 1)
+            max_date_cos_wet = max_date_cos_wet.astype('int16')
             max_date_cos_wet.attrs = attrs_wet
             ras = os.path.join(out_dir,'Maxdc_wet.tif')
             ras_list.append(ras)
@@ -184,24 +187,66 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         if 'Mindc_wet' in si_vars:
             min_date_360_wet = 2 * np.pi * min_date_wet/365
             min_date_cos_wet = 100 * (np.cos(min_date_360_wet) + 1)
+            min_date_cos_wet = min_date_cos_wet.astype('int16')
             min_date_cos_wet.attrs = attrs_wet
             ras = os.path.join(out_dir,'Mindc_wet.tif')
             ras_list.append(ras)
             min_date_cos_wet.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
-        '''
-        if 'SOS_wet' in si_vars:
-            #greenup = src_wet.where(src_wet['time'] < max_date_wet)
-            green_deriv = src_wet.differentiate("time")
+        if 'SOS_wet' in si_vars or 'LOS_wet' in si_vars or 'ROG_wet' in si_vars:
+            src_wet_c = src_wet.chunk({"time": -1})
+            greenup = src_wet_c.where(src_wet['time'] < max_date_wet)
+            green_deriv = src_wet_c.differentiate("time")
             pos_green_deriv = green_deriv.where(green_deriv > 0)
             pos_greenup = greenup.where(~np.isnan(pos_green_deriv))
-            #median = pos_greenup.median("time")
+            median = pos_greenup.median("time")
             distance = abs(pos_greenup - median)
-            SOS_wet = distance.min("time")
-            SOS_wet.attrs = attrs_wet
-            ras = os.path.join(out_dir,'SOS_wet.tif')
+            sos_wet = distance.min(dim="time",skipna=True)
+            sos_wetd = distance.idxmin(dim="time",skipna=True)
+            sos_wetd1 = sos_wetd.where(sos_wetd >= start_doy, sos_wetd + 365)
+            if 'SOS_wet' in si_vars:
+                sos_wetd1.attrs = attrs_wet
+                ras = os.path.join(out_dir,'SOS_wet.tif')
+                ras_list.append(ras)
+                sos_wetd1.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+        if 'EOS_wet' in si_vars or 'LOS_wet' in si_vars or 'ROS_wet' in si_vars:
+            src_wet_c = src_wet.chunk({"time": -1})
+            brownup = src_wet_c.where(src_wet['time'] > max_date_wet)
+            brown_deriv = src_wet_c.differentiate("time")
+            neg_brown_deriv = brown_deriv.where(brown_deriv < 0)
+            neg_brownup = brownup.where(~np.isnan(neg_brown_deriv))
+            median = neg_brownup.median("time")
+            distance = abs(neg_brownup - median)
+            eos_wet = distance.min(dim="time",skipna=True)
+            eos_wetd = distance.idxmin(dim="time",skipna=True)
+            eos_wetd1 = eos_wetd.where(eos_wetd >= start_doy, eos_wetd + 365)
+            if 'EOS_wet' in si_vars:
+                eos_wetd1.attrs = attrs_wet
+                ras = os.path.join(out_dir,'EOS_wet.tif')
+                ras_list.append(ras)
+                eos_wetd1.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+        if 'LOS_wet' in si_vars:
+            los_wet = eos_wetd1 - sos_wetd1
+            los_wet.attrs = attrs_wet
+            ras = os.path.join(out_dir,'LOS_wet.tif')
             ras_list.append(ras)
-            SOS_wet.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
-        '''          
+            los_wet.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+        if 'ROG_wet' in si_vars:
+            mmax_wetd1 = max_date_wet.where(max_date_wet >= start_doy, max_date_wet + 365)
+            rog_wet = (mmax_wet - sos_wet) / (mmax_wetd1 - sos_wetd1)
+            rog_wet = rog_wet.astype('int16')
+            rog_wet.attrs = attrs_wet
+            ras = os.path.join(out_dir,'ROG_wet.tif')
+            ras_list.append(ras)
+            rog_wet.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+        if 'ROS_wet' in si_vars:
+            mmax_wetd1 = max_date_wet.where(max_date_wet >= start_doy, max_date_wet + 365).astype('int16')
+            ros_wet = (mmax_wet - eos_wet) / (mmax_wetd1 - eos_wetd1) 
+            ros_wet = ros_wet.astype('int16')
+            ros_wet.attrs = attrs_wet
+            ras = os.path.join(out_dir,'ROS_wet.tif')
+            ras_list.append(ras)
+            ros_wet.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+                  
     dry_bands = [b for b in si_vars if b.split("_")[1] == 'dry']
     if len(dry_bands) > 0:
         with gw.open(ts_stack_dry, time_names= ds_stack_dry) as src_dry:
@@ -241,6 +286,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         if 'Maxdc_dry' in si_vars:
             max_date_360_dry = 2 * np.pi * max_date_dry/365
             max_date_cos_dry = 100 * (np.cos(max_date_360_dry) + 1)
+            max_date_cos_dry = max_date_cos_dry.astype('int16')
             max_date_cos_dry.attrs = attrs_dry
             ras = os.path.join(out_dir,'Maxdc_dry.tif')
             ras_list.append(ras)
@@ -256,11 +302,66 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         if 'Mindc_dry' in si_vars:
             min_date_360_dry = 2 * np.pi * min_date_dry/365
             min_date_cos_dry = 100* (np.cos(min_date_360_dry) + 1)
+            min_date_cos_dry = min_date_cos_dry.astype('int16')
             min_date_cos_dry.attrs = attrs_dry
             ras = os.path.join(out_dir,'Mindc_dry.tif')
             ras_list.append(ras)
             min_date_cos_dry.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
-                
+        if 'SOS_dry' in si_vars or 'LOS_dry' in si_vars or 'ROG_dry' in si_vars:
+            src_dry_c = src_dry.chunk({"time": -1})
+            greenup = src_dry_c.where(src_dry['time'] < max_date_dry)
+            green_deriv = src_dry_c.differentiate("time")
+            pos_green_deriv = green_deriv.where(green_deriv > 0)
+            pos_greenup = greenup.where(~np.isnan(pos_green_deriv))
+            median = pos_greenup.median("time")
+            distance = abs(pos_greenup - median)
+            sos_dry = distance.min(dim="time",skipna=True)
+            sos_dryd = distance.idxmin(dim="time",skipna=True)
+            sos_dryd1 = sos_dryd.where(sos_dryd >= start_doy, sos_dryd + 365)
+            if 'SOS_dry' in si_vars:
+                sos_dryd1.attrs = attrs_dry
+                ras = os.path.join(out_dir,'SOS_dry.tif')
+                ras_list.append(ras)
+                sos_dryd1.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+        if 'EOS_dry' in si_vars or 'LOS_dry' in si_vars or 'ROS_dry' in si_vars:
+            src_dry_c = src_dry.chunk({"time": -1})
+            brownup = src_dry_c.where(src_dry['time'] > max_date_dry)
+            brown_deriv = src_dry_c.differentiate("time")
+            neg_brown_deriv = brown_deriv.where(brown_deriv < 0)
+            neg_brownup = brownup.where(~np.isnan(neg_brown_deriv))
+            median = neg_brownup.median("time")
+            distance = abs(neg_brownup - median)
+            eos_dry = distance.min(dim="time",skipna=True)
+            eos_dryd = distance.idxmin(dim="time",skipna=True)
+            eos_dryd1 = eos_dryd.where(eos_dryd >= start_doy, eos_dryd + 365)
+            if 'EOS_dry' in si_vars:
+                eos_dryd1.attrs = attrs_dry
+                ras = os.path.join(out_dir,'EOS_dry.tif')
+                ras_list.append(ras)
+                eos_wetd1.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+        if 'LOS_dry' in si_vars:
+            los_dry = eos_dryd1 - sos_dryd1
+            los_dry.attrs = attrs_dry
+            ras = os.path.join(out_dir,'LOS_dry.tif')
+            ras_list.append(ras)
+            los_dry.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+        if 'ROG_dry' in si_vars:
+            mmax_dryd1 = max_date_dry.where(max_date_dry >= start_doy, max_date_dry + 365)
+            rog_dry = (mmax_dry - sos_dry) / (mmax_dryd1 - sos_dryd1)
+            rog_dry = rog_dry.astype('int16')
+            rog_dry.attrs = attrs_dry
+            ras = os.path.join(out_dir,'ROG_dry.tif')
+            ras_list.append(ras)
+            rog_dry.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True)
+        if 'ROS_dry' in si_vars:
+            mmax_dryd1 = max_date_dry.where(max_date_dry >= start_doy, max_date_dry + 365).astype('int16')
+            ros_dry = (mmax_dry - eos_dry) / (mmax_dryd1 - eos_dryd1) 
+            ros_dry = ros_dry.astype('int16')
+            ros_dry.attrs = attrs_dry
+            ras = os.path.join(out_dir,'ROS_dry.tif')
+            ras_list.append(ras)
+            ros_dry.gw.to_raster(ras,verbose=1,n_workers=4,n_threads=2,n_chunks=200, overwrite=True) 
+    
     for img in sorted(os.listdir(img_dir)):
         if (start_mo == 1 and img.startswith(str(start_yr))) or (start_mo > 1 and img.startswith(str(int(start_yr)+1))):
             if img.endswith('020.tif') and 'Jan_20' in si_vars:
@@ -305,11 +406,11 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         
     print(ras_list)
     if len(ras_list)<len(si_vars):
-        print('oops--got an unknown band; Current Band options are Max,Min,Amp,Avg,CV,Std,MaxDate,MaxDateCos,MinDate,MinDateCos,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec')
+        print('oops--got an unknown band')
 
     else:
         ##Start writing output composite
-        with rio.open(ras_list[1]) as src0:
+        with rio.open(ras_list[0]) as src0:
             meta = src0.meta
             meta.update(count = len(ras_list))
             
