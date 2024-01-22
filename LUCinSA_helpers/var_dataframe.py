@@ -168,41 +168,47 @@ def append_feature_dataframe(in_dir,ptfile,feat_df,cell_list,grid_file,out_dir,s
 
         xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
         coords = list(map(list, zip(*xy)))
-        for pv in poly_vars:
-            ppath = os.path.join(poly_var_path,'{}_{}.tif'.format(pv,cell))
-            if os.path.isfile(ppath):
-                with rio.open(ppath, 'r') as src:
-                    vals = src.read(1)
-                    varn = 'var_poly_{}'.format(pv)
-                    ptsgdb[varn] = [sample[0] for sample in src.sample(coords)] 
-            else: 
-                sys.stderr.write ('no var {} created for {} \n'.format(pv,cell))   
+        
+        if poly_vars is not None and poly_vars != 'None':
+            for pv in poly_vars:
+                ppath = os.path.join(poly_var_path,'{}_{}.tif'.format(pv,cell))
+                if os.path.isfile(ppath):
+                    with rio.open(ppath, 'r') as src:
+                        vals = src.read(1)
+                        varn = 'var_poly_{}'.format(pv)
+                        ptsgdb[varn] = [sample[0] for sample in src.sample(coords)] 
+                else: 
+                    sys.stderr.write ('no var {} created for {} \n'.format(pv,cell))   
+        
         for si in spec_indices:
-            sys.stderr.write('extracting {}... \n'.format(si))
-            img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
-            if os.path.isdir(img_dir):
-                new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
-                comp = rio.open(new_vars,'r')
-                for b, band in enumerate(si_vars):
-                    sys.stdout.write('{}:{}'.format(b,band))
-                    comp.np = comp.read(b+1)
-                    varn = ('var_{}_{}'.format(si,band))
-                    ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
-            else:
-                sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
-        for sing in singleton_vars:
-            sys.stderr.write('extracting {}... \n'.format(sing))
-            with open(singleton_var_dict, 'r+') as singleton_feat_dict:
-                dic = json.load(singleton_feat_dict)
-            if not sing in dic:
-                sys.stderr.write ('error:')
-            else: 
-                sf_path = dic[sing]['path']
-                sf_col = dic[sing]['col']
-                with rio.open(sf_path, 'r') as src2:
-                    vals = src2.read(1)
-                    varn = 'var_sing_{}'.format(sing)
-                    ptsgdb[varn] = [sample[0] for sample in src2.sample(coords)] 
+            if si is not None and si != ' ' and si !='None':
+                sys.stderr.write('extracting {}... \n'.format(si))
+                img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
+                if os.path.isdir(img_dir):
+                    new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
+                    comp = rio.open(new_vars,'r')
+                    for b, band in enumerate(si_vars):
+                        sys.stdout.write('{}:{}'.format(b,band))
+                        comp.np = comp.read(b+1)
+                        varn = ('var_{}_{}'.format(si,band))
+                        ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
+                else:
+                    sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
+        
+        if singleton_vars is not None and singleton_vars != 'None':
+            for sing in singleton_vars:
+                sys.stderr.write('extracting {}... \n'.format(sing))
+                with open(singleton_var_dict, 'r+') as singleton_feat_dict:
+                    dic = json.load(singleton_feat_dict)
+                if not sing in dic:
+                    sys.stderr.write ('error:')
+                else: 
+                    sf_path = dic[sing]['path']
+                    sf_col = dic[sing]['col']
+                    with rio.open(sf_path, 'r') as src2:
+                        vals = src2.read(1)
+                        varn = 'var_sing_{}'.format(sing)
+                        ptsgdb[varn] = [sample[0] for sample in src2.sample(coords)] 
     
         ptsgdb.drop(columns=['geometry'], inplace=True)
         all_pts = pd.concat([all_pts, ptsgdb])
