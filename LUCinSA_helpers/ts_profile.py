@@ -40,7 +40,7 @@ def get_val_at_XY(img, spec_index, xcoord,ycoord):
 def get_polygons_in_aoi(out_dir, aoi_file, poly_path, oldest=2018, newest=2020):
     '''
     Filters polygon layer to contain only those overlapping selected AOI
-   Allows filtering by 'FirstYrObs','ObsYr','Year'or'Acquired' to remove polygons obseserved during years outside the period of interest
+    Allows filtering by 'FirstYrObs','ObsYr','Year'or'Acquired' to remove polygons obseserved during years outside the period of interest
     Outputs new polygon set to a .json file
     '''
     all_polys = gpd.read_file(poly_path)
@@ -93,7 +93,10 @@ def get_pts_in_grid (grid_file, grid_cell, ptfile):
     #sys.stderr.write('grid is in: {}'.format(crs_grid))  #ESRI:102033
     #sys.stderr.write('{}'.format(df))
 
-    ptsdf = pd.read_csv(ptfile, index_col=0)
+    if isinstance(ptfile, pd.DataFrame):
+        ptsdf = ptfile
+    else:
+        ptsdf = pd.read_csv(ptfile, index_col=0)
     pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=crs_grid)
     
     if df.shape[0] > 1:
@@ -401,11 +404,11 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
     return ptsgdb
 
 def get_timeseries_for_pts_multicell(out_dir, spec_index, start_yr, end_yr, img_dir, image_type, grid_file, cell_list,
-                            polyfile, oldest, newest, npts, seed, load_samp, ptfile):
+                            polyfile=None, oldest=0, newest=0, npts=3, seed=88, load_samp=False, ptfile=None, filter_class=None):
     '''
     Returns datetime dataframe of values for sampled pts (n={'npts}) for each polygon in {'polys'}
     OR for previously generated points with {load_samp}=True and {pt_file}=path to .csv file
-     (.csv file needs 'XCoord' and 'YCoord' fields (in this case, groundpolys, oldest, newest, npts and seed are not used))
+     (.csv file needs 'XCoord' and 'YCoord' fields (in this case, polyfile, oldest, newest, npts and seed are not used))
     for all images of {image_type} acquired between {'start_yr'} and {'end_yr'} in {'TS_Directory'}
     imageType can be 'Sentinel', 'Landsat', or 'All'
     Output format is a datetime object with date (YYYY-MM-DD) on each row and sample name (polygonID_pt#) in columns
@@ -417,8 +420,13 @@ def get_timeseries_for_pts_multicell(out_dir, spec_index, start_yr, end_yr, img_
         ts_stack = []
         print ('working on cell {}'.format(cell))
         if load_samp == True:
-            points = get_pts_in_grid (grid_file, cell, ptfile)
             polys = None
+            if filter_class is not None:
+                point_df = pd.read_csv(ptfile, index_col=0)
+                selpts = point_df[point_df['Class']==filter_class]
+                points = get_pts_in_grid (grid_file, cell, selpts)
+            else:    
+                points = get_pts_in_grid (grid_file, cell, ptfile)
         else:
             polys = get_polygons_in_grid (grid_file, cell, polyfile, oldest, newest)
             points = None

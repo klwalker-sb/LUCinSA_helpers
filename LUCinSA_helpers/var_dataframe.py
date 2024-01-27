@@ -81,13 +81,13 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
         coords = list(map(list, zip(*xy)))
     
         sys.stdout.write('Extracting variables from stack')
-        comp = rio.open(os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr)),'r')
-        #Open each band and get values
-        for b, band in enumerate(band_names):
-            sys.stdout.write('{}:{}'.format(b,band))
-            comp.np = comp.read(b+1)
-            varn = ('var_{}'.format(band))
-            ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
+        with rio.open(os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr)),'r') as comp:
+            #Open each band and get values
+            for b, band in enumerate(band_names):
+                sys.stdout.write('{}:{}'.format(b,band))
+                comp.np = comp.read(b+1)
+                varn = ('var_{}'.format(band))
+                ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
             #pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
     
     return ptsgdb

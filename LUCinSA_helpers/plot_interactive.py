@@ -72,22 +72,29 @@ def convert_and_print_coord_list(coord_list,img_crs, out_dir):
 
 def get_values_at_coords(coord_list, coord_crs, img, bands):
     
-    ptsval = {}
+    #ptsval = {}
     if isinstance(coord_list, pd.DataFrame):
-        ptsdf = coord_list
+        if 'geometry' in coord_list.columns:
+            pts = coord_list
+        else:
+            ptsdf = coord_list
+            pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=coord_crs)
     else:
         ptsdf = pd.read_csv(coord_list)
+        pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=coord_crs)
 
-    pts = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs=coord_crs)
+    
     xy = [pts['geometry'].x, pts['geometry'].y]
+    #print('xy = {}'.format(xy))
     coords = list(map(list, zip(*xy)))
+    #print('coords = {}'.format(coords))
     
     #if 'Smooth' in image_type:
     if img.endswith('.tif'):
         #img_name = os.path.basename(img)[:7]
         with rio.open(img, 'r') as src:
-            for b in bands:
-                ptsval[b] = [sample[b-1] for sample in src.sample(coords)]
+            for b, band in enumerate(bands):
+                pts[band] = [sample[b] for sample in src.sample(coords)]
 
     #elif 'Sentinel' in image_type or 'Landsat' in image_type or image_type == 'AllRaw':
     elif img.endswith('.nc'): 
@@ -102,9 +109,9 @@ def get_values_at_coords(coord_list, coord_crs, img, bands):
                 thispt_val = xr_val.sel(x=pts['geometry'].x[index],y=pts['geometry'].y[index], method='nearest', tolerance=30)
                 this_val = thispt_val.values
                 vals.append(this_val)
-                ptsval[b] = vals
+                pts[b] = vals
     
-    return ptsval
+    return pts
 
 def add_shpfile_overlay(shp, ptfile, inputCRS, polyfile=None):
     ### TO Add A shapefile to map (optional):
