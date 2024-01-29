@@ -61,6 +61,7 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
     on each row and an image index value(named YYYYDDD) in each column
     '''
     stack_path = os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr))
+    #stack_path = os.path.join(in_dir,'stack.tif')
     if not os.path.isfile(stack_path):
         print('need to create variable stack for {}_{} first.'.format(feature_model, start_yr))
         ptsgdb = None
@@ -82,6 +83,7 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
     
         sys.stdout.write('Extracting variables from stack')
         with rio.open(os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr)),'r') as comp:
+        #with rio.open(os.path.join(in_dir,'stack.tif'),'r') as comp:
             #Open each band and get values
             for b, band in enumerate(band_names):
                 sys.stdout.write('{}:{}'.format(b,band))
@@ -183,17 +185,32 @@ def append_feature_dataframe(in_dir,ptfile,feat_df,cell_list,grid_file,out_dir,s
         for si in spec_indices:
             if si is not None and si != ' ' and si !='None':
                 sys.stderr.write('extracting {}... \n'.format(si))
-                img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
-                if os.path.isdir(img_dir):
-                    new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
-                    comp = rio.open(new_vars,'r')
-                    for b, band in enumerate(si_vars):
-                        sys.stdout.write('{}:{}'.format(b,band))
-                        comp.np = comp.read(b+1)
-                        varn = ('var_{}_{}'.format(si,band))
-                        ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
+                if 'phen' in si_vars:
+                    comp_dir = os.path.join(cell_dir,'comp',si)
+                    phen_img = os.path.join(comp_dir, '{:06d}_{}_{}_PhenWet.tif'.format(int(cell),start_yr,si))
+                    phen_vars = ['maxv_wet', 'maxd_wet', 'sosv_wet', 'sosd_wet', 'rog_wet', 'eosv_wet', 'eosd_wet', 'ros_wet', 'los_wet']
+                    if os.path.exists(phen_img) == False:
+                        sys.stderr.write('no phen stack crated for {} for cell {}'.format(si,cell))
+                    else:
+                        phen_comp = rio.open(phen_img,'r')
+                        for b, band in enumerate(phen_vars):
+                            sys.stdout.write('{}:{}'.format(b,band))
+                            phen_comp.np = phen_comp.read(b+1)
+                            varn = ('var_{}_{}'.format(si,band))
+                            ptsgdb[varn] = [sample[b] for sample in phen_comp.sample(coords)]
                 else:
-                    sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
+                    img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
+                    if os.path.isdir(img_dir):
+                        new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
+                        comp = rio.open(new_vars,'r')
+                        for b, band in enumerate(si_vars):
+                            sys.stdout.write('{}:{}'.format(b,band))
+                            comp.np = comp.read(b+1)
+                            varn = ('var_{}_{}'.format(si,band))
+                            ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
+                
+                    else:
+                        sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
         
         if singleton_vars is not None and singleton_vars != 'None':
             for sing in singleton_vars:

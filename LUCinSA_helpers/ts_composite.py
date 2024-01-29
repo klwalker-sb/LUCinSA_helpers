@@ -80,7 +80,7 @@ def prep_ts_variable_bands(si_vars,ts_stack,ds_stack, out_dir,temp,start_doy,ban
         ## Greenup calcs adapted from Digital Earth Africa, temporal.py
         sosv_path = os.path.join(out_dir,f'sosv_{temp}.tif')
         sosd_path = os.path.join(out_dir,f'sosd_{temp}.tif')
-        if os.path.exists(sosd_path) == False  or os.path.exists(sosv_path) == False: 
+        if os.path.exists(sosd_path) == False or os.path.exists(sosv_path) == False: 
             src_c = src.chunk({"time": -1})
             greenup = src_c.where(src_c['time'] < maxd)
             green_deriv = src_c.differentiate("time")
@@ -353,15 +353,15 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         print('si vars remaining to create: {}'.format(si_vars))
               
     ## Convert image stack to XArray using geowombat:
-    yr_bands = [b for b in si_vars if b.split("_")[1] == 'yr']
+    yr_bands = [b for b in si_vars if "_" not in b or b.split("_")[1] == 'yr']
     if len(yr_bands) > 0:
         prep_ts_variable_bands(si_vars, ts_stack, ds_stack, out_dir,'yr',start_doy, band_names, ras_list, **gw_args)
 
-    wet_bands = [b for b in si_vars if b.split("_")[1] == 'wet']
+    wet_bands = [b for b in si_vars if "_" in b and b.split("_")[1] == 'wet']
     if len(wet_bands) > 0:
         prep_ts_variable_bands(si_vars, ts_stack_wet, ds_stack_wet, out_dir,'wet', start_doy, band_names, ras_list, **gw_args)
             
-    dry_bands = [b for b in si_vars if b.split("_")[1] == 'dry']
+    dry_bands = [b for b in si_vars if "_" in b and b.split("_")[1] == 'dry']
     if len(dry_bands) > 0:
         prep_ts_variable_bands(si_vars, ts_stack_dry, ds_stack_dry, out_dir,'dry', start_doy, band_names, ras_list, **gw_args)
     
@@ -384,9 +384,9 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
         # Read each layer and write it to stack
         
         if len(ras_list)>12:
-            out_ras = os.path.join(out_dir,'{:06d}_{}_RFVars.tif'.format(int(grid_cell),start_yr,spec_index))
+            out_ras = os.path.join(out_dir,'{:06d}_{}_{}_RFVars.tif'.format(int(grid_cell),start_yr,spec_index))
         elif len(ras_list)==12:
-            out_ras = os.path.join(out_dir,'{:06d}_{}_monthly.tif'.format(int(grid_cell),start_yr,spec_index))
+            out_ras = os.path.join(out_dir,'{:06d}_{}_{}_monthly.tif'.format(int(grid_cell),start_yr,spec_index))
         elif len(ras_list)==9:
             if band_names[0].split('_')[1] == 'wet':
                 out_ras = os.path.join(out_dir,'{:06d}_{}_{}_PhenWet.tif'.format(int(grid_cell),start_yr,spec_index))

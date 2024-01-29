@@ -337,9 +337,11 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
         else:
             out_dir = os.path.join(cell_dir,'comp')        
         
-        stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
-        if os.path.isfile(stack_path):
-            sys.stderr.write('stack file already exists for model {}'.format(feature_model))
+        #stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
+        stack_path = os.path.join(cell_dir,'comp','stack.tif')
+        #if os.path.isfile(stack_path):
+        #    sys.stderr.write('stack file already exists for model {}'.format(feature_model))
+        if 1==2:
         else:
             stack_paths = []
             num_bands_all = 0
@@ -435,9 +437,9 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                 with rio.open(stack_paths[0],'r') as src0:
                     kwargs = src0.meta
                     kwargs.update(count = output_count)
-                    
+                
                 with rio.open(os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr)),'w',**kwargs) as dst:
-                    dst_idx = 1
+                #with rio.open(os.path.join(cell_dir,'comp','stack.tif'),'w',**kwargs) as dst:
                     for path, index in zip(stack_paths, indexes):
                         with rio.open(path) as src:
                             if isinstance(index, int):
