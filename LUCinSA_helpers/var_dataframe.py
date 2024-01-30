@@ -145,8 +145,9 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
     pd.DataFrame.to_csv(rfdf,os.path.join(out_dir,'RFdf_{}_{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
     pd.DataFrame.to_csv(all_pts,os.path.join(out_dir,'ptsgdb_{}-{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
     
-def append_feature_dataframe(in_dir,ptfile,feat_df,cell_list,grid_file,out_dir,start_yr,start_mo,spec_indices,si_vars,singleton_vars=None,
-                              singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None):
+def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_dir, start_yr, start_mo, spec_indices, si_vars,
+                             spec_indices_pheno=None, pheno_vars=None, singleton_vars=None, singleton_var_dict=None, poly_vars=None, 
+                             poly_var_path=None, scratch_dir=None):
     all_pts = pd.DataFrame()
 
     cells = []
@@ -171,6 +172,44 @@ def append_feature_dataframe(in_dir,ptfile,feat_df,cell_list,grid_file,out_dir,s
         xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
         coords = list(map(list, zip(*xy)))
         
+        for sip in spec_indices_phen:
+            if sip is not None and sip != 'None':
+                comp_dir = os.path.join(cell_dir,'comp',sip)
+                for temp in ['wet','dry']:
+                    sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
+                    pvars = [si for si in sip if si.split("_")[1] == temp]
+                    phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
+                                   f'rog{temp}',f'eosv{temp}',f'eosd{temp}',f'ros{temp}',f'los{temp}']
+                    if len(wet_vars) > 0:
+                        phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}.tif'.format(int(cell),start_yr,si,temp.upper()))
+                        if os.path.exists(phen_comp) == True:
+                            sys.stderr.write('getting variables from existing stack')
+                        else:
+                            sys.stderr.write('no existing stack. calculating new varaibles...'
+                                make_ts_composite(cell,cell_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
+                        phen_vars = rio.open(phen_comp,'r')
+                        for b, band in enumerate(phen_bands):
+                            sys.stdout.write('{}:{}'.format(b,band))
+                            phen_vars.np = phen_vars.read(b+1)
+                            varn = ('var_{}_{}'.format(si,band))
+                            ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
+
+        for si in spec_indices:
+            if si is not None and si != ' ' and si !='None':
+                sys.stderr.write('extracting {}... \n'.format(si))
+                comp_dir = os.path.join(cell_dir,'comp',si)
+                img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
+                    if os.path.isdir(img_dir):
+                        new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
+                        comp = rio.open(new_vars,'r')
+                        for b, band in enumerate(si_vars):
+                            sys.stdout.write('{}:{}'.format(b,band))
+                            comp.np = comp.read(b+1)
+                            varn = ('var_{}_{}'.format(si,band))
+                            ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]                
+                    else:
+                        sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
+                                             
         if poly_vars is not None and poly_vars != 'None':
             for pv in poly_vars:
                 ppath = os.path.join(poly_var_path,'{}_{}.tif'.format(pv,cell))
@@ -181,36 +220,6 @@ def append_feature_dataframe(in_dir,ptfile,feat_df,cell_list,grid_file,out_dir,s
                         ptsgdb[varn] = [sample[0] for sample in src.sample(coords)] 
                 else: 
                     sys.stderr.write ('no var {} created for {} \n'.format(pv,cell))   
-        
-        for si in spec_indices:
-            if si is not None and si != ' ' and si !='None':
-                sys.stderr.write('extracting {}... \n'.format(si))
-                if 'phen' in si_vars:
-                    comp_dir = os.path.join(cell_dir,'comp',si)
-                    phen_img = os.path.join(comp_dir, '{:06d}_{}_{}_PhenWet.tif'.format(int(cell),start_yr,si))
-                    phen_vars = ['maxv_wet', 'maxd_wet', 'sosv_wet', 'sosd_wet', 'rog_wet', 'eosv_wet', 'eosd_wet', 'ros_wet', 'los_wet']
-                    if os.path.exists(phen_img) == False:
-                        sys.stderr.write('no phen stack crated for {} for cell {}'.format(si,cell))
-                    else:
-                        phen_comp = rio.open(phen_img,'r')
-                        for b, band in enumerate(phen_vars):
-                            sys.stdout.write('{}:{}'.format(b,band))
-                            phen_comp.np = phen_comp.read(b+1)
-                            varn = ('var_{}_{}'.format(si,band))
-                            ptsgdb[varn] = [sample[b] for sample in phen_comp.sample(coords)]
-                else:
-                    img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
-                    if os.path.isdir(img_dir):
-                        new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
-                        comp = rio.open(new_vars,'r')
-                        for b, band in enumerate(si_vars):
-                            sys.stdout.write('{}:{}'.format(b,band))
-                            comp.np = comp.read(b+1)
-                            varn = ('var_{}_{}'.format(si,band))
-                            ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
-                
-                    else:
-                        sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
         
         if singleton_vars is not None and singleton_vars != 'None':
             for sing in singleton_vars:

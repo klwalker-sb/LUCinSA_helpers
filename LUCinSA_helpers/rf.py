@@ -318,7 +318,7 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
         
     return spec_indices,si_vars,spec_indices_pheno,pheno_vars,singleton_vars,poly_vars,band_names
     
-def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_indices,si_vars,feature_mod_dict,
+def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_indices,si_vars,spec_indices_pheno,pheno_vars,feature_mod_dict,
                         singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None):
     
     # get model paramaters if model already exists in dict. Else create new dict entry for this model
@@ -554,13 +554,15 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
     
     return rf, score
 
-def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_mo, samp_mod_name, feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, lc_mod=None, lut=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
+def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_mo, samp_mod_name, feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, spec_indices_pheno=None, pheno_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, lc_mod=None, lut=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
     
-    spec_indices,si_vars,singleton_vars,poly_vars,band_names = getset_feature_model(
+    spec_indices,si_vars,spec_indices_pheno,pheno_vars,singleton_vars,poly_vars,band_names = getset_feature_model(
                                                                   feature_mod_dict,
                                                                   feature_model,
                                                                   spec_indices,
                                                                   si_vars,
+                                                                  spec_indices_pheno,
+                                                                  pheno_vars,
                                                                   singleton_vars,
                                                                   poly_vars)
     
