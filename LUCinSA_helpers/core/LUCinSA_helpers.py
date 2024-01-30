@@ -161,8 +161,11 @@ def main():
                                    help='list of cells to look for points/poys in. (list or path to .csv file with list, no header' )
             subparser.add_argument('--spec_indices', dest='spec_indices', help='',
                                   default = '[evi2,gcvi,wi,kndvi,nbr,ndmi]')
-            subparser.add_argument('--si_vars', dest='si_vars', help = '',
-                                   default='[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]')
+            subparser.add_argument('--si_vars', dest='si_vars', help = 'summary variables to run for each index in spec_indices',
+                               default='[maxv_yr,minv_yr,amp_yr,avg_yr,sd_yr,cv_yr,Jan_20,Feb_20,Mar_20,Apr_20,May_20,Jun_20,Jul_20,Aug_20,Sep_20,Oct_20,Nov_20,Dec_20]')
+            subparser.add_argument('--spec_indices_pheno', dest='Spec_indices_pheno', 
+                                   help='spec indices to get phenological variables for', default=None)
+            subparser.add_argument('--pheno_vars', dest='pheno_vars', help='list of phenological variables', default=None)
             subparser.add_argument('--singleton_vars', dest='singleton_vars', help='list of singleton variables to include', default=None)
             subparser.add_argument('--poly_vars', dest='poly_vars', help='list of polygon-level variables to include', default=None)
             subparser.add_argument('--poly_var_path', dest='poly_var_path', 
@@ -284,6 +287,8 @@ def main():
                              start_mo = args.start_mo,
                              spec_indices = check_for_list(args.spec_indices),
                              si_vars = check_for_list(args.si_vars),
+                             spec_indices_pheno = check_for_list(args.spec_indices_pheno),
+                             pheno_vars = check_for_list(args.pheno_vars),
                              feature_mod_dict = args.feature_mod_dict,
                              singleton_vars = check_for_list(args.singleton_vars),
                              singleton_var_dict = args.singleton_var_dict,
@@ -318,6 +323,8 @@ def main():
                                   start_mo = args.start_mo,
                                   spec_indices = check_for_list(args.spec_indices),
                                   si_vars = check_for_list(args.si_vars),
+                                  spec_indices_pheno = check_for_list(args.spec_indices_pheno),
+                                  pheno_vars = check_for_list(args.pheno_vars),
                                   singleton_vars = check_for_list(args.singleton_vars),
                                   singleton_var_dict = args.singleton_var_dict,
                                   poly_vars = check_for_list(args.poly_vars),
@@ -347,6 +354,8 @@ def main():
                  img_out = args.img_out,
                  spec_indices = args.spec_indices,
                  si_vars = args.si_vars,
+                 spec_indices_pheno = check_for_list(args.spec_indices_pheno),
+                 pheno_vars = check_for_list(args.pheno_vars),
                  singleton_vars = args.singleton_vars,
                  poly_vars = args.poly_vars,
                  poly_var_path = args.poly_var_path,

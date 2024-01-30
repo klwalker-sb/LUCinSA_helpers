@@ -271,12 +271,16 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir):
    
     return holdout_fields
 
-def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_vars=None,singleton_vars=None,poly_vars=None):
+def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_vars=None,spec_indices_pheno=None,pheno_vars=None
+                         singleton_vars=None,poly_vars=None):
+    
     with open(feature_mod_dict, 'r+') as feature_model_dict:
         dic = json.load(feature_model_dict)
         if feature_model in dic:
             spec_indices = dic[feature_model]['spec_indices']
             si_vars = dic[feature_model]['si_vars']
+            spec_indices_pheno = dic['spec_indices_pheno']
+            pheno_vars = dic['pheno_vars']
             singleton_vars = dic[feature_model]['singleton_vars']
             poly_vars = dic[feature_model]['poly_vars']
             band_names = dic[feature_model]['band_names']
@@ -288,10 +292,18 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
             dic[feature_model]['si_vars'] = si_vars
             dic[feature_model]['singleton_vars'] = singleton_vars
             dic[feature_model]['poly_vars'] = poly_vars
+            dic[feature_model]['spec_indices_pheno'] = spec_indices_pheno
+            dic[feature_model]['pheno_vars'] = pheno_vars
             band_names = []
-            for si in spec_indices:
-                for sv in si_vars:
-                    band_names.append('{}_{}'.format(si,sv))
+            
+            if spec_indices_pheno is not None and spec_indices_pheno != 'None':
+                for sip in spec_indices_pheno:
+                    for pv in pheno_vars:
+                        band_names_append('{}_{}'.format(sip,pv))
+            if spec_indices is not None and spec_indices != 'None':
+                for si in spec_indices:
+                    for sv in si_vars:
+                        band_names.append('{}_{}'.format(si,sv))
             if singleton_vars is not None and singleton_vars != 'None':
                 for sin in singleton_vars:
                     band_names.append('sing_{}'.format(sin))
@@ -304,17 +316,19 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
             print('created new model: {} \n spec_indices = {} \n si_vars = {} \n singleton_vars = {} \n poly_vars = {}'
                   .format(feature_model, spec_indices, si_vars, singleton_vars, poly_vars))
         
-    return spec_indices,si_vars,singleton_vars,poly_vars,band_names
+    return spec_indices,si_vars,spec_indices_pheno,pheno_vars,singleton_vars,poly_vars,band_names
     
 def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_indices,si_vars,feature_mod_dict,
                         singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, scratch_dir=None):
     
     # get model paramaters if model already exists in dict. Else create new dict entry for this model
-    spec_indices, si_vars, singleton_vars, poly_vars, band_names = getset_feature_model(
+    spec_indices, si_vars, spec_indices_pheno, pheno_vars, singleton_vars, poly_vars, band_names = getset_feature_model(
                                                                    feature_mod_dict, 
                                                                    feature_model, 
                                                                    spec_indices, 
-                                                                   si_vars, 
+                                                                   si_vars,
+                                                                   spec_indices_pheno,
+                                                                   pheno_vars
                                                                    singleton_vars, 
                                                                    poly_vars)
     

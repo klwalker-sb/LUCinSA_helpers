@@ -23,8 +23,10 @@ TSDIR="/home/downspout-cel/${COUNTRY}_lc/stac/grids/"
 
 MODNAME='base_noseg'
 VIs="[evi2,gcvi,wi,kndvi,nbr,ndmi]"
-SIVARS="[Max,Min,Amp,Avg,CV,Std,Jan,Feb,Mar,Apr,May,Jun,Jul,Aug,Sep,Oct,Nov,Dec]"
-SING="forest_strata"
+SIVARS="[maxv_yr,minv_yr,amp_yr,avg_yr,sd_yr,cv_yr,Jan_20,Feb_20,Mar_20,Apr_20,May_20,Jun_20,Jul_20,Aug_20,Sep_20,Oct_20,Nov_20,Dec_20]"
+SING="[forest_strata]"
+PHENOVIS="[gcvi,kndvi]"
+PHENOVARS="[maxv_wet,maxd_wet,sosv_wet,sosd_wet,rog_wet,eosv_wet,eosd_wet,ros_wet,los_wet]"
 POLYVARS="[pred_ext,pred_dst,pred_area,pred_APR,AvgNovDec_FieldStd]"
 POLYPATH="/home/downspout-cel/paraguay_lc/Segmentations/RF_feats/"
 SINGDICT="/home/downspout-cel/paraguay_lc/singleton_var_dict.json"
@@ -37,6 +39,6 @@ SCRATCH=''
 # activate the virtual environment
 conda activate venv.lucinsa38_pipe
 
-LUCinSA_helpers make_var_stack --in_dir $TSDIR --cell_list $CELLS --feature_model $MODNAME --start_yr $STARTYR --start_mo $STARTMO --spec_indices $VIs --si_vars $SIVARS --feature_mod_dict $MODDICT --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
+LUCinSA_helpers make_var_stack --in_dir $TSDIR --cell_list $CELLS --feature_model $MODNAME --start_yr $STARTYR --start_mo $STARTMO --spec_indices $VIs --si_vars $SIVARS --spec_indices_pheno $PHENOVIS --pheno_vars $PHENOVARS --feature_mod_dict $MODDICT --singleton_vars $SING --singleton_var_dict $SINGDICT --poly_vars $POLYVARS --poly_var_path $POLYPATH --scratch_dir=$SCRATCH
 
 conda deactivate
