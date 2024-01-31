@@ -182,7 +182,7 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                             sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
                             pvars = [s for s in pheno_vars if s.split("_")[1] == temp]
                             if len(pvars) > 0:
-                                sys.stderr.write('{}'.format(pvars))
+                                sys.stderr.write('{} \n'.format(pvars))
                                 phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
                                    f'rog{temp}',f'eosv{temp}',f'eosd{temp}',f'ros{temp}',f'los{temp}']
                                 phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}{}.tif'
@@ -192,13 +192,13 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                                     sys.stderr.write('getting variables from existing stack \n')
                                 else:
                                     sys.stderr.write('no existing stack. calculating new varaibles...')
-                                    make_ts_composite(cell,img_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
-                                    phen_vars = rio.open(phen_comp,'r')
-                                    for b, band in enumerate(phen_bands):
-                                        sys.stdout.write('{}:{}'.format(b,band))
-                                        phen_vars.np = phen_vars.read(b+1)
-                                        varn = ('var_{}_{}'.format(si,band))
-                                        ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
+                                    phen_comp = make_ts_composite(cell,img_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
+                                phen_vars = rio.open(phen_comp,'r')
+                                for b, band in enumerate(phen_bands):
+                                    sys.stdout.write('{}:{}'.format(b,band))
+                                    phen_vars.np = phen_vars.read(b+1)
+                                    varn = ('var_{}_{}'.format(sip,band))
+                                    ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
                     else:
                         sys.stderr.write ('no index {} created for {} \n'.format(sip,cell))
                         
@@ -236,7 +236,7 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                 with open(singleton_var_dict, 'r+') as singleton_feat_dict:
                     dic = json.load(singleton_feat_dict)
                 if not sing in dic:
-                    sys.stderr.write ('error:')
+                    sys.stderr.write ('error: need to enter {} into singular feature dictionary with path info.'.format(sing))
                 else: 
                     sf_path = dic[sing]['path']
                     sf_col = dic[sing]['col']
@@ -248,6 +248,7 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
         ptsgdb.drop(columns=['geometry'], inplace=True)
         all_pts = pd.concat([all_pts, ptsgdb])
 
+    sys.stdout.write('done extracting variables. output to appended_vars.csv in {}'.format(out_dir))
     pts_out = pd.DataFrame.to_csv(all_pts,os.path.join(out_dir,'appended_vars.csv'), sep=',', index=True)
 
     return pts_out
