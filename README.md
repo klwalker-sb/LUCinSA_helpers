@@ -214,11 +214,21 @@ The notebook, `2b_ViewTimeSeriesComposite.ipynb` allows a user to build and view
 
 ![alt](/images/ts_example.jpg)
 
-The notebook, `2_TimeSeriesSignatures.ipynb` allows a user to build and inspect time series curves for a set of points in a grid cell to identify trends and outliers.  
+The notebook, `2_TimeSeriesSignatures.ipynb` allows a user to build and inspect time series curves for a set of points in a grid cell to identify trends and outliers. It is possible to query the different time series curves to identify the points they belong to and inspect those areas on the map.
 
 ![alt](/images/Interactive_timeSeries_rice_3737b.jpg)
-![alt](/images/Interactive_timeSeries_rice_3737c.jpg)
-![alt](/images/Interactive_timeSeries_rice_3737d.jpg)
+
+<div style="display:flex">
+     <div style="flex:1;padding-right:10px;">
+          <img src="images/Interactive_timeSeries_rice_3737c.jpg" width="600"/>
+     </div>
+     <div style="flex:1;padding-left:10px;">
+          <img src="/images/Interactive_timeSeries_rice_3737d.jpg" width="300"/>
+     </div>
+</div>
+
+#![alt](/images/Interactive_timeSeries_rice_3737c.jpg)
+#![alt](/images/Interactive_timeSeries_rice_3737d.jpg)
 
 In this notebook, it is also possible to visualize how phenological variables will be calculated (SOS = Start of Season, EOS = End of Season, POS = Peak of season, LOS = Length of season, ROG = rate of growth, ROS = Rate of Senescence)
 
