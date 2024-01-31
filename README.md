@@ -220,15 +220,12 @@ The notebook, `2_TimeSeriesSignatures.ipynb` allows a user to build and inspect 
 
 <div style="display:flex">
      <div style="flex:1;padding-right:10px;">
-          <img src="images/Interactive_timeSeries_rice_3737c.jpg" width="600"/>
+          <img src="images/Interactive_timeSeries_rice_3737c.jpg" width="500"/>
      </div>
      <div style="flex:1;padding-left:10px;">
-          <img src="/images/Interactive_timeSeries_rice_3737d.jpg" width="300"/>
+          <img src="/images/Interactive_timeSeries_rice_3737d.jpg" width="200"/>
      </div>
 </div>
-
-#![alt](/images/Interactive_timeSeries_rice_3737c.jpg)
-#![alt](/images/Interactive_timeSeries_rice_3737d.jpg)
 
 In this notebook, it is also possible to visualize how phenological variables will be calculated (SOS = Start of Season, EOS = End of Season, POS = Peak of season, LOS = Length of season, ROG = rate of growth, ROS = Rate of Senescence)
 
