@@ -18,7 +18,9 @@ def main():
            This function converts variables in Bash scripts that are 
            entered as strings "[X,X,X]" into lists in Python.
         '''
-        if isinstance(arg_input, list):
+        if arg_input is None:
+            pass
+        elif isinstance(arg_input, list):
             arg_input = arg_input
         elif arg_input.startswith('['):
             arg_input = arg_input[1:-1].split(',')
@@ -163,7 +165,7 @@ def main():
                                   default = '[evi2,gcvi,wi,kndvi,nbr,ndmi]')
             subparser.add_argument('--si_vars', dest='si_vars', help = 'summary variables to run for each index in spec_indices',
                                default='[maxv_yr,minv_yr,amp_yr,avg_yr,sd_yr,cv_yr,Jan_20,Feb_20,Mar_20,Apr_20,May_20,Jun_20,Jul_20,Aug_20,Sep_20,Oct_20,Nov_20,Dec_20]')
-            subparser.add_argument('--spec_indices_pheno', dest='Spec_indices_pheno', 
+            subparser.add_argument('--spec_indices_pheno', dest='spec_indices_pheno', 
                                    help='spec indices to get phenological variables for', default=None)
             subparser.add_argument('--pheno_vars', dest='pheno_vars', help='list of phenological variables', default=None)
             subparser.add_argument('--singleton_vars', dest='singleton_vars', help='list of singleton variables to include', default=None)

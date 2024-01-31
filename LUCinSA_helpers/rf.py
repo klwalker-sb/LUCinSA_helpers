@@ -271,7 +271,7 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir):
    
     return holdout_fields
 
-def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_vars=None,spec_indices_pheno=None,pheno_vars=None
+def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_vars=None,spec_indices_pheno=None,pheno_vars=None,
                          singleton_vars=None,poly_vars=None, combo_bands=None):
     
     with open(feature_mod_dict, 'r+') as feature_model_dict:
@@ -279,8 +279,8 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
         if feature_model in dic:
             spec_indices = dic[feature_model]['spec_indices']
             si_vars = dic[feature_model]['si_vars']
-            spec_indices_pheno = dic['spec_indices_pheno']
-            pheno_vars = dic['pheno_vars']
+            spec_indices_pheno = dic[feature_model]['spec_indices_pheno']
+            pheno_vars = dic[feature_model]['pheno_vars']
             singleton_vars = dic[feature_model]['singleton_vars']
             poly_vars = dic[feature_model]['poly_vars']
             combo_bands = dic[feature_model]['combo_bands']
@@ -324,7 +324,7 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
     return spec_indices,si_vars,spec_indices_pheno,pheno_vars,singleton_vars,poly_vars,combo_bands,band_names
     
 def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_indices,si_vars,spec_indices_pheno,pheno_vars,feature_mod_dict,
-                        singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, combo_vars=None,                                         scratch_dir=None):
+                        singleton_vars=None, singleton_var_dict=None, poly_vars=None, poly_var_path=None, combo_bands=None,                                         scratch_dir=None):
     
     # get model paramaters if model already exists in dict. Else create new dict entry for this model
     spec_indices, si_vars, spec_indices_pheno, pheno_vars, singleton_vars, poly_vars, combo_bands, band_names = getset_feature_model(
@@ -333,7 +333,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                                                    spec_indices, 
                                                                    si_vars,
                                                                    spec_indices_pheno,
-                                                                   pheno_vars
+                                                                   pheno_vars,
                                                                    singleton_vars, 
                                                                    poly_vars,
                                                                    combo_bands)
@@ -359,9 +359,8 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
         
         #stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
         stack_path = os.path.join(cell_dir,'comp','stack.tif')
-        #if os.path.isfile(stack_path):
-        #    sys.stderr.write('stack file already exists for model {}'.format(feature_model))
-        if 1==2:
+        if os.path.isfile(stack_path):
+            sys.stderr.write('stack file already exists for model {}'.format(feature_model))
         else:
             stack_paths = []
             num_bands_all = 0
@@ -458,8 +457,8 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                     kwargs = src0.meta
                     kwargs.update(count = output_count)
                 
-                with rio.open(os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr)),'w',**kwargs) as dst:
-                #with rio.open(os.path.join(cell_dir,'comp','stack.tif'),'w',**kwargs) as dst:
+                #with rio.open(os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr)),'w',**kwargs) as dst:
+                with rio.open(os.path.join(cell_dir,'comp','stack.tif'),'w',**kwargs) as dst:
                     for path, index in zip(stack_paths, indexes):
                         with rio.open(path) as src:
                             if isinstance(index, int):
@@ -472,7 +471,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                 dst_idx += len(index)
                     dst.descriptions = tuple(band_names)
             print('done writing {}_{}_stack.tif for cell {}'.format(feature_model,start_yr,cell))
-            return stack_path        
+        return stack_path        
                 
 def classify_raster(var_stack,rf_path,class_img_out):
 

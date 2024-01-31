@@ -180,35 +180,35 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                     pvars = [si for si in sip if si.split("_")[1] == temp]
                     phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
                                    f'rog{temp}',f'eosv{temp}',f'eosd{temp}',f'ros{temp}',f'los{temp}']
-                    if len(wet_vars) > 0:
-                        phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}.tif'.format(int(cell),start_yr,si,temp.upper()))
+                    if len(pvars) > 0:
+                        phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}.tif'.format(int(cell),start_yr,sip,temp.upper()))
                         if os.path.exists(phen_comp) == True:
                             sys.stderr.write('getting variables from existing stack')
                         else:
-                            sys.stderr.write('no existing stack. calculating new varaibles...'
-                                make_ts_composite(cell,cell_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
-                        phen_vars = rio.open(phen_comp,'r')
-                        for b, band in enumerate(phen_bands):
-                            sys.stdout.write('{}:{}'.format(b,band))
-                            phen_vars.np = phen_vars.read(b+1)
-                            varn = ('var_{}_{}'.format(si,band))
-                            ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
+                            sys.stderr.write('no existing stack. calculating new varaibles...')
+                            make_ts_composite(cell,cell_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
+                            phen_vars = rio.open(phen_comp,'r')
+                            for b, band in enumerate(phen_bands):
+                                sys.stdout.write('{}:{}'.format(b,band))
+                                phen_vars.np = phen_vars.read(b+1)
+                                varn = ('var_{}_{}'.format(si,band))
+                                ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
 
         for si in spec_indices:
             if si is not None and si != ' ' and si !='None':
                 sys.stderr.write('extracting {}... \n'.format(si))
                 comp_dir = os.path.join(cell_dir,'comp',si)
                 img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
-                    if os.path.isdir(img_dir):
-                        new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
-                        comp = rio.open(new_vars,'r')
-                        for b, band in enumerate(si_vars):
-                            sys.stdout.write('{}:{}'.format(b,band))
-                            comp.np = comp.read(b+1)
-                            varn = ('var_{}_{}'.format(si,band))
-                            ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]                
-                    else:
-                        sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
+                if os.path.isdir(img_dir):
+                    new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
+                    comp = rio.open(new_vars,'r')
+                    for b, band in enumerate(si_vars):
+                        sys.stdout.write('{}:{}'.format(b,band))
+                        comp.np = comp.read(b+1)
+                        varn = ('var_{}_{}'.format(si,band))
+                        ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]                
+                else:
+                    sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
                                              
         if poly_vars is not None and poly_vars != 'None':
             for pv in poly_vars:
@@ -255,19 +255,19 @@ def reduce_variable_dataframe(ptdf, drop_indices, drop_vars, drop_combo, out_dir
         for v in drop_vars:
             drop_cols2 = [c for c in cols if c.split('_')[1] == v.split('_')[1] and c.split('_')[2] == v.split('_')[2]]
             ptsdf.drop(drop_cols, axis=1, inplace=True)
-   else: drop_cols1 = 0
-   if len(drop_combo) > 0: 
+    else: drop_cols1 = 0
+    if len(drop_combo) > 0: 
         for cb in drop_combo:
             drop_cols3 = [c for c in cols if c==cb]
             ptsdf.drop(drop_cols, axis=1, inplace=True)
-   else: drop_cols2 = 0
-   all_dropped = drop_cols + drop_cols1 + drop_cols2
-   final_cols == [c foc c in cols if c not in all_dropped]
-   new_model = getset_feature_models(feature_mod_dict,new_feature_model,spec_indices=None,si_vars=None,
+    else: drop_cols2 = 0
+    all_dropped = drop_cols + drop_cols1 + drop_cols2
+    final_cols == [c for c in cols if c not in all_dropped]
+    new_model = getset_feature_models(feature_mod_dict,new_feature_model,spec_indices=None,si_vars=None,
                                      spec_indices_pheno=None,pheno_vars=None, singleton_vars=None,poly_vars=None, combo_bands=final_cols)
-   df_out = pd.DataFrame.to_csv(ptsdf,os.path.join(out_dir,'{}.csv'.format(model)), sep=',', index=True)
+    df_out = pd.DataFrame.to_csv(ptsdf,os.path.join(out_dir,'{}.csv'.format(model)), sep=',', index=True)
     
-retuen df_out
+    return df_out
                                              
 def get_variables_at_pts_external(out_dir, ras_in,ptfile):
 
