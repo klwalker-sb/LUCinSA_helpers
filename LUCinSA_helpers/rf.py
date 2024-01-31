@@ -368,7 +368,8 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
             for si in spec_indices:
                 img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
                 if os.path.isdir(img_dir):
-                    new_bands = make_ts_composite(cell, img_dir, out_dir, start_yr, start_mo, si, si_vars)
+                    si_dir_out = os.path.join(out_dir, si) 
+                    new_bands = make_ts_composite(cell, img_dir, si_dir_out, start_yr, start_mo, si, si_vars)
                     with rio.open(new_bands) as src:
                         num_bands = src.count
                     if num_bands < len(si_vars):

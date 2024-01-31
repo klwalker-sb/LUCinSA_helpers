@@ -147,7 +147,7 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
     
 def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_dir, start_yr, start_mo, spec_indices, si_vars,
                              spec_indices_pheno=None, pheno_vars=None, singleton_vars=None, singleton_var_dict=None, poly_vars=None, 
-                             poly_var_path=None, scratch_dir=None):
+                             poly_var_path=None, combo_bands=None, scratch_dir=None):
     all_pts = pd.DataFrame()
 
     cells = []
@@ -172,43 +172,45 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
         xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
         coords = list(map(list, zip(*xy)))
         
-        for sip in spec_indices_phen:
-            if sip is not None and sip != 'None':
-                comp_dir = os.path.join(cell_dir,'comp',sip)
-                for temp in ['wet','dry']:
-                    sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
-                    pvars = [si for si in sip if si.split("_")[1] == temp]
-                    phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
+        if spec_indices_pheno is not None and spec_indices_pheno != 'None':
+            for sip in spec_indices_pheno:
+                if sip is not None and sip != 'None':
+                    comp_dir = os.path.join(cell_dir,'comp',sip)
+                    for temp in ['wet','dry']:
+                        sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
+                        pvars = [s for s in pheno_vars if s.split("_")[1] == temp]
+                        phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
                                    f'rog{temp}',f'eosv{temp}',f'eosd{temp}',f'ros{temp}',f'los{temp}']
-                    if len(pvars) > 0:
-                        phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}.tif'.format(int(cell),start_yr,sip,temp.upper()))
-                        if os.path.exists(phen_comp) == True:
-                            sys.stderr.write('getting variables from existing stack')
-                        else:
-                            sys.stderr.write('no existing stack. calculating new varaibles...')
-                            make_ts_composite(cell,cell_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
-                            phen_vars = rio.open(phen_comp,'r')
-                            for b, band in enumerate(phen_bands):
-                                sys.stdout.write('{}:{}'.format(b,band))
-                                phen_vars.np = phen_vars.read(b+1)
-                                varn = ('var_{}_{}'.format(si,band))
-                                ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
+                        if len(pvars) > 0:
+                            phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}.tif'.format(int(cell),start_yr,sip,temp.upper()))
+                            if os.path.exists(phen_comp) == True:
+                                sys.stderr.write('getting variables from existing stack')
+                            else:
+                                sys.stderr.write('no existing stack. calculating new varaibles...')
+                                make_ts_composite(cell,cell_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
+                                phen_vars = rio.open(phen_comp,'r')
+                                for b, band in enumerate(phen_bands):
+                                    sys.stdout.write('{}:{}'.format(b,band))
+                                    phen_vars.np = phen_vars.read(b+1)
+                                    varn = ('var_{}_{}'.format(si,band))
+                                    ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
 
-        for si in spec_indices:
-            if si is not None and si != ' ' and si !='None':
-                sys.stderr.write('extracting {}... \n'.format(si))
-                comp_dir = os.path.join(cell_dir,'comp',si)
-                img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
-                if os.path.isdir(img_dir):
-                    new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
-                    comp = rio.open(new_vars,'r')
-                    for b, band in enumerate(si_vars):
-                        sys.stdout.write('{}:{}'.format(b,band))
-                        comp.np = comp.read(b+1)
-                        varn = ('var_{}_{}'.format(si,band))
-                        ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]                
-                else:
-                    sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
+        if spec_indices is not None and spec_indices != ' ' and spec_indices !='None':
+            for si in spec_indices:
+                if si is not None and si != ' ' and si !='None':
+                    sys.stderr.write('extracting {}... \n'.format(si))
+                    comp_dir = os.path.join(cell_dir,'comp',si)
+                    img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
+                    if os.path.isdir(img_dir):
+                        new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
+                        comp = rio.open(new_vars,'r')
+                        for b, band in enumerate(si_vars):
+                            sys.stdout.write('{}:{}'.format(b,band))
+                            comp.np = comp.read(b+1)
+                            varn = ('var_{}_{}'.format(si,band))
+                            ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]                
+                    else:
+                        sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
                                              
         if poly_vars is not None and poly_vars != 'None':
             for pv in poly_vars:
