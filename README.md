@@ -226,7 +226,7 @@ The notebook, `2_TimeSeriesSignatures.ipynb` allows a user to build and inspect 
                 <img src="images/Interactive_timeSeries_rice_3737c.jpg" width="500"/>
             </td>
             <td style="padding:10px">
-                <img src="/images/Interactive_timeSeries_rice_3737d.jpg" width="200"/>
+                <img src="/images/Interactive_timeSeries_rice_3737d.jpg" width="300"/>
             </td>
         </tr>
     </table>
