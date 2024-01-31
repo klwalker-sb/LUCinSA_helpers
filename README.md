@@ -214,6 +214,17 @@ The notebook, `2b_ViewTimeSeriesComposite.ipynb` allows a user to build and view
 
 ![alt](/images/ts_example.jpg)
 
+The notebook, `2_TimeSeriesSignatures.ipynb` allows a user to build and inspect time series curves for a set of points in a grid cell to identify trends and outliers.  
+
+![alt](/images/Interactive_timeSeries_rice_3737b.jpg)
+![alt](/images/Interactive_timeSeries_rice_3737c.jpg)
+![alt](/images/Interactive_timeSeries_rice_3737d.jpg)
+
+In this notebook, it is also possible to visualize how phenological variables will be calculated (SOS = Start of Season, EOS = End of Season, POS = Peak of season, LOS = Length of season, ROG = rate of growth, ROS = Rate of Senescence)
+
+![alt](/images/ts_pheno.jpg)
+
+
 # machine-learning classification models and surface-level classification
 from smoothed time-series outputs to final land-cover classification is a multi-step process involving:
   * selecting summary variables and stacking all variables into a single stack for each cell

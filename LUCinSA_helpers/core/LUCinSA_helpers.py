@@ -168,6 +168,8 @@ def main():
             subparser.add_argument('--pheno_vars', dest='pheno_vars', help='list of phenological variables', default=None)
             subparser.add_argument('--singleton_vars', dest='singleton_vars', help='list of singleton variables to include', default=None)
             subparser.add_argument('--poly_vars', dest='poly_vars', help='list of polygon-level variables to include', default=None)
+            subparser.add_argument('--combo_bands', dest='combo_bands', 
+                                   help='list of specific si+si_var combos to include (not in others)', default=None)
             subparser.add_argument('--poly_var_path', dest='poly_var_path', 
                                    help='path to directory containing polygon-level variables (i.e. segmentation', default=None)
             subparser.add_argument('--scratch_dir', dest='scratch_dir', 
@@ -293,6 +295,7 @@ def main():
                              singleton_vars = check_for_list(args.singleton_vars),
                              singleton_var_dict = args.singleton_var_dict,
                              poly_vars = check_for_list(args.poly_vars),
+                             combo_bands = check_for_list(args.combo_bands),
                              poly_var_path = args.poly_var_path,
                              scratch_dir = args.scratch_dir)
                                    
@@ -328,6 +331,7 @@ def main():
                                   singleton_vars = check_for_list(args.singleton_vars),
                                   singleton_var_dict = args.singleton_var_dict,
                                   poly_vars = check_for_list(args.poly_vars),
+                                  combo_bands = check_for_list(args.combo_bands),
                                   poly_var_path = args.poly_var_path,
                                   scratch_dir = args.scratch_dir)
     
@@ -359,6 +363,7 @@ def main():
                  singleton_vars = args.singleton_vars,
                  poly_vars = args.poly_vars,
                  poly_var_path = args.poly_var_path,
+                 combo_bands = check_for_list(args.combo_bands),
                  lc_mod = args.lc_mod,
                  lut = args.lut,
                  importance_method = args.importance_method,
