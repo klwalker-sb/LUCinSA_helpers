@@ -176,25 +176,32 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
             for sip in spec_indices_pheno:
                 if sip is not None and sip != 'None':
                     comp_dir = os.path.join(cell_dir,'comp',sip)
-                    for temp in ['wet','dry']:
-                        sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
-                        pvars = [s for s in pheno_vars if s.split("_")[1] == temp]
-                        phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
+                    img_dir = os.path.join(cell_dir,'brdf_ts','ms', sip)
+                    if os.path.isdir(img_dir):
+                        for temp in ['wet','dry']:
+                            sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
+                            pvars = [s for s in pheno_vars if s.split("_")[1] == temp]
+                            if len(pvars) > 0:
+                                sys.stderr.write('{}'.format(pvars))
+                                phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
                                    f'rog{temp}',f'eosv{temp}',f'eosd{temp}',f'ros{temp}',f'los{temp}']
-                        if len(pvars) > 0:
-                            phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}.tif'.format(int(cell),start_yr,sip,temp.upper()))
-                            if os.path.exists(phen_comp) == True:
-                                sys.stderr.write('getting variables from existing stack')
-                            else:
-                                sys.stderr.write('no existing stack. calculating new varaibles...')
-                                make_ts_composite(cell,cell_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
-                                phen_vars = rio.open(phen_comp,'r')
-                                for b, band in enumerate(phen_bands):
-                                    sys.stdout.write('{}:{}'.format(b,band))
-                                    phen_vars.np = phen_vars.read(b+1)
-                                    varn = ('var_{}_{}'.format(si,band))
-                                    ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
-
+                                phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}{}.tif'
+                                                         .format(int(cell),start_yr,sip,temp[0].upper(),temp[1:]))
+                                sys.stderr.write('looking for {} \n'.format(phen_comp)) 
+                                if os.path.exists(phen_comp) == True:
+                                    sys.stderr.write('getting variables from existing stack \n')
+                                else:
+                                    sys.stderr.write('no existing stack. calculating new varaibles...')
+                                    make_ts_composite(cell,img_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
+                                    phen_vars = rio.open(phen_comp,'r')
+                                    for b, band in enumerate(phen_bands):
+                                        sys.stdout.write('{}:{}'.format(b,band))
+                                        phen_vars.np = phen_vars.read(b+1)
+                                        varn = ('var_{}_{}'.format(si,band))
+                                        ptsgdb[varn] = [sample[b] for sample in phen_vars.sample(coords)]
+                    else:
+                        sys.stderr.write ('no index {} created for {} \n'.format(sip,cell))
+                        
         if spec_indices is not None and spec_indices != ' ' and spec_indices !='None':
             for si in spec_indices:
                 if si is not None and si != ' ' and si !='None':

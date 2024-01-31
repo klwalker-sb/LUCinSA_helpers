@@ -237,6 +237,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     ds_stack = []
     ds_stack_wet = []
     ds_stack_dry = []
+    start_doy = int (30.5 * start_mo) - 30
     for img in sorted(os.listdir(img_dir)):
         if img.endswith('.tif'):
             ## ts images are named YYYYDDD with YYYY=year and DDD=doy
@@ -244,7 +245,6 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
             ## use year to filter to mapping year and doy to parse seasons regardless of year
             img_yr = int(img[:4])
             img_doy = int(img[4:7])
-            start_doy = int (30.5 * start_mo) - 30
             if (img_yr == int(start_yr) and img_doy >= start_doy) or (img_yr == (int(start_yr)+1) and img_doy < start_doy):
                 ts_stack.append(os.path.join(img_dir,img))
                 ds_stack.append(img_date)
