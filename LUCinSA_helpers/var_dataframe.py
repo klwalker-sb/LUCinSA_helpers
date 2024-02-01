@@ -60,10 +60,11 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
     output is a dataframe with a pt (named polygonID_pt#)
     on each row and an image index value(named YYYYDDD) in each column
     '''
-    stack_path = os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr))
-    #stack_path = os.path.join(in_dir,'stack.tif')
-    if not os.path.isfile(stack_path):
-        print('need to create variable stack for {}_{} first.'.format(feature_model, start_yr))
+    #stack_path = os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr))
+    stack_path = os.path.join(in_dir,'stack.tif')
+    if not os.path.exists(stack_path):
+        sys.stderr.write('path {} does not exist. \n'.format(stack_path))
+        sys.stderr.write('need to create variable stack for {}_{} first. \n'.format(feature_model, start_yr))
         ptsgdb = None
     
     else:
@@ -73,7 +74,7 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
             if polys:
                 ptsgdb = get_ran_pts_in_polys (polys, numpts, seed)
             else:
-                print('There are no polygons or points to process in this cell')
+                sys.stderr.write('There are no polygons or points to process in this cell')
                 return None
         elif load_samp == True:
             ptsgdb = ptgdb
@@ -82,8 +83,8 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
         coords = list(map(list, zip(*xy)))
     
         sys.stdout.write('Extracting variables from stack')
-        with rio.open(os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr)),'r') as comp:
-        #with rio.open(os.path.join(in_dir,'stack.tif'),'r') as comp:
+        #with rio.open(os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr)),'r') as comp:
+        with rio.open(os.path.join(in_dir,'stack.tif'),'r') as comp:
             #Open each band and get values
             for b, band in enumerate(band_names):
                 sys.stdout.write('{}:{}'.format(b,band))
@@ -106,10 +107,10 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
             for row in csv.reader(cell_file):
                 cells.append (row[0])
     else:
-        print('cell_list needs to be a list or path to .csv file with list')
+        sys.stderr.write('cell_list needs to be a list or path to .csv file with list \n')
     for cell in cells:
         var_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)),'comp')
-        print ('working on cell {}'.format(cell))
+        sys.stderr.write('working on cell {} \n'.format(cell))
         if load_samp == True:
             sys.stdout.write('loading sample from points for cell {} \n'.format(cell))
             points = get_pts_in_grid (grid_file, cell, ptfile)
@@ -119,7 +120,7 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
             polys = get_polygons_in_grid (grid_file, cell, polyfile, oldest, newest)
             points = None
         
-        sys.stdout.write('looking for {}_{}_stack.tif in {} to extract variables'.format(feature_model,start_yr,var_dir))
+        sys.stdout.write('looking for {}_{}_stack.tif in {} to extract variables... \n'.format(feature_model,start_yr,var_dir))
         if isinstance(points, gpd.GeoDataFrame) or polys is not None:
             if load_samp == True:
                 polys=None
@@ -164,7 +165,7 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
         sys.stderr.write('working on cell {}... \n'.format(cell))
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         ptsgdb = get_pts_in_grid (grid_file, int(cell), ptfile)
-        if scratch_dir:
+        if scratch_dir is not None and scratch_dir != 'None':
             out_dir_int = os.path.join(scratch_dir,'{}'.format(cell))
         else:
             out_dir_int = os.path.join(cell_dir,'comp')       

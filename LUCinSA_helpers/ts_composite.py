@@ -59,7 +59,7 @@ def prep_ts_variable_bands(si_vars,ts_stack,ds_stack, out_dir,temp,start_doy,ban
             add_var_to_stack(maxd2,f'maxd_{temp}',attrs,out_dir,band_names,ras_list,**gw_args)
     if f'maxdc_{temp}' in si_vars:
         maxd_360 = 2 * np.pi * maxd1/365
-        maxd_cos = 100 * (np.cos(max_360) + 1)
+        maxd_cos = 100 * (np.cos(maxd_360) + 1)
         maxd_cos = maxd_cos.astype('int16')
         add_var_to_stack(maxd_cos,f'maxdc_{temp}',attrs,out_dir,band_names,ras_list,**gw_args)
     if f'mind_{temp}' in si_vars or f'mindc_{temp}' in si_vars:
