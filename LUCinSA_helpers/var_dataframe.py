@@ -184,7 +184,7 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                             if len(pvars) > 0:
                                 sys.stderr.write('{} \n'.format(pvars))
                                 phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
-                                   f'rog{temp}',f'eosv{temp}',f'eosd{temp}',f'ros{temp}',f'los{temp}']
+                                   f'rog_{temp}',f'eosv_{temp}',f'eosd_{temp}',f'ros_{temp}',f'los{temp}']
                                 phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}{}.tif'
                                                          .format(int(cell),start_yr,sip,temp[0].upper(),temp[1:]))
                                 sys.stderr.write('looking for {} \n'.format(phen_comp)) 

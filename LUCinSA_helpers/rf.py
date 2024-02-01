@@ -28,7 +28,6 @@ from LUCinSA_helpers.ts_composite import make_ts_composite
 gdal.UseExceptions()
 gdal.AllRegister()
 
-
 def get_class_col(lc_mod,lut):
     if lc_mod == 'All':
         class_col = 'LC25'
@@ -347,8 +346,9 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                 cells.append (row[0])
     elif isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
         cells.append(cell_list) 
-    
+        sys.stdout.write('cell list: {} \n'.format(cells))
     for cell in cells:
+        sys.stderr.write('working on cell: {}.... \n'.format(cell))
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         
         # set the path for the temporary output files prior to final stacking
@@ -360,27 +360,32 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
         #stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
         stack_path = os.path.join(cell_dir,'comp','stack.tif')
         if os.path.isfile(stack_path):
-            sys.stderr.write('stack file already exists for model {}'.format(feature_model))
+            sys.stderr.write('stack file already exists for model {} \n'.format(feature_model))
         else:
             stack_paths = []
             num_bands_all = 0
-            sys.stdout.write('making variable stack for cell {}'.format(cell))
+            sys.stdout.write('making variable stack for cell {} \n'.format(cell))
+            keep_going = True
             for si in spec_indices:
                 img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
-                if os.path.isdir(img_dir):
+                if not os.path.exists(img_dir):
+                    sys.stderr.write('ERROR: missing spec index: {} \n'.format(si))
+                    keep_going = False
+            if keep_going == True:
+                for si in spec_indices:
                     si_dir_out = os.path.join(out_dir, si) 
                     new_bands = make_ts_composite(cell, img_dir, si_dir_out, start_yr, start_mo, si, si_vars)
                     with rio.open(new_bands) as src:
                         num_bands = src.count
                     if num_bands < len(si_vars):
-                        sys.stderr.write('ERROR: not all variables could be calculated for {}'.format(si))
+                        sys.stderr.write('ERROR: not all variables could be calculated for {} \n'.format(si))
                     else:
                         stack_paths.append(new_bands)
                         sys.stdout.write('Added {} with {} bands \n'.format(si,num_bands))
-                else:sys.stderr.write('ERROR: missing spec index: {}'.format(si))        
-            
+                       
             if len(stack_paths) < len(spec_indices):
-                sys.stderr.write('ERROR: did not find ts data for all the requested spec_indices')              
+                sys.stderr.write('ERROR: did not find ts data for all the requested spec_indices \n')
+
             else:
                 num_bands_all = num_bands_all + num_bands
                 if singleton_vars is not None and singleton_vars != 'None':
@@ -394,7 +399,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                 sf_col = dic[sf]['col']
                                 sys.stdout.write('getting {} from {}'.format(sf,sf_path))    
                             else:
-                                sys.stderr.write('ERROR: do not know path for {}. Add to singleton_var_dict and rerun'.format(sf))
+                                sys.stderr.write('ERROR: do not know path for {}. Add to singleton_var_dict and rerun \n'.format(sf))
                                 sys.exit()
 
                         singleton_clipped = os.path.join(cell_dir,'comp','{}.tif'.format(sf))
@@ -439,7 +444,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                 stack_paths.append(poly_path)
                             num_bands_all = num_bands_all + 1
                         else:
-                            sys.stderr.write('variable {} does not exist for cell {}'.format(pv,cell))
+                            sys.stderr.write('variable {} does not exist for cell {} \n'.format(pv,cell))
                                       
                 sys.stdout.write('Final stack will have {} bands \n'.format(num_bands_all))
                 sys.stdout.write('band names = {} \n'.format(band_names))
@@ -459,6 +464,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                     kwargs.update(count = output_count)
                 
                 #with rio.open(os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr)),'w',**kwargs) as dst:
+                dst_idx = 1
                 with rio.open(os.path.join(cell_dir,'comp','stack.tif'),'w',**kwargs) as dst:
                     for path, index in zip(stack_paths, indexes):
                         with rio.open(path) as src:
@@ -471,8 +477,8 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                 dst.write(data, range(dst_idx, dst_idx + len(index)))
                                 dst_idx += len(index)
                     dst.descriptions = tuple(band_names)
-            print('done writing {}_{}_stack.tif for cell {}'.format(feature_model,start_yr,cell))
-        return stack_path        
+                print('done writing {}_{}_stack.tif for cell {} \n'.format(feature_model,start_yr,cell))
+                        
                 
 def classify_raster(var_stack,rf_path,class_img_out):
 
