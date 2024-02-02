@@ -263,26 +263,35 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
 def reduce_variable_dataframe(ptdf, drop_indices, drop_vars, drop_combo, out_dir, new_feature_mod, feature_mod_dict):
     ptsdf = pd.read_csv(ptdf, index_col=0)
     cols = list(ptsdf.columns)
-    if len(drop_indices) > 0: 
-        for i in drop_indices:
-            drop_cols = [c for c in cols if c.split('_')[0] == i]
-            ptsdf.drop(drop_cols, axis=1, inplace=True)
+    if drop_indices is not None and drop_indices != 'None':
+        if len(drop_indices) > 0: 
+            for i in drop_indices:
+                drop_cols = [c for c in cols if c.split('_')[1] == i]
+                ptsdf.drop(drop_cols, axis=1, inplace=True)
+        else: drop_cols = []
     else: drop_cols = 0
-    if len(drop_vars) > 0: 
-        for v in drop_vars:
-            drop_cols2 = [c for c in cols if c.split('_')[1] == v.split('_')[1] and c.split('_')[2] == v.split('_')[2]]
-            ptsdf.drop(drop_cols, axis=1, inplace=True)
+    if drop_vars is not None and drop_vars != 'None':    
+        if len(drop_vars) > 0: 
+            for v in drop_vars:
+                drop_cols1 = [c for c in cols if c.split('_')[2] == v.split('_')[2] and c.split('_')[3] == v.split('_')[3]]
+                ptsdf.drop(drop_cols1, axis=1, inplace=True)
+        else: drop_cols1 = []
     else: drop_cols1 = 0
-    if len(drop_combo) > 0: 
-        for cb in drop_combo:
-            drop_cols3 = [c for c in cols if c==cb]
-            ptsdf.drop(drop_cols, axis=1, inplace=True)
+    if drop_combo is not None and drop_combo != 'None':  
+        if len(drop_combo) > 0: 
+            for cb in drop_combo:
+                drop_cols2 = [c for c in cols if c==cb]
+                ptsdf.drop(drop_cols2, axis=1, inplace=True)
+        else: drop_cols2 = []
     else: drop_cols2 = 0
     all_dropped = drop_cols + drop_cols1 + drop_cols2
-    final_cols == [c for c in cols if c not in all_dropped]
-    new_model = getset_feature_models(feature_mod_dict,new_feature_model,spec_indices=None,si_vars=None,
+    print('dropping {} from model'.format(all_dropped))
+    final_cols = [c for c in cols if c not in all_dropped]
+    print('new model has bands: {}'.format(final_cols))
+    new_model = getset_feature_model(feature_mod_dict,new_feature_mod,spec_indices=None,si_vars=None,
                                      spec_indices_pheno=None,pheno_vars=None, singleton_vars=None,poly_vars=None, combo_bands=final_cols)
-    df_out = pd.DataFrame.to_csv(ptsdf,os.path.join(out_dir,'{}.csv'.format(model)), sep=',', index=True)
+    df_out = pd.DataFrame.to_csv(ptsdf,os.path.join(out_dir,'{}.csv'.format(new_feature_mod)), sep=',', index=True)
+    print('created new model {} in {}'.format(new_feature_mod,out_dir))
     
     return df_out
                                              

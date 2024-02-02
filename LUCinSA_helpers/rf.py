@@ -297,8 +297,9 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
             dic[feature_model]['combo_bands'] = combo_bands
             
             band_names = []
-            if len(combo_bands) > 0:
-                band_names.append(combo_bands)
+            if combo_bands is not None and combo_bands != 'None':
+                for cb in combo_bands:
+                    band_names.append(cb)
             if spec_indices_pheno is not None and spec_indices_pheno != 'None':
                 for sip in spec_indices_pheno:
                     for pv in pheno_vars:
@@ -317,8 +318,8 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
             dic[feature_model]['band_names'] = all_bands
             with open(feature_mod_dict, 'w') as new_feature_model_dict:
                 json.dump(dic, new_feature_model_dict)
-            print('created new model: {} \n spec_indices = {} \n si_vars = {} \n pheno_vars = {} on {} \n singleton_vars={} \n singleton_vars = {} \n poly_vars = {}'
-                  .format(feature_model, spec_indices, si_vars, pheno_vars, spec_indices_pheno, singleton_vars, poly_vars))
+            print('created new model: {} \n spec_indices={} \n si_vars={} \n pheno_vars={} on {} \n singleton_vars={} \n poly_vars={} \n combo_bands={} \n'
+                  .format(feature_model, spec_indices, si_vars, pheno_vars, spec_indices_pheno, singleton_vars, poly_vars, combo_bands))
         
     return spec_indices,si_vars,spec_indices_pheno,pheno_vars,singleton_vars,poly_vars,combo_bands,band_names
     
