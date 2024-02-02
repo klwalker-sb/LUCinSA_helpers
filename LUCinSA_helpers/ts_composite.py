@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+import sys
 from pathlib import Path
 import datetime
 import rasterio as rio
@@ -355,6 +356,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     ## Convert image stack to XArray using geowombat:
     yr_bands = [b for b in si_vars if "_" not in b or b.split("_")[1] == 'yr']
     if len(yr_bands) > 0:
+        sys.stderr.write('working on yr_band {} \n'.format(yr_bands))
         prep_ts_variable_bands(si_vars, ts_stack, ds_stack, out_dir,'yr',start_doy, band_names, ras_list, **gw_args)
 
     wet_bands = [b for b in si_vars if "_" in b and b.split("_")[1] == 'wet']
@@ -365,15 +367,15 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     if len(dry_bands) > 0:
         prep_ts_variable_bands(si_vars, ts_stack_dry, ds_stack_dry, out_dir,'dry', start_doy, band_names, ras_list, **gw_args)
     
-    mo_bands = [b for b in si_vars if b.split("_")[1] == '20']
+    mo_bands = [b for b in si_vars if "_" in b and b.split("_")[1] == '20']
     if len(mo_bands) > 0:
         get_monthly_ts(si_vars, img_dir, start_yr, start_mo, band_names, ras_list)
         
-    print('ras_list:{}'.format(ras_list))
+    sys.stderr.write('ras_list:{}'.format(ras_list))
     print('band_names:{}'.format(band_names))
     print('writing stack for si_vars:{}'.format(band_names))
     if len(ras_list)<len(si_vars):
-        print('oops--got an unknown band')
+        sys.stderr.write('oops--got an unknown band')
 
     else:
         ##Start writing output composite

@@ -205,7 +205,7 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
         if spec_indices is not None and spec_indices != ' ' and spec_indices !='None':
             for si in spec_indices:
                 if si is not None and si != ' ' and si !='None':
-                    sys.stderr.write('extracting {}... \n'.format(si))
+                    sys.stderr.write('looking at {}... \n'.format(si))
                     if scratch_dir is not None and scratch_dir != 'None':
                         out_dir_int = os.path.join(scratch_dir,'{}'.format(cell))
                     else:
@@ -213,15 +213,16 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                     img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
                     if os.path.isdir(img_dir):
                         for siv in si_vars:
+                            sys.stderr.write('getting {}... \n'.format(siv))
                             if os.path.exists(os.path.join(out_dir_int,'{}.tif'.format(siv))):
-                                comp = os.path.join(Out_dir_int,'{}.tif'.format(siv))
+                                comp = os.path.join(out_dir_int,'{}.tif'.format(siv))
                             else:
-                                comp = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, siv)
-                            with rio.open(comp, 'r') as scr:
+                                comp = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, [siv])
+                            with rio.open(comp, 'r') as src:
                                 vals = src.read(1)
-                                varn = ('var_{}_{}'.format(si,band))
-                                sys.stdout.write(' adding {}:{} \n'.format(b,band))
-                                ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]                
+                                varn = ('var_{}_{}'.format(si,siv))
+                                sys.stdout.write(' adding {}:{} \n'.format(si,siv))
+                                ptsgdb[varn] = [sample[0] for sample in src.sample(coords)]                
                     else:
                         sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
                                              
