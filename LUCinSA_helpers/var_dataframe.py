@@ -68,13 +68,13 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
         ptsgdb = None
     
     else:
-        band_names = getset_feature_model(feature_mod_dict, feature_model)[4]
+        band_names = getset_feature_model(feature_mod_dict, feature_model)[7]
     
         if load_samp == False:
             if polys:
                 ptsgdb = get_ran_pts_in_polys (polys, numpts, seed)
             else:
-                sys.stderr.write('There are no polygons or points to process in this cell')
+                sys.stderr.write('There are no polygons or points to process in this cell \n')
                 return None
         elif load_samp == True:
             ptsgdb = ptgdb
@@ -82,12 +82,11 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
         xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
         coords = list(map(list, zip(*xy)))
     
-        sys.stdout.write('Extracting variables from stack')
-        #with rio.open(os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr)),'r') as comp:
-        with rio.open(os.path.join(in_dir,'stack.tif'),'r') as comp:
+        sys.stdout.write('Extracting variables from stack \n')
+        with rio.open(stack_path ,'r') as comp:
             #Open each band and get values
             for b, band in enumerate(band_names):
-                sys.stdout.write('{}:{}'.format(b,band))
+                sys.stdout.write('{}:{},'.format(b,band))
                 comp.np = comp.read(b+1)
                 varn = ('var_{}'.format(band))
                 ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]
@@ -207,16 +206,22 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
             for si in spec_indices:
                 if si is not None and si != ' ' and si !='None':
                     sys.stderr.write('extracting {}... \n'.format(si))
-                    comp_dir = os.path.join(cell_dir,'comp',si)
+                    if scratch_dir is not None and scratch_dir != 'None':
+                        out_dir_int = os.path.join(scratch_dir,'{}'.format(cell))
+                    else:
+                        out_dir_int = os.path.join(cell_dir,'comp',si)       
                     img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
                     if os.path.isdir(img_dir):
-                        new_vars = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, si_vars)
-                        comp = rio.open(new_vars,'r')
-                        for b, band in enumerate(si_vars):
-                            sys.stdout.write('{}:{}'.format(b,band))
-                            comp.np = comp.read(b+1)
-                            varn = ('var_{}_{}'.format(si,band))
-                            ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]                
+                        for siv in si_vars:
+                            if os.path.exists(os.path.join(out_dir_int,'{}.tif'.format(siv))):
+                                comp = os.path.join(Out_dir_int,'{}.tif'.format(siv))
+                            else:
+                                comp = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, siv)
+                            with rio.open(comp, 'r') as scr:
+                                vals = src.read(1)
+                                varn = ('var_{}_{}'.format(si,band))
+                                sys.stdout.write(' adding {}:{} \n'.format(b,band))
+                                ptsgdb[varn] = [sample[b] for sample in comp.sample(coords)]                
                     else:
                         sys.stderr.write ('no index {} created for {} \n'.format(si,cell))
                                              

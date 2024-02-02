@@ -399,7 +399,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
             out_ras = os.path.join(out_dir,'{:06d}_{}_{}_{}{}.tif'.
                                    format(int(grid_cell),start_yr,spec_index,band_names[0],band_names[1]))
         elif len(ras_list)==1:
-            out_ras = os.path.join(out_dir,'{:06d}_{}_{}_{}.tif'.
+            out_ras = os.path.join(out_dir,'{}.tif'.
                                    format(int(grid_cell),start_yr,spec_index,band_names[0]))
         else:
             out_ras = os.path.join(out_dir,'{:06d}_{}_{}_{}{}{}.tif'.
