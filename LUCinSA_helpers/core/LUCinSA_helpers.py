@@ -3,6 +3,7 @@ import argparse
 from LUCinSA_helpers.check_log_files_dl import check_dl_logs
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite
+from LUCinSA_helpers.pheno import make_pheno_vars
 from LUCinSA_helpers.file_checks import reconstruct_db, get_cell_status, check_valid_pixels, update_cell_status_db
 from LUCinSA_helpers.file_checks import print_files_in_multiple_directories
 from LUCinSA_helpers.var_dataframe import make_var_dataframe
@@ -41,7 +42,8 @@ def main():
                            'get_cell_status',
                            'update_summary_db',
                            'get_time_series', 
-                           'make_ts_composite', 
+                           'make_ts_composite',
+                           'make_pheno_vars',
                            'check_valid_pix',
                            'reconstruct_db',
                            'check_ts_windows',
@@ -117,7 +119,7 @@ def main():
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
         
         if process in ['get_time_series','make_ts_composite','rf_model','rf_classification',
-                       'make_var_dataframe','make_var_stack','append_feature_dataframe']:
+                       'make_var_dataframe','make_var_stack','append_feature_dataframe','make_pheno_vars']:
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
             subparser.add_argument('--start_yr', dest ='start_yr', help='year to map (first if spans two)', default=2010, type=int)
             subparser.add_argument('--start_mo', dest ='start_mo', default=2010, type=int,
@@ -145,12 +147,21 @@ def main():
             subparser.add_argument('--ptfile', dest ='ptfile', 
                                    help='Path to file containing points, if load_samp=True', default=None)
 
-        if process == 'make_ts_composite':
+        if process in ['make_ts_composite','make_pheno_vars']:
             subparser.add_argument('--img_dir', dest ='img_dir', help='directory containing images')
-            subparser.add_argument('--si_vars', dest ='si_vars', help='spectral variables to calculate - in order of band output')
             subparser.add_argument('--grid_cell', dest='grid_cell', help='cell being processed') 
             subparser.add_argument('--spec_index', dest='spec_index', help='Spectral index to explore. options are...', default='evi2')
 
+        if process in ['make_ts_composite']:
+            subparser.add_argument('--si_vars', dest ='si_vars', help='spectral variables to calculate - in order of band output')
+        
+        if process in ['make_pheno_vars']:
+            subparser.add_argument('--pheno_vars', dest ='pheno_vars', help='pheno variables to calculate - in order of band output')
+            subparser.add_argument('--sigdif', dest ='sigdif', help='increase/decrease from median considered significant for peak',
+                                  default = 500)
+            subparser.add_argument('--pad_days', dest ='pad_days', help='number of days to pad on each side of season for curve fitting',
+                                  default = '[20,20]')
+            
         if process in ['make_var_dataframe','make_var_stack','rf_classification']:
             subparser.add_argument('--in_dir', dest='in_dir', help='')
             subparser.add_argument('--feature_model', dest = 'feature_model', 
@@ -200,7 +211,6 @@ def main():
                                    help='path to existing random forest model, or None if model is to be created')
             subparser.add_argument('--img_out', dest='img_out',help='Full path name of classified image to be created')
                                   
-
     args = parser.parse_args()
 
     if args.process == 'version':
@@ -259,7 +269,18 @@ def main():
                         start_mo = args.start_mo,
                         spec_index = args.spec_index,
                         si_vars = check_for_list(args.si_vars))
-
+        
+    if args.process == 'make_pheno_vars':
+        make_pheno_vars(grid_cell = args.grid_cell,
+                        img_dir = args.img_dir,
+                        out_dir = args.out_dir,
+                        start_yr = args.start_yr,
+                        start_mo = args.start_mo,
+                        spec_index = args.spec_index, 
+                        pheno_vars = check_for_list(args.pheno_vars),
+                        sigdif = args.sigdif,
+                        pad_days = check_for_list(args.pad_days))
+        
     if args.process == 'check_valid_pix':
         check_valid_pixels(raw_dir = args.raw_dir,
                          brdf_dir = args.processed_dir,

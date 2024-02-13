@@ -2,7 +2,6 @@
 # coding: utf-8
 
 import os
-import sys
 from pathlib import Path
 import datetime
 import rasterio as rio
@@ -24,7 +23,6 @@ def prep_ts_variable_bands(si_vars,ts_stack,ds_stack, out_dir,temp,start_doy,ban
     with gw.open(ts_stack, time_names = ds_stack) as src:
         attrs = src.attrs.copy()
      
-    #if any(v in si_vars for v in [f'maxv_{temp}',f'amp_{temp}', f'maxd_{temp}', f'maxdc_{temp}', f'rog_{temp}', f'ros_{temp}']):
     if any(v in si_vars for v in [f'maxv_{temp}',f'amp_{temp}', f'maxd_{temp}', f'maxdc_{temp}']):
         mmax = src.max(dim='time')
         if f'maxv_{temp}' in si_vars:
@@ -60,7 +58,7 @@ def prep_ts_variable_bands(si_vars,ts_stack,ds_stack, out_dir,temp,start_doy,ban
             add_var_to_stack(maxd2,f'maxd_{temp}',attrs,out_dir,band_names,ras_list,**gw_args)
     if f'maxdc_{temp}' in si_vars:
         maxd_360 = 2 * np.pi * maxd1/365
-        maxd_cos = 100 * (np.cos(maxd_360) + 1)
+        maxd_cos = 100 * (np.cos(max_360) + 1)
         maxd_cos = maxd_cos.astype('int16')
         add_var_to_stack(maxd_cos,f'maxdc_{temp}',attrs,out_dir,band_names,ras_list,**gw_args)
     if f'mind_{temp}' in si_vars or f'mindc_{temp}' in si_vars:
@@ -238,7 +236,6 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     ds_stack = []
     ds_stack_wet = []
     ds_stack_dry = []
-    start_doy = int (30.5 * start_mo) - 30
     for img in sorted(os.listdir(img_dir)):
         if img.endswith('.tif'):
             ## ts images are named YYYYDDD with YYYY=year and DDD=doy
@@ -246,6 +243,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
             ## use year to filter to mapping year and doy to parse seasons regardless of year
             img_yr = int(img[:4])
             img_doy = int(img[4:7])
+            start_doy = int (30.5 * start_mo) - 30
             if (img_yr == int(start_yr) and img_doy >= start_doy) or (img_yr == (int(start_yr)+1) and img_doy < start_doy):
                 ts_stack.append(os.path.join(img_dir,img))
                 ds_stack.append(img_date)
@@ -356,7 +354,6 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     ## Convert image stack to XArray using geowombat:
     yr_bands = [b for b in si_vars if "_" not in b or b.split("_")[1] == 'yr']
     if len(yr_bands) > 0:
-        sys.stderr.write('working on yr_band {} \n'.format(yr_bands))
         prep_ts_variable_bands(si_vars, ts_stack, ds_stack, out_dir,'yr',start_doy, band_names, ras_list, **gw_args)
 
     wet_bands = [b for b in si_vars if "_" in b and b.split("_")[1] == 'wet']
@@ -367,15 +364,15 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
     if len(dry_bands) > 0:
         prep_ts_variable_bands(si_vars, ts_stack_dry, ds_stack_dry, out_dir,'dry', start_doy, band_names, ras_list, **gw_args)
     
-    mo_bands = [b for b in si_vars if "_" in b and b.split("_")[1] == '20']
+    mo_bands = [b for b in si_vars if b.split("_")[1] == '20']
     if len(mo_bands) > 0:
         get_monthly_ts(si_vars, img_dir, start_yr, start_mo, band_names, ras_list)
         
-    sys.stderr.write('ras_list:{}'.format(ras_list))
+    print('ras_list:{}'.format(ras_list))
     print('band_names:{}'.format(band_names))
     print('writing stack for si_vars:{}'.format(band_names))
     if len(ras_list)<len(si_vars):
-        sys.stderr.write('oops--got an unknown band')
+        print('oops--got an unknown band')
 
     else:
         ##Start writing output composite
@@ -389,11 +386,6 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
             out_ras = os.path.join(out_dir,'{:06d}_{}_{}_RFVars.tif'.format(int(grid_cell),start_yr,spec_index))
         elif len(ras_list)==12:
             out_ras = os.path.join(out_dir,'{:06d}_{}_{}_monthly.tif'.format(int(grid_cell),start_yr,spec_index))
-        elif len(ras_list)==9:
-            if band_names[0].split('_')[1] == 'wet':
-                out_ras = os.path.join(out_dir,'{:06d}_{}_{}_PhenWet.tif'.format(int(grid_cell),start_yr,spec_index))
-            elif band_names[0].split('_')[1] == 'dry':
-                out_ras = os.path.join(out_dir,'{:06d}_{}_{}_PhenDry.tif'.format(int(grid_cell),start_yr,spec_index))
         elif len(ras_list)==4:
             out_ras = os.path.join(out_dir,'{:06d}_{}_{}_{}{}{}{}.tif'.
                                    format(int(grid_cell),start_yr,spec_index,band_names[0],band_names[1],band_names[2],band_names[3]))
@@ -401,7 +393,7 @@ def make_ts_composite(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,si_
             out_ras = os.path.join(out_dir,'{:06d}_{}_{}_{}{}.tif'.
                                    format(int(grid_cell),start_yr,spec_index,band_names[0],band_names[1]))
         elif len(ras_list)==1:
-            out_ras = os.path.join(out_dir,'{}.tif'.
+            out_ras = os.path.join(out_dir,'{:06d}_{}_{}_{}.tif'.
                                    format(int(grid_cell),start_yr,spec_index,band_names[0]))
         else:
             out_ras = os.path.join(out_dir,'{:06d}_{}_{}_{}{}{}.tif'.

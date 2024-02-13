@@ -175,18 +175,19 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
         if spec_indices_pheno is not None and spec_indices_pheno != 'None':
             for sip in spec_indices_pheno:
                 if sip is not None and sip != 'None':
-                    comp_dir = os.path.join(cell_dir,'comp',sip)
+                    comp_dir = os.path.join(cell_dir,'comp', sip)
                     img_dir = os.path.join(cell_dir,'brdf_ts','ms', sip)
                     if os.path.isdir(img_dir):
                         for temp in ['wet','dry']:
-                            sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
                             pvars = [s for s in pheno_vars if s.split("_")[1] == temp]
                             if len(pvars) > 0:
+                                sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
                                 sys.stderr.write('{} \n'.format(pvars))
-                                phen_bands = [f'maxv_{temp}',f'maxd_{temp}',f'sosv_{temp}',f'sosd_{temp}',
-                                   f'rog_{temp}',f'eosv_{temp}',f'eosd_{temp}',f'ros_{temp}',f'los{temp}']
-                                phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen{}{}.tif'
-                                                         .format(int(cell),start_yr,sip,temp[0].upper(),temp[1:]))
+                               
+                                phen_bands = [f'numrot_{temp}',f'posd_{temp}',f'posv_{temp}',f'sosd_{temp}',f'sosv_{temp}',
+                                   f'rog_{temp}',f'eosd_{temp}',f'eosv_{temp}',f'ros_{temp}',f'los_{temp}']
+                                phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen_{}.tif'
+                                                         .format(int(cell),start_yr,sip,temp))
                                 sys.stderr.write('looking for {} \n'.format(phen_comp)) 
                                 if os.path.exists(phen_comp) == True:
                                     sys.stderr.write('getting variables from existing stack \n')
@@ -273,7 +274,7 @@ def reduce_variable_dataframe(ptdf, drop_indices, drop_vars, drop_combo, out_dir
     if drop_vars is not None and drop_vars != 'None':    
         if len(drop_vars) > 0: 
             for v in drop_vars:
-                drop_cols1 = [c for c in cols if c.split('_')[2] == v.split('_')[2] and c.split('_')[3] == v.split('_')[3]]
+                drop_cols1 = [c for c in cols if c.split('_')[2] == v.split('_')[0] and c.split('_')[3] == v.split('_')[1]]
                 ptsdf.drop(drop_cols1, axis=1, inplace=True)
         else: drop_cols1 = []
     else: drop_cols1 = 0
