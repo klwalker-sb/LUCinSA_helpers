@@ -24,6 +24,7 @@ import csv
 from LUCinSA_helpers.ts_profile import get_pts_in_grid, get_polygons_in_grid, get_ran_pts_in_polys
 from LUCinSA_helpers.rf import getset_feature_model
 from LUCinSA_helpers.ts_composite import make_ts_composite
+from LUCinSA_helpers.pheno import make_pheno_vars
 
 def clip_singleton_feat_to_cell(singleton_feat,singleton_feat_dict,out_dir,clip_to_ras):
     with open(singleton_feat_dict, 'r+') as singleton_feat_dict:
@@ -184,8 +185,10 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                                 sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
                                 sys.stderr.write('{} \n'.format(pvars))
                                
-                                phen_bands = [f'numrot_{temp}',f'posd_{temp}',f'posv_{temp}',f'sosd_{temp}',f'sosv_{temp}',
-                                   f'rog_{temp}',f'eosd_{temp}',f'eosv_{temp}',f'ros_{temp}',f'los_{temp}']
+                                phen_bands = [f'maxv_{temp}', f'minv_{temp}', f'med_{temp}', f'slp_{temp}', f'numrot_{temp}',
+                                              f'posd_{temp}', f'posv_{temp}', f'numlow_{temp}', f'tosd_{temp}', f'p1amp_{temp}',
+                                              f'sosd_{temp}', f'sosv_{temp}', f'eosd_{temp}', f'eosv_{temp}', f'rog_{temp}', 
+                                              f'ros_{temp}',f'los_{temp}']
                                 phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen_{}.tif'
                                                          .format(int(cell),start_yr,sip,temp))
                                 sys.stderr.write('looking for {} \n'.format(phen_comp)) 
@@ -193,7 +196,7 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                                     sys.stderr.write('getting variables from existing stack \n')
                                 else:
                                     sys.stderr.write('no existing stack. calculating new varaibles...')
-                                    phen_comp = make_ts_composite(cell,img_dir,comp_dir,start_yr,start_mo,sip,phen_bands)
+                                    phen_comp = make_pheno_vars(cell,img_dir,comp_dir,start_yr,start_mo,sip,phen_bands,500,[30,0])
                                 phen_vars = rio.open(phen_comp,'r')
                                 for b, band in enumerate(phen_bands):
                                     sys.stdout.write('{}:{}'.format(b,band))
