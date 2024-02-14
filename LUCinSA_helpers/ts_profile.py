@@ -90,6 +90,7 @@ def get_pts_in_grid (grid_file, grid_cell, ptfile):
         shutil.copy(grid_file, temp_file)
         df = gpd.read_file(temp_file)
         crs_grid = df.crs
+        print(crs_grid)
     #sys.stderr.write('grid is in: {}'.format(crs_grid))  #ESRI:102033
     #sys.stderr.write('{}'.format(df))
 
