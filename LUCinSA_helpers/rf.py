@@ -303,7 +303,7 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
             if spec_indices_pheno is not None and spec_indices_pheno != 'None':
                 for sip in spec_indices_pheno:
                     for pv in pheno_vars:
-                        band_names_append('{}_{}'.format(sip,pv))
+                        band_names.append('{}_{}'.format(sip,pv))
             if spec_indices is not None and spec_indices != 'None':
                 for si in spec_indices:
                     for sv in si_vars:

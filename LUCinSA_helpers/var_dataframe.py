@@ -267,30 +267,22 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
 def reduce_variable_dataframe(ptdf, drop_indices, drop_vars, drop_combo, out_dir, new_feature_mod, feature_mod_dict):
     ptsdf = pd.read_csv(ptdf, index_col=0)
     cols = list(ptsdf.columns)
-    if drop_indices is not None and drop_indices != 'None':
-        if len(drop_indices) > 0: 
+    drop_cols = set()
+    if drop_indices is not None and drop_indices != 'None' and len(drop_indices) > 0: 
             for i in drop_indices:
-                drop_cols = [c for c in cols if c.split('_')[1] == i]
-                ptsdf.drop(drop_cols, axis=1, inplace=True)
-        else: drop_cols = []
-    else: drop_cols = 0
-    if drop_vars is not None and drop_vars != 'None':    
-        if len(drop_vars) > 0: 
+                drop = [c for c in cols if c.split('_')[1] == i]
+                drop_cols.update(drop)
+    if drop_vars is not None and drop_vars != 'None' and len(drop_vars) > 0: 
             for v in drop_vars:
-                drop_cols1 = [c for c in cols if c.split('_')[2] == v.split('_')[0] and c.split('_')[3] == v.split('_')[1]]
-                ptsdf.drop(drop_cols1, axis=1, inplace=True)
-        else: drop_cols1 = []
-    else: drop_cols1 = 0
-    if drop_combo is not None and drop_combo != 'None':  
-        if len(drop_combo) > 0: 
+                drop = [c for c in cols if c.split('_')[2] == v.split('_')[0] and c.split('_')[3] == v.split('_')[1]]
+                drop_cols.update(drop)
+    if drop_combo is not None and drop_combo != 'None' and len(drop_combo) > 0: 
             for cb in drop_combo:
-                drop_cols2 = [c for c in cols if c==cb]
-                ptsdf.drop(drop_cols2, axis=1, inplace=True)
-        else: drop_cols2 = []
-    else: drop_cols2 = 0
-    all_dropped = drop_cols + drop_cols1 + drop_cols2
-    print('dropping {} from model'.format(all_dropped))
-    final_cols = [c for c in cols if c not in all_dropped]
+                drop = [c for c in cols if c==cb]
+                drop_cols.update(drop)
+    ptsdf.drop(list(drop_cols), axis=1, inplace=True)
+    print('dropping {} from model'.format(drop_cols))
+    final_cols = [c for c in cols if c not in list(drop_cols)]
     print('new model has bands: {}'.format(final_cols))
     new_model = getset_feature_model(feature_mod_dict,new_feature_mod,spec_indices=None,si_vars=None,
                                      spec_indices_pheno=None,pheno_vars=None, singleton_vars=None,poly_vars=None, combo_bands=final_cols)

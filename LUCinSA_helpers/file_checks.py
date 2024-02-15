@@ -129,6 +129,7 @@ def reconstruct_db(processing_info_path,landsat_path,sentinel2_path,brdf_path):
                     bp = 'True' if b.split('_')[0] == 'L3B' else ('False' if b.split('_')[0] == 'L3A' else np.nan)
                     processing_dict[dlid] = {'dl':'{}'.format(landsat_path,dlid),
                                            'beforeDB':True,
+                                           'redownload':False,
                                            'brdf_id':'{}'.format(b),
                                            'brdf':'True',
                                            'brdf_error':np.nan,
@@ -137,10 +138,10 @@ def reconstruct_db(processing_info_path,landsat_path,sentinel2_path,brdf_path):
             else:
                 for f in landsat_files:
                     processing_dict[os.path.splitext(f)[0]]={'dl':'{}/{}'.format(landsat_path,f),
-                                                             'beforeDB':True}
+                                                             'beforeDB':True, 'redownload':False}
                 for s in sentinel2_files:
                     processing_dict[os.path.splitext(s)[0]]={'dl':'{}/{}'.format(sentinel2_path,s),
-                                                             'beforeDB':True}
+                                                             'beforeDB':True, 'redownload':False}
             new_processing_info = pd.DataFrame.from_dict(processing_dict,orient='index')
             new_processing_info.rename_axis('id', axis=1, inplace=True)
             pd.to_pickle(new_processing_info, processing_info_path)
