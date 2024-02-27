@@ -619,15 +619,10 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
 
 def get_smallholder(rf_mod, one = False, half = False):
     rf_mod = pd.DataFrame(rf_mod)
-    smalls = []
     if one == True: #decide if you want to do 1ha or halfha
-        for index, row in rf_mod.iterrows():
-            if row["smalls_1ha"] >= 0.0:
-                smalls.append(row) #add each row where you are classifying smallholders and smallholders only
-    if half == True: 
-        for index, row in rf_mod.iterrows():
-            if row["smalls_halfha"] >= 0.0:
-                smalls.append(row)
+        smalls = rf_mod.loc[int(rf_mod['smalls_1ha']) == 1]
+    elif half == True: 
+        smalls = rf_mod.loc[int(rf_mod['smalls_halfha']) == 1]
                 
     return pd.DataFrame(smalls)
 
@@ -642,7 +637,7 @@ def small_acc(rf_mod, one = False, half = False):
         half_ha_cropNoCrop = get_confusion_matrix(half_ha['pred'], half_ha['label'],lut,classification_params['lc_mod'],'crop_nocrop',True,classification_params['local_model_dir'],'Nov_default')
         return half_ha_cropNoCrop.head(1)["crop"]/half_ha_cropNoCrop.head(1)["All"]
 
-def wave(cm_path, UA = False, PA = False, weights = False):
+def wave(cm_path, uacc = False, pacc = False, weights = False):
 
     if weights == False:
         weights = np.ones(30)
@@ -654,7 +649,7 @@ def wave(cm_path, UA = False, PA = False, weights = False):
     ua = 0
     pa = 0
 
-    if UA == True:
+    if uacc == True:
         count = 0
         ind = 0
         for i, j in cm.iterrows():
@@ -665,7 +660,7 @@ def wave(cm_path, UA = False, PA = False, weights = False):
             ind += 1
         return ua/count
 
-    if PA == True:
+    if pacc == True:
         count = 0
         ind = 0
         for i, j in cm.iterrows():
@@ -683,7 +678,7 @@ def new_wave(cm_path, stored_path, model_name):
     new_data = pd.DataFrame({"Model": [model_name],
                              "UA": [wave(cm_path, UA = True)],
                              "PA": [wave(cm_path, PA = True)],
-                             "No. of Obs.": [len(pixdf["LC25_name_y"])]})
+                             "No. of Obs.": [len(pixdf["LC25_name"])]})
     #print(stored.reset_index(drop=True))
     #print(new_data.reset_index(drop=True))
     stored = pd.concat([stored.reset_index(drop = True), new_data.reset_index(drop = True)], ignore_index = True)
@@ -691,27 +686,27 @@ def new_wave(cm_path, stored_path, model_name):
 
 # new overall averaging function
 
-def overall_wave(CNC_metrics, CT_path, model_name):
+def overall_wave(cnc_metrics, ct_path, model_name):
     
     # iterate through rows of the CNC_metrics dataframe
-    CNC = pd.read_csv(CNC_metrics, index_col = 0)
-    for index, row in CNC.iterrows():
+    cnc = pd.read_csv(cnc_metrics, index_col = 0)
+    for index, row in cnc.iterrows():
         if row["Model"] == model_name:
-            CNC_partial = row
+            cnc_partial = row
 
     # now deal with the CT matrix
-    CT = pd.read_csv(CT_path, index_col = 0)
-    CT_partial = [wave(CT_path, UA = True, weights = "CT"), wave(CT_path, PA = True, weights = "CT")]
+    ct = pd.read_csv(ct_path, index_col = 0)
+    ct_partial = [wave(ct_path, uacc = True, weights = "CT"), wave(ct_path, pacc = True, weights = "CT")]
     
-    CNC_partial = [CNC_partial["UA"], CNC_partial["PA"]]
-    #print(CNC_partial)
-    #print(CT_partial)
+    cnc_partial = [cnc_partial["UA"], cnc_partial["PA"]]
+    #print(cnc_partial)
+    #print(ct_partial)
 
     overall_metrics = pd.DataFrame({"Model": ["{}_{}".format(mod_type, mod_name)],
-                             "UA": [(2 * CNC_partial[0] + CT_partial[0])/3],
-                             "PA": [(2 * CNC_partial[1] + CT_partial[1])/3],
-                             "1_ha": [CNC["1_ha"][0]],
-                             "half_ha": [CNC["half_ha"][0]],
+                             "UA": [(2 * cnc_partial[0] + ct_partial[0])/3],
+                             "PA": [(2 * cnc_partial[1] + ct_partial[1])/3],
+                             "1_ha": [cnc["1_ha"][0]],
+                             "half_ha": [cnc["half_ha"][0]],
                              "No. of Obs.": [len(pixdf["LC25_name_y"])]})
     return overall_metrics
 
