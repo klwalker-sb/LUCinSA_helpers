@@ -295,8 +295,6 @@ def prep_pheno_bands(pheno_vars,ts_stack,ds_stack,ts_stack_padded, ds_stack_padd
             add_var_to_stack(eosv,f'eosv_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
  
     if f'rog_{temp}' in pheno_vars or f'ros_{temp}' in pheno_vars:
-        with gw.open(os.path.join(out_dir,f'posv_{temp}_{start_yr}.tif')) as posv:
-            pass
         with gw.open(os.path.join(out_dir,f'posd_{temp}_{start_yr}.tif')) as posd2:
             pass
         if f'rog_{temp}' in pheno_vars or f'los_{temp}' in pheno_vars:
