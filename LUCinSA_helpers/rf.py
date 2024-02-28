@@ -29,11 +29,11 @@ gdal.UseExceptions()
 gdal.AllRegister()
 
 def get_class_col(lc_mod,lut):
-    if lc_mod == 'All':
+    if lc_mod == 'all':
         class_col = 'LC25'
     elif lc_mod == "trans_cats":
         class_col = 'LCTrans'
-    elif lc_mod == 'crop_nocrop':
+    elif lc_mod == 'cropNoCrop':
         class_col = 'LC2'
     elif lc_mod == 'crop_nocrop_medcrop':
         class_col = 'LC3'
@@ -59,7 +59,7 @@ def get_class_col(lc_mod,lut):
                 lut.at[target_class[0],'LC1'] = 1
                 lut.at[target_class[0],'LC1_name'] = lc_base
     else:
-        print('current options for lc_mod are All, LCTrans, LC2, LC3, LC4, LC5, LC_crops and single_X with X as any category. You put {}'.format(lc_mod))
+        print('current options for lc_mod are all, LCTrans, LC2, LC3, LC4, LC5, LC_crops and single_X with X as any category. You put {}'.format(lc_mod))
     
     '''
     elif lc_mod == 'crop_post':
@@ -94,7 +94,97 @@ def get_class_col(lc_mod,lut):
     '''
         
     return class_col,lut
+
+def wave(cm_path, uacc = False, pacc = False, weights = False):
+
+    if weights == False:
+        weights = np.ones(30)
+
+    elif weights == "CT":
+        weights = [1, 1, 1, 1, 2, 1, 1, 1, 1]
         
+    cm = pd.read_csv(cm_path)
+    ua = 0
+    pa = 0
+
+    if uacc == True:
+        count = 0
+        ind = 0
+        for i, j in cm.iterrows():
+            if j[-2] > 0:
+                ua += j[-2] * weights[ind]
+                #print(ua)
+                count += weights[ind]
+            ind += 1
+        return ua/count
+
+    if pacc == True:
+        count = 0
+        ind = 0
+        for i, j in cm.iterrows():
+            if j[-1] > 0:
+                pa += j[-1] * weights[ind]
+                #print(pa)
+                count += weights[ind]
+            ind += 1
+        return pa/count
+
+# open the csvs and add a new row with the new data
+
+def balance_training_data(lut, pixdf, out_dir, new_name, cutoff, mix_factor):
+    '''
+    balances class samples based on map proportion, relative to sample size for class with max map proportion
+    (this estimated map proportion is a column named "perLC25E" in the LUT )
+    allows a minimum threshold to be set {cutoff} so that sample sizes are not reduced below the minimum
+    allows a factor to be set for mixed (heterogeneous) classes to sample them more heavily than main classes
+        (the maximum value will depend on the available samples for these classes. Current max is ~4)
+    '''
+    ##   first collect the sample ratios from the LUT
+    lut=pd.read_csv(lut)
+    ordered = lut.sort_values('perLC25E')[["perLC25E", "LC25_name"]]
+    #print(ordered)
+    
+    ##   clean this df for NaN and repeats, check if the percents add up correctly, then divide as integer
+    
+    ordered = ordered.dropna()
+    ordered = ordered.drop_duplicates(subset = "perLC25E") 
+    #print(ordered)
+    
+    tot = ordered["perLC25E"].sum()
+    # print(tot)     # should be close to 1
+    
+    ##   rescale by dividing by min proportion
+    mmax = ordered["perLC25E"].max()
+    ordered["perLC25E"] = ordered["perLC25E"]/mmax
+    #print(ordered)
+    
+    ##  get sample counts for each class 
+    counts = pixdf['LC25_name'].value_counts().rename_axis("LC25_name").reset_index(name="counts")
+    #print(counts)
+    print(f'Total sample size before balancing is: {sum(counts["counts"])}')
+    
+    ## join sample counts with scaled class proportions
+    ratiodf = ordered.merge(counts, left_on="LC25_name", right_on="LC25_name", how='left')
+    print(ratiodf)
+    maxsamp = ratiodf.at[ratiodf['perLC25E'].idxmax(), 'counts']
+    print(f'samp size for class with max proportion is {maxsamp}')
+    ## get resample ratio based on class proportion 
+    ratiodf['ratios'] = np.where(ratiodf["counts"] < cutoff, 1, 
+                          np.where(ratiodf["perLC25E"] * maxsamp < ratiodf["counts"], 
+                             np.maximum((cutoff / ratiodf["counts"]), (ratiodf["perLC25E"] * maxsamp / ratiodf["counts"])),   
+                            1))
+    mixed_classes = ["Mixed-VegEdge", "Mixed-path", "Crops-mix"]
+    ratiodf['ratios'] = np.where(ratiodf["LC25_name"].isin(mixed_classes), (ratiodf['ratios'] * mix_factor), ratiodf['ratios'])
+    
+    pixdf_ratios_rebal = pixdf.merge(ratiodf[['LC25_name','ratios']],left_on="LC25_name", right_on="LC25_name", how='left')
+    pixdf_ratios_rebal = pixdf_ratios_rebal[pixdf_ratios_rebal['rand'] < pixdf_ratios_rebal['ratios']]
+    print(pixdf_ratios_rebal['LC25_name'].value_counts())
+    totsamp = sum(pixdf_ratios_rebal['LC25_name'].value_counts())
+    print(f'Total sample size after balancing is: {totsamp}')
+    
+    pixdf_path = os.path.join(out_dir,'pixdf_bal{}mix{}.csv'.format(cutoff,mix_factor))
+    pd.DataFrame.to_csv(pixdf_ratios_rebal, pixdf_path)
+    
 def separate_holdout(training_pix_path, out_dir):
     '''
     USE THIS WHEN WE AUGMENT BY POLYGON
@@ -166,7 +256,7 @@ def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_c
     '''
     #print(f'Confusion Matrix: {cm}')
     if print_cm == True:
-        pd.DataFrame.to_csv(cm,os.path.join(out_dir,f'CM_{model_name}.csv'), sep=',', index=True)
+        pd.DataFrame.to_csv(cm,os.path.join(out_dir,f'{model_name}_{lc_mod_acc}.csv'), sep=',', index=True)
     
     return cm
 
@@ -566,11 +656,9 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
     score = get_holdout_scores(ho, rf[0], class_col, out_dir)
 
     #add the smallholder indication variables to the output df
-    smalls_1ha = df_in["smlhld_1ha"]
-    smalls_halfha = df_in["smlhd_halfha"]
-    score = pd.DataFrame(score)
-    score["smalls_1ha"] = smalls_1ha
-    score["smalls_halfha"] = smalls_halfha
+    #score = pd.DataFrame(score)
+    score["smalls_1ha"] = df_in["smlhld_1ha"]
+    score["smalls_halfha"] = df_in["smlhd_halfha"]
     
     return rf, score
 
@@ -617,96 +705,5 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
             rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut)
             classify_raster(var_stack, rf_mod,class_img_out)
 
-def get_smallholder(rf_mod, one = False, half = False):
-    rf_mod = pd.DataFrame(rf_mod)
-    if one == True: #decide if you want to do 1ha or halfha
-        smalls = rf_mod.loc[int(rf_mod['smalls_1ha']) == 1]
-    elif half == True: 
-        smalls = rf_mod.loc[int(rf_mod['smalls_halfha']) == 1]
-                
-    return pd.DataFrame(smalls)
 
-def small_acc(rf_mod, one = False, half = False):
-    if one == True:
-        one_ha = get_smallholder(rf_mod[1], one = True) # df for 1_ha smallholder ag
-        one_ha_cropNoCrop = get_confusion_matrix(one_ha['pred'], one_ha['label'],lut,classification_params['lc_mod'],'crop_nocrop',True,classification_params['local_model_dir'],'Nov_default')
-        return one_ha_cropNoCrop.head(1)["crop"]/one_ha_cropNoCrop.head(1)["All"]
-    
-    if half == True:
-        half_ha = get_smallholder(rf_mod[1], half = True) # df for half_ha smallholder ag
-        half_ha_cropNoCrop = get_confusion_matrix(half_ha['pred'], half_ha['label'],lut,classification_params['lc_mod'],'crop_nocrop',True,classification_params['local_model_dir'],'Nov_default')
-        return half_ha_cropNoCrop.head(1)["crop"]/half_ha_cropNoCrop.head(1)["All"]
-
-def wave(cm_path, uacc = False, pacc = False, weights = False):
-
-    if weights == False:
-        weights = np.ones(30)
-
-    elif weights == "CT":
-        weights = [1, 1, 1, 1, 2, 1, 1, 1, 1]
-        
-    cm = pd.read_csv(cm_path)
-    ua = 0
-    pa = 0
-
-    if uacc == True:
-        count = 0
-        ind = 0
-        for i, j in cm.iterrows():
-            if j[-2] > 0:
-                ua += j[-2] * weights[ind]
-                #print(ua)
-                count += weights[ind]
-            ind += 1
-        return ua/count
-
-    if pacc == True:
-        count = 0
-        ind = 0
-        for i, j in cm.iterrows():
-            if j[-1] > 0:
-                pa += j[-1] * weights[ind]
-                #print(pa)
-                count += weights[ind]
-            ind += 1
-        return pa/count
-
-# open the csvs and add a new row with the new data
-
-def new_wave(cm_path, stored_path, model_name):
-    stored = pd.read_csv(stored_path, index_col = 0)
-    new_data = pd.DataFrame({"Model": [model_name],
-                             "UA": [wave(cm_path, UA = True)],
-                             "PA": [wave(cm_path, PA = True)],
-                             "No. of Obs.": [len(pixdf["LC25_name"])]})
-    #print(stored.reset_index(drop=True))
-    #print(new_data.reset_index(drop=True))
-    stored = pd.concat([stored.reset_index(drop = True), new_data.reset_index(drop = True)], ignore_index = True)
-    return stored
-
-# new overall averaging function
-
-def overall_wave(cnc_metrics, ct_path, model_name):
-    
-    # iterate through rows of the CNC_metrics dataframe
-    cnc = pd.read_csv(cnc_metrics, index_col = 0)
-    for index, row in cnc.iterrows():
-        if row["Model"] == model_name:
-            cnc_partial = row
-
-    # now deal with the CT matrix
-    ct = pd.read_csv(ct_path, index_col = 0)
-    ct_partial = [wave(ct_path, uacc = True, weights = "CT"), wave(ct_path, pacc = True, weights = "CT")]
-    
-    cnc_partial = [cnc_partial["UA"], cnc_partial["PA"]]
-    #print(cnc_partial)
-    #print(ct_partial)
-
-    overall_metrics = pd.DataFrame({"Model": ["{}_{}".format(mod_type, mod_name)],
-                             "UA": [(2 * cnc_partial[0] + ct_partial[0])/3],
-                             "PA": [(2 * cnc_partial[1] + ct_partial[1])/3],
-                             "1_ha": [cnc["1_ha"][0]],
-                             "half_ha": [cnc["half_ha"][0]],
-                             "No. of Obs.": [len(pixdf["LC25_name_y"])]})
     return overall_metrics
-
