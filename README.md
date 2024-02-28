@@ -74,6 +74,7 @@ Relevant parameter settings are printed within the notebook, enabling reproducib
 When edits are pushed, notebook outputs are automatically cleared at commit staging, as per
 [this post](https://medium.com/somosfit/version-control-on-jupyter-notebooks-6b67a0cf12a3)
 This helps to keep this git repo from getting overwhelmed with notebook data.
+Before pusihng edits, copy the `pre-commit` file from the main directory into `.git/hooks`
 Also make sure to use the original .gitignore file (which might be hidden) when pushing edits
 
 ## check download logs
