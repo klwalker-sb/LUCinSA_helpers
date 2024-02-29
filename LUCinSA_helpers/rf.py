@@ -256,7 +256,7 @@ def wave(cm_path, uacc = False, pacc = False, weights = False):
         weights = np.ones(30)
 
     elif weights == "CT":
-        # CropType = Corn, NoCrop, Rice, ShrubCrop, Smallholder, Soybeans, Sugar, TreeCrops
+        # CropType = Corn, NoCrop, Rice, ShrubCrop, Smallholder, Soybeans, Sugar, TreeCrops, All (All is not correct in these cms)
         weights = [1, 1, 1, 1, 2, 1, 1, 1, 0]
         
     cm = pd.read_csv(cm_path)
@@ -283,8 +283,7 @@ def new_wave(cm_path, stored_path, model_name, rf_scores, pixdf, lut):
                              "Num_obs": [pixdf["LC25_name"].shape[0]],
                              "Num_sm_1ha" : [pixdf['smlhld_1ha'].sum()],                    
                              "Num_sm_halfha" : [pixdf['smlhd_halfha'].sum()]})
-    #print(stored.reset_index(drop=True))
-    #print(new_data.reset_index(drop=True))
+
     stored = pd.concat([stored.reset_index(drop = True), new_data.reset_index(drop = True)], ignore_index = True)
     return stored
 
@@ -296,15 +295,12 @@ def overall_wave(cnc_metrics, ct_path, model_name,pixdf):
     # now calculate weighted values from the cropType matrix:
     ct = pd.read_csv(ct_path, index_col = 0)
     ct_partial = [wave(ct_path, uacc = True, weights = "CT"), wave(ct_path, pacc = True, weights = "CT")]
-    
-    cnc_partial = [cnc_partial["UA"].values[0], cnc_partial["PA"].values[0], 
-                   cnc_partial["1_ha"].values[0], cnc_partial["half_ha"].values[0]]
 
     overall_metrics = pd.DataFrame({"Model": ["{}".format(model_name)],
-                             "UA": [(2 * cnc_partial[0] + ct_partial[0])/3],
-                             "PA": [(2 * cnc_partial[1] + ct_partial[1])/3],
-                             "1_ha": [cnc_partial[2]],
-                             "half_ha": [cnc_partial[3]],
+                             "UA": [(2 * cnc_partial["UA"].values[0] + ct_partial[0])/3],
+                             "PA": [(2 * cnc_partial["PA"].values[0] + ct_partial[1])/3],
+                             "1_ha": [cnc_partial["1_ha"].values[0]],
+                             "half_ha": [cnc_partial["half_ha"].values[0]],
                              "Num_obs": [pixdf["LC25_name"].shape[0]],
                              "Num_sm_1ha" : [pixdf['smlhld_1ha'].sum()],                    
                              "Num_sm_halfha" : [pixdf['smlhd_halfha'].sum()]})
@@ -346,7 +342,7 @@ def build_weighted_accuracy_table(out_dir,model_name,rf_scores,pixdf,lut):
         cmi = new_wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name, i)), 
             os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)),model_name, rf_scores,pixdf,lut)
         cmi.to_csv(os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)))
-        print(cmi)
+        #print(cmi)
 
     all_metrics_path = os.path.join(out_dir,'metrics','overall_metrics.csv')
     overall = overall_wave(os.path.join(out_dir,'metrics','cropNoCrop_metrics.csv'), 
