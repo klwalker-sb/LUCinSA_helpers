@@ -221,7 +221,6 @@ def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_c
     #print(f'Confusion Matrix: {cm}')
     if print_cm == True:
         mod_path = os.path.join(out_dir,'{}_{}.csv'.format(model_name,lc_mod_acc))
-        print(mod_path)
         pd.DataFrame.to_csv(cm, mod_path, sep=',', index=True)
     
     return cm
