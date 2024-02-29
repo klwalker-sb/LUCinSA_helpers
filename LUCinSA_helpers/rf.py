@@ -95,42 +95,6 @@ def get_class_col(lc_mod,lut):
         
     return class_col,lut
 
-def wave(cm_path, uacc = False, pacc = False, weights = False):
-
-    if weights == False:
-        weights = np.ones(30)
-
-    elif weights == "CT":
-        weights = [1, 1, 1, 1, 2, 1, 1, 1, 1]
-        
-    cm = pd.read_csv(cm_path)
-    ua = 0
-    pa = 0
-
-    if uacc == True:
-        count = 0
-        ind = 0
-        for i, j in cm.iterrows():
-            if j[-2] > 0:
-                ua += j[-2] * weights[ind]
-                #print(ua)
-                count += weights[ind]
-            ind += 1
-        return ua/count
-
-    if pacc == True:
-        count = 0
-        ind = 0
-        for i, j in cm.iterrows():
-            if j[-1] > 0:
-                pa += j[-1] * weights[ind]
-                #print(pa)
-                count += weights[ind]
-            ind += 1
-        return pa/count
-
-# open the csvs and add a new row with the new data
-
 def balance_training_data(lut, pixdf, out_dir, new_name, cutoff, mix_factor):
     '''
     balances class samples based on map proportion, relative to sample size for class with max map proportion
@@ -256,7 +220,9 @@ def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_c
     '''
     #print(f'Confusion Matrix: {cm}')
     if print_cm == True:
-        pd.DataFrame.to_csv(cm,os.path.join(out_dir,f'{model_name}_{lc_mod_acc}.csv'), sep=',', index=True)
+        mod_path = os.path.join(out_dir,'{}_{}.csv'.format(model_name,lc_mod_acc))
+        print(mod_path)
+        pd.DataFrame.to_csv(cm, mod_path, sep=',', index=True)
     
     return cm
 
@@ -271,6 +237,145 @@ def quick_accuracy(X_test, y_test, rf_model, lc_mod, out_dir,model_name,lut):
     
     return accuracy, cm
 
+def small_acc(rf_mod, lut, one = False, half = False):
+    if one == True:
+        one_ha = rf_mod.loc[rf_mod['smalls_1ha'] == 1]
+        print('There are {} 1ha smallholder samples in the holdout.'.format(one_ha.shape[0]))
+        one_ha_cropNoCrop = get_confusion_matrix(one_ha['pred'], one_ha['label'],lut,'all','cropNoCrop',False,None,None)
+        return one_ha_cropNoCrop.head(1)["crop"]/one_ha_cropNoCrop.head(1)["All"]
+    
+    if half == True:
+        half_ha = rf_mod.loc[rf_mod['smalls_halfha'] == 1]
+        print('There are {} half-ha smallholder samples in the holdout.'.format(half_ha.shape[0]))
+        half_ha_cropNoCrop = get_confusion_matrix(half_ha['pred'], half_ha['label'],lut,'all','cropNoCrop',False,None,None)
+        return half_ha_cropNoCrop.head(1)["crop"]/half_ha_cropNoCrop.head(1)["All"]
+
+def wave(cm_path, uacc = False, pacc = False, weights = False):
+
+    if weights == False:
+        weights = np.ones(30)
+
+    elif weights == "CT":
+        weights = [1, 1, 1, 1, 2, 1, 1, 1, 1]
+        
+    cm = pd.read_csv(cm_path)
+    ua = 0
+    pa = 0
+
+    if uacc == True:
+        count = 0
+        ind = 0
+        for i, j in cm.iterrows():
+            if j[-2] > 0:
+                ua += j[-2] * weights[ind]
+                #print(ua)
+                count += weights[ind]
+            ind += 1
+        return ua/count
+
+    if pacc == True:
+        count = 0
+        ind = 0
+        for i, j in cm.iterrows():
+            if j[-1] > 0:
+                pa += j[-1] * weights[ind]
+                #print(pa)
+                count += weights[ind]
+            ind += 1
+        return pa/count
+
+# open the csvs and add a new row with the new data
+
+def new_wave(cm_path, stored_path, model_name, rf_scores, pixdf, lut):
+    stored = pd.read_csv(stored_path, index_col = 0)
+    new_data = pd.DataFrame({"Model": [model_name],
+                             "UA": [wave(cm_path, uacc = True)],
+                             "PA": [wave(cm_path, pacc = True)],
+                             "1_ha": [small_acc(rf_scores, lut, one = True)[0]],
+                             "half_ha": [small_acc(rf_scores, lut, half = True)[0]],
+                             "Num_obs": [pixdf["LC25_name"].shape[0]],
+                             "Num_sm_1ha" : [pixdf['smlhld_1ha'].sum()],                    
+                             "Num_sm_halfha" : [pixdf['smlhd_halfha'].sum()]})
+    #print(stored.reset_index(drop=True))
+    #print(new_data.reset_index(drop=True))
+    stored = pd.concat([stored.reset_index(drop = True), new_data.reset_index(drop = True)], ignore_index = True)
+    return stored
+
+def overall_wave(cnc_metrics, ct_path, model_name,pixdf):
+    
+    # iterate through rows of the CNC_metrics dataframe
+    cnc = pd.read_csv(cnc_metrics, index_col = 0)
+    cnc_partial = cnc[cnc["Model"] == model_name]
+
+    # now deal with the CT matrix
+    ct = pd.read_csv(ct_path, index_col = 0)
+    ct_partial = [wave(ct_path, uacc = True, weights = "CT"), wave(ct_path, pacc = True, weights = "CT")]
+    
+    cnc_partial = [cnc_partial["UA"], cnc_partial["PA"], cnc_partial["1_ha"], cnc_partial["half_ha"]]
+    #print(cnc_partial)
+    #print(ct_partial)
+
+    overall_metrics = pd.DataFrame({"Model": ["{}".format(model_name)],
+                             "UA": [(2 * cnc_partial[0] + ct_partial[0])/3],
+                             "PA": [(2 * cnc_partial[1] + ct_partial[1])/3],
+                             "1_ha": [cnc_partial[2]],
+                             "half_ha": [cnc_partial[3]],
+                             "Num_obs": [pixdf["LC25_name"].shape[0]],
+                             "Num_sm_1ha" : [pixdf['smlhld_1ha'].sum()],                    
+                             "Num_sm_halfha" : [pixdf['smlhd_halfha'].sum()]})
+    return overall_metrics
+
+def build_weighted_accuracy_table(out_dir,model_name,rf_scores,pixdf,lut):
+    '''
+    take the cms and find take the averages of the UAs and PAs
+    '''
+    types = ["cropNoCrop", "cropType", "veg", "all"] 
+    
+    for idx, i in enumerate(types):
+        sub_dir = os.path.join(out_dir,'{}_cms'.format(i))
+        os.makedirs(sub_dir, exist_ok=True) 
+        cm = get_confusion_matrix(rf_scores['pred'],rf_scores['label'],lut,'all',i,print_cm=True,out_dir=sub_dir,model_name=model_name)
+        #If the output csv files do not already exist, create them:
+        if os.path.isfile(os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i))) == False:
+            if i == 'cropNoCrop':
+                print('CropNoCrop cm: {}'.format(cm))
+                metricsi = pd.DataFrame({"Model": ["{}".format(model_name)],
+                             "UA": [wave(os.path.join(sub_dir,'{}_{}.csv'.format(model_name,i)), uacc = True)],
+                             "PA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), pacc = True)],
+                             "1_ha": [small_acc(rf_scores, lut, one = True)[0]],
+                             "half_ha": [small_acc(rf_scores, lut, half = True)[0]],
+                             "Num_obs": [pixdf["LC25_name"].shape[0]],
+                             "Num_sm_1ha" : [pixdf['smlhld_1ha'].sum()],                    
+                             "Num_sm_halfha" : [pixdf['smlhd_halfha'].sum()]})
+            else:
+                metricsi = pd.DataFrame({"Model": ["{}".format(model_name)],
+                             "UA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), uacc = True)],
+                             "PA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), pacc = True)],
+                             "Num_obs": [pixdf["LC25_name"].shape[0]]}) 
+            print(metricsi)
+            metrics_dir = os.path.join(out_dir,'metrics')
+            os.makedirs(metrics_dir, exist_ok=True) 
+            metricsi.to_csv(os.path.join(metrics_dir,'{}_metrics.csv'.format(i)))
+        else:
+            # open the csvs and add a new row with the new data
+            cmi = new_wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name, i)), 
+                os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)),model_name, rf_scores,pixdf,lut)
+            cmi.to_csv(os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)))
+            print(cmi)
+
+    all_metrics_path = os.path.join(out_dir,'metrics','overall_metrics.csv')
+    overall = overall_wave(os.path.join(out_dir,'metrics','cropNoCrop_metrics.csv'), 
+             os.path.join(out_dir,'cropType_cms','{}_cropType.csv'.format(model_name)),model_name, pixdf)
+    if os.path.isfile(all_metrics_path) == False:
+        overall.to_csv(all_metrics_path)
+    else:
+        #print(overall)
+        stored = pd.read_csv(all_metrics_path, index_col = 0)
+        stored = pd.concat([stored.reset_index(drop = True), overall.reset_index(drop = True)], ignore_index = True)
+        stored.to_csv(all_metrics_path)          
+    
+    return stored
+    
 def prep_test_train(df_in, out_dir, class_col, mod_name):
     
     if isinstance(df_in, pd.DataFrame):
