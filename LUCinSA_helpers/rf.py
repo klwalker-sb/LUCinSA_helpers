@@ -206,6 +206,7 @@ def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_c
     cm['sumcol'] = cm.apply(lambda x: cm.loc['All', x.name] if x.name in cm.columns else 0)
     cm['UA'] = cm['correct']/cm['All']
     cm['PA'] = cm['correct']/cm['sumcol']
+    cm['F1'] = (2 * cm['UA'] * cm['PA'])/(cm['UA'] + cm['PA'])
  
     '''
     crops = lut.loc[lut['LC2'] == 1]
@@ -249,40 +250,35 @@ def small_acc(rf_mod, lut, one = False, half = False):
         half_ha_cropNoCrop = get_confusion_matrix(half_ha['pred'], half_ha['label'],lut,'all','cropNoCrop',False,None,None)
         return half_ha_cropNoCrop.head(1)["crop"]/half_ha_cropNoCrop.head(1)["All"]
 
-def wave(cm_path, uacc = False, pacc = False, weights = False):
+def wave(cm_path, metric, weights = False):
 
     if weights == False:
         weights = np.ones(30)
 
     elif weights == "CT":
-        # CropType = Corn, NoCrop, Rice, ShrubCrop, Smallholder, Soybeans, Sugar, TreeCrops, All (All is not correct in these cms)
+        # CropType = Corn, NoCrop, Rice, ShrubCrop, Smallholder, Soybeans, Sugar, TreeCrops, All (All is not correct in current cms)
         weights = [1, 1, 1, 1, 2, 1, 1, 1, 0]
         
     cm = pd.read_csv(cm_path)
 
-    if uacc == True:
-        cm['uaw'] = cm.apply(lambda row: row['UA'] * weights[row.name], axis=1)
-        cmpos = cm[cm['uaw']>0]
-        score = cmpos['uaw'].sum() / cmpos.shape[0] 
-
-    if pacc == True:
-        cm['paw'] = cm.apply(lambda row: row['PA'] * weights[row.name], axis=1)
-        cmpos = cm[cm['paw']>0]
-        score = cmpos['paw'].sum() / cmpos.shape[0] 
+    cm['weighted'] = cm.apply(lambda row: row[metric] * weights[row.name], axis=1)
+    cmpos = cm[cm['weighted']>0]
+    score = cmpos['weighted'].sum() / cmpos.shape[0] 
 
     return score
 
 def new_wave(cm_path, stored_path, model_name, rf_scores, pixdf, lut):
     stored = pd.read_csv(stored_path, index_col = 0)
     new_data = pd.DataFrame({"Model": [model_name],
-                             "UA": [wave(cm_path, uacc = True)],
-                             "PA": [wave(cm_path, pacc = True)],
+                             "UA": [wave(cm_path, metric='UA')],
+                             "PA": [wave(cm_path, metric='PA')],
+                             "F1": [wave(cm_path, metric='F1')],
                              "1_ha": [small_acc(rf_scores, lut, one = True)[0]],
                              "half_ha": [small_acc(rf_scores, lut, half = True)[0]],
                              "Num_obs": [pixdf["LC25_name"].shape[0]],
                              "Num_sm_1ha" : [pixdf['smlhld_1ha'].sum()],                    
                              "Num_sm_halfha" : [pixdf['smlhd_halfha'].sum()]})
-
+  
     stored = pd.concat([stored.reset_index(drop = True), new_data.reset_index(drop = True)], ignore_index = True)
     return stored
 
@@ -293,11 +289,14 @@ def overall_wave(cnc_metrics, ct_path, model_name,pixdf):
 
     # now calculate weighted values from the cropType matrix:
     ct = pd.read_csv(ct_path, index_col = 0)
-    ct_partial = [wave(ct_path, uacc = True, weights = "CT"), wave(ct_path, pacc = True, weights = "CT")]
+    ct_partial = [wave(ct_path, metric='UA', weights = "CT"), 
+                  wave(ct_path, metric='PA', weights = "CT"), 
+                  wave(ct_path, metric='F1', weights = "CT")]
 
     overall_metrics = pd.DataFrame({"Model": ["{}".format(model_name)],
                              "UA": [(2 * cnc_partial["UA"].values[0] + ct_partial[0])/3],
                              "PA": [(2 * cnc_partial["PA"].values[0] + ct_partial[1])/3],
+                             "F1": [(2 * cnc_partial["F1"].values[0] + ct_partial[2])/3],
                              "1_ha": [cnc_partial["1_ha"].values[0]],
                              "half_ha": [cnc_partial["half_ha"].values[0]],
                              "Num_obs": [pixdf["LC25_name"].shape[0]],
@@ -320,8 +319,9 @@ def build_weighted_accuracy_table(out_dir,model_name,rf_scores,pixdf,lut):
             if i == 'cropNoCrop':
                 print('CropNoCrop cm: {}'.format(cm))
                 metricsi = pd.DataFrame({"Model": ["{}".format(model_name)],
-                             "UA": [wave(os.path.join(sub_dir,'{}_{}.csv'.format(model_name,i)), uacc = True)],
-                             "PA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), pacc = True)],
+                             "UA": [wave(os.path.join(sub_dir,'{}_{}.csv'.format(model_name,i)), metric='UA')],
+                             "PA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), metric='PA')],
+                             "F1": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), metric='F1')],
                              "1_ha": [small_acc(rf_scores, lut, one = True)[0]],
                              "half_ha": [small_acc(rf_scores, lut, half = True)[0]],
                              "Num_obs": [pixdf["LC25_name"].shape[0]],
@@ -329,19 +329,20 @@ def build_weighted_accuracy_table(out_dir,model_name,rf_scores,pixdf,lut):
                              "Num_sm_halfha" : [pixdf['smlhd_halfha'].sum()]})
             else:
                 metricsi = pd.DataFrame({"Model": ["{}".format(model_name)],
-                             "UA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), uacc = True)],
-                             "PA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), pacc = True)],
+                             "UA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), metric='UA')],
+                             "PA": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), metric='PA')],
+                             "F1": [wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name,i)), metric='F1')],
                              "Num_obs": [pixdf["LC25_name"].shape[0]]}) 
-            print(metricsi)
+            #print(metricsi)
             metrics_dir = os.path.join(out_dir,'metrics')
             os.makedirs(metrics_dir, exist_ok=True) 
             metricsi.to_csv(os.path.join(metrics_dir,'{}_metrics.csv'.format(i)))
-
-        # open the csvs and add a new row with the new data
-        cmi = new_wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name, i)), 
-            os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)),model_name, rf_scores,pixdf,lut)
-        cmi.to_csv(os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)))
-        #print(cmi)
+        else:
+            # open the csvs and add a new row with the new data
+            cmi = new_wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name, i)), 
+                os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)),model_name, rf_scores,pixdf,lut)
+            cmi.to_csv(os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)))
+            #print(cmi)
 
     all_metrics_path = os.path.join(out_dir,'metrics','overall_metrics.csv')
     overall = overall_wave(os.path.join(out_dir,'metrics','cropNoCrop_metrics.csv'), 
@@ -353,7 +354,7 @@ def build_weighted_accuracy_table(out_dir,model_name,rf_scores,pixdf,lut):
         stored = pd.read_csv(all_metrics_path, index_col = 0)
         stored = pd.concat([stored.reset_index(drop = True), overall.reset_index(drop = True)], ignore_index = True)
         stored.to_csv(all_metrics_path)          
-    
+    print(stored)
     return stored
     
 def prep_test_train(df_in, out_dir, class_col, mod_name):
