@@ -256,35 +256,22 @@ def wave(cm_path, uacc = False, pacc = False, weights = False):
         weights = np.ones(30)
 
     elif weights == "CT":
-        weights = [1, 1, 1, 1, 2, 1, 1, 1, 1]
+        # CropType = Corn, NoCrop, Rice, ShrubCrop, Smallholder, Soybeans, Sugar, TreeCrops
+        weights = [1, 1, 1, 1, 2, 1, 1, 1, 0]
         
     cm = pd.read_csv(cm_path)
-    ua = 0
-    pa = 0
 
     if uacc == True:
-        count = 0
-        ind = 0
-        for i, j in cm.iterrows():
-            if j[-2] > 0:
-                ua += j[-2] * weights[ind]
-                #print(ua)
-                count += weights[ind]
-            ind += 1
-        return ua/count
+        cm['uaw'] = cm.apply(lambda row: row['UA'] * weights[row.name], axis=1)
+        cmpos = cm[cm['uaw']>0]
+        score = cmpos['uaw'].sum() / cmpos.shape[0] 
 
     if pacc == True:
-        count = 0
-        ind = 0
-        for i, j in cm.iterrows():
-            if j[-1] > 0:
-                pa += j[-1] * weights[ind]
-                #print(pa)
-                count += weights[ind]
-            ind += 1
-        return pa/count
+        cm['paw'] = cm.apply(lambda row: row['PA'] * weights[row.name], axis=1)
+        cmpos = cm[cm['paw']>0]
+        score = cmpos['paw'].sum() / cmpos.shape[0] 
 
-# open the csvs and add a new row with the new data
+    return score
 
 def new_wave(cm_path, stored_path, model_name, rf_scores, pixdf, lut):
     stored = pd.read_csv(stored_path, index_col = 0)
@@ -302,18 +289,16 @@ def new_wave(cm_path, stored_path, model_name, rf_scores, pixdf, lut):
     return stored
 
 def overall_wave(cnc_metrics, ct_path, model_name,pixdf):
-    
-    # iterate through rows of the CNC_metrics dataframe
+    # Read the cropNoCrop matrix and extract values
     cnc = pd.read_csv(cnc_metrics, index_col = 0)
     cnc_partial = cnc[cnc["Model"] == model_name]
 
-    # now deal with the CT matrix
+    # now calculate weighted values from the cropType matrix:
     ct = pd.read_csv(ct_path, index_col = 0)
     ct_partial = [wave(ct_path, uacc = True, weights = "CT"), wave(ct_path, pacc = True, weights = "CT")]
     
-    cnc_partial = [cnc_partial["UA"], cnc_partial["PA"], cnc_partial["1_ha"], cnc_partial["half_ha"]]
-    #print(cnc_partial)
-    #print(ct_partial)
+    cnc_partial = [cnc_partial["UA"].values[0], cnc_partial["PA"].values[0], 
+                   cnc_partial["1_ha"].values[0], cnc_partial["half_ha"].values[0]]
 
     overall_metrics = pd.DataFrame({"Model": ["{}".format(model_name)],
                              "UA": [(2 * cnc_partial[0] + ct_partial[0])/3],
@@ -356,12 +341,12 @@ def build_weighted_accuracy_table(out_dir,model_name,rf_scores,pixdf,lut):
             metrics_dir = os.path.join(out_dir,'metrics')
             os.makedirs(metrics_dir, exist_ok=True) 
             metricsi.to_csv(os.path.join(metrics_dir,'{}_metrics.csv'.format(i)))
-        else:
-            # open the csvs and add a new row with the new data
-            cmi = new_wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name, i)), 
-                os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)),model_name, rf_scores,pixdf,lut)
-            cmi.to_csv(os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)))
-            print(cmi)
+
+        # open the csvs and add a new row with the new data
+        cmi = new_wave(os.path.join(sub_dir.format(i),'{}_{}.csv'.format(model_name, i)), 
+            os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)),model_name, rf_scores,pixdf,lut)
+        cmi.to_csv(os.path.join(out_dir,'metrics','{}_metrics.csv'.format(i)))
+        print(cmi)
 
     all_metrics_path = os.path.join(out_dir,'metrics','overall_metrics.csv')
     overall = overall_wave(os.path.join(out_dir,'metrics','cropNoCrop_metrics.csv'), 
