@@ -183,20 +183,23 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                             pvars = [s for s in pheno_vars if s.split("_")[1] == temp]
                             if len(pvars) > 0:
                                 sys.stderr.write('extracting {} pheno vars for {}... \n'.format(temp,sip))
-                                sys.stderr.write('{} \n'.format(pvars))
-                               
-                                phen_bands = [f'maxv_{temp}', f'minv_{temp}', f'med_{temp}', f'slp_{temp}', f'numrot_{temp}',
+                                if len(pvars) == 1:
+                                    phen_comp = os.path.join(comp_dir, '{:06d}_{}.tif'.format(int(cell),pvars[0]))
+                                    phen_bands = pvars
+                                else:
+                                    phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen_{}.tif'.format(int(cell),start_yr,sip,temp))
+                                    #sys.stderr.write('{} \n'.format(pvars))
+                                    phen_bands = [f'maxv_{temp}', f'minv_{temp}', f'med_{temp}', f'slp_{temp}', f'numrot_{temp}',
                                               f'posd_{temp}', f'posv_{temp}', f'numlow_{temp}', f'tosd_{temp}', f'p1amp_{temp}',
                                               f'sosd_{temp}', f'sosv_{temp}', f'eosd_{temp}', f'eosv_{temp}', f'rog_{temp}', 
-                                              f'ros_{temp}',f'los_{temp}']
-                                phen_comp = os.path.join(comp_dir, '{:06d}_{}_{}_Phen_{}.tif'
-                                                         .format(int(cell),start_yr,sip,temp))
+                                              f'ros_{temp}',f'los_{temp}']  
                                 sys.stderr.write('looking for {} \n'.format(phen_comp)) 
                                 if os.path.exists(phen_comp) == True:
                                     sys.stderr.write('getting variables from existing stack \n')
                                 else:
-                                    sys.stderr.write('no existing stack. calculating new varaibles...')
-                                    phen_comp = make_pheno_vars(cell,img_dir,comp_dir,start_yr,start_mo,sip,phen_bands,500,[30,0])
+                                    continue
+                                    #sys.stderr.write('no existing stack. calculating new varaibles...')
+                                    #phen_comp = make_pheno_vars(cell,img_dir,comp_dir,start_yr,start_mo,sip,phen_bands,500,[30,0])
                                 phen_vars = rio.open(phen_comp,'r')
                                 for b, band in enumerate(phen_bands):
                                     sys.stdout.write('{}:{}'.format(b,band))
@@ -221,7 +224,8 @@ def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_
                             if os.path.exists(os.path.join(out_dir_int,'{}.tif'.format(siv))):
                                 comp = os.path.join(out_dir_int,'{}.tif'.format(siv))
                             else:
-                                comp = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, [siv])
+                                continue
+                                #comp = make_ts_composite(cell, img_dir, out_dir_int, start_yr, start_mo, si, siv)
                             with rio.open(comp, 'r') as src:
                                 vals = src.read(1)
                                 varn = ('var_{}_{}'.format(si,siv))
@@ -286,7 +290,7 @@ def reduce_variable_dataframe(ptdf, drop_indices, drop_vars, drop_combo, out_dir
     print('new model has bands: {}'.format(final_cols))
     new_model = getset_feature_model(feature_mod_dict,new_feature_mod,spec_indices=None,si_vars=None,
                                      spec_indices_pheno=None,pheno_vars=None, singleton_vars=None,poly_vars=None, combo_bands=final_cols)
-    df_out = pd.DataFrame.to_csv(ptsdf,os.path.join(out_dir,'{}.csv'.format(new_feature_mod)), sep=',', index=True)
+    df_out = pd.DataFrame.to_csv(ptsdf,os.path.join(out_dir,'ptsgdb_{}.csv'.format(new_feature_mod)), sep=',', index=True)
     print('created new model {} in {}'.format(new_feature_mod,out_dir))
     
     return df_out

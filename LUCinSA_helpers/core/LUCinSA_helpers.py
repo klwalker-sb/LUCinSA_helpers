@@ -204,12 +204,13 @@ def main():
             subparser.add_argument('--importance_method', dest ='importance_method', help='Permultation | Inference | None')
             subparser.add_argument('--ran_hold', dest ='ran_hold', 
                                    help='fixed random number, for repetition of same dataset', type=int, default=0)
-            subparser.add_argument('--samp_model_name', dest ='samp_model_name', 
-                                   help='name of sample model')                          
+            subparser.add_argument('--samp_model_name', dest ='samp_model_name', help='name of sample model')                          
         if process == 'rf_classification':
             subparser.add_argument('--rf_mod', dest='rf_mod',
                                    help='path to existing random forest model, or None if model is to be created')
             subparser.add_argument('--img_out', dest='img_out',help='Full path name of classified image to be created')
+        if process == 'rf_model':
+            subparser.add_argument('--model_name', dest='model_name', help='format: sampleMod_FeatureMod_Yr')
                                   
     args = parser.parse_args()
 
@@ -374,8 +375,8 @@ def main():
                  feature_model = args.feature_model,
                  start_yr = args.start_yr,
                  start_mo = args.start_mo,
-                 samp_model_name = args.samp_model_name,
-                 feature_model_dict = args.feature_model_dict,
+                 samp_mod_name = args.samp_model_name,
+                 feature_mod_dict = args.feature_mod_dict,
                  singleton_var_dict = args.singleton_var_dict,
                  rf_mod = args.rf_mod,
                  img_out = args.img_out,

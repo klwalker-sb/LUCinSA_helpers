@@ -12,7 +12,7 @@ import xarray as xr
 import pandas as pd
 import bottleneck
 
-def add_var_to_stack(arr, var, attrs, out_dir, band_names, ras_list, **gw_args):
+def add_var_to_stack(arr, var, attrs, out_dir, phen_band_names, ras_list, **gw_args):
     
     ras = os.path.join(out_dir,f'{var}.tif')
     if os.path.exists(ras) == False:  
@@ -20,8 +20,8 @@ def add_var_to_stack(arr, var, attrs, out_dir, band_names, ras_list, **gw_args):
         print(f'making {var} raster') 
         arr.gw.to_raster(ras,**gw_args)
     ras_list.append(ras)
-    band = str(var.split('_')[0:1])
-    band_names.append(band)
+    band = var.rsplit('_', 1)[0]
+    phen_band_names.append(band)
 
 def find_peak_simp(ts_stack,ds_stack):
     
@@ -88,7 +88,7 @@ def find_peaks_robust(ts_stack, ds_stack,peak_thresh,base_thresh,invert):
     
     return numpeaks, peak0d, peak0v, peak9d, peak9v
         
-def find_peaks_deriv(ts_stack,ds_stack,band_names,peak_thresh,base_thresh,ras_list,out_dir, **gw_args):
+def find_peaks_deriv(ts_stack,ds_stack,phen_band_names,peak_thresh,base_thresh,ras_list,out_dir, **gw_args):
     '''
     method to find the first peak of a season (in case more than one peaks occur)
     '''
@@ -181,24 +181,24 @@ def get_senescence(ts_stack, ds_stack, peak_time, method='step'):
     return eos, eosv
             
 def prep_pheno_bands(pheno_vars,ts_stack,ds_stack,ts_stack_padded, ds_stack_padded, out_dir,start_yr, 
-                     temp,start_doy,sigdif,band_names,ras_list,**gw_args):
+                     temp,start_doy,sigdif,phen_band_names,ras_list,**gw_args):
    
     with gw.open(ts_stack, time_names = ds_stack) as src:
         attrs = src.attrs.copy()
     
     if f'maxv_{temp}' in pheno_vars or f'amp_{temp}' in pheno_vars:
         mmax = src.max(dim='time').astype('int16')
-        add_var_to_stack(mmax,f'maxv_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args) 
+        add_var_to_stack(mmax,f'maxv_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args) 
     if f'minv_{temp}' in pheno_vars or f'amp_{temp}' in pheno_vars:
         mmin = src.min(dim='time').astype('int16')
-        add_var_to_stack(mmin,f'minv_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args) 
+        add_var_to_stack(mmin,f'minv_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args) 
     if f'amp_{temp}' in pheno_vars:
         aamp =  (mmax - mmin)
-        add_var_to_stack(aamp,f'amp_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+        add_var_to_stack(aamp,f'amp_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
         
     mmed = src.median(dim='time').astype('int16')
     if f'med_{temp}' in pheno_vars:
-        add_var_to_stack(mmed,f'med_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+        add_var_to_stack(mmed,f'med_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
     
     if f'slp_{temp}' in pheno_vars:
         slp_path = os.path.join(out_dir,f'slp_{temp}_{start_yr}.tif')
@@ -208,13 +208,13 @@ def prep_pheno_bands(pheno_vars,ts_stack,ds_stack,ts_stack_padded, ds_stack_padd
                                                                 deg=1,skipna=True).polyfit_coefficients[0].astype('int16')    
         else:
             vslope = slp_path
-        add_var_to_stack(vslope,f'slp_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+        add_var_to_stack(vslope,f'slp_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
     
     peaks = find_peaks_robust(ts_stack,ds_stack, mmed+int(sigdif), mmed, invert=False)
     ## peaks returns number of peaks, date-of-1st-peak, val-of-first-peak, date-of-last-peak, val-of-last-peak
    
     if f'numrot_{temp}' in pheno_vars:
-        add_var_to_stack(peaks[0],f'numrot_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+        add_var_to_stack(peaks[0],f'numrot_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
     
     if f'posd_{temp}' in pheno_vars:
         posd_path = os.path.join(out_dir,f'posd_{temp}_{start_yr}.tif')
@@ -225,11 +225,11 @@ def prep_pheno_bands(pheno_vars,ts_stack,ds_stack,ts_stack_padded, ds_stack_padd
             posd2 = peak1s.where(peak1s >= start_doy, (peak1s + 365)).fillna(0).astype('int16')     
         else:
             posd2 = posd_path
-        add_var_to_stack(posd2,f'posd_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+        add_var_to_stack(posd2,f'posd_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
     
     posv = peaks[2].where(peaks[0] > 0, mmed).astype('int16').squeeze() 
     if f'posv_{temp}' in pheno_vars:                       
-        add_var_to_stack(posv,f'posv_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)        
+        add_var_to_stack(posv,f'posv_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)        
         
     if any(v in pheno_vars for v in [f'tosd_{temp}', f'tosv_{temp}',f'numlow_{temp}',f'p1amp_{temp}']):
         tosd_path = os.path.join(out_dir,f'tosd_{temp}_{start_yr}.tif')
@@ -248,16 +248,16 @@ def prep_pheno_bands(pheno_vars,ts_stack,ds_stack,ts_stack_padded, ds_stack_padd
             tosv = tosv_path
             numlow = numlow_path
         if f'numlow_{temp}' in pheno_vars:
-            add_var_to_stack(numlow,f'numlow_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(numlow,f'numlow_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
         if f'tosd_{temp}' in pheno_vars:
-            add_var_to_stack(tosd2,f'tosd_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(tosd2,f'tosd_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
         if f'tosv_{temp}' in pheno_vars:      
-            add_var_to_stack(tosv,f'tosv_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(tosv,f'tosv_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
         if f'p1amp_{temp}' in pheno_vars:                 
             p1amp00 = (posv - tosv).where(peaks[0] > 0, (mmed - tosv))  
             p1amp0 = p1amp00.where(numlow > 0, (posv - mmed))
             p1amp = p1amp0.where(((p1amp0 > 0) & ((peaks[0] > 0) | (numlow > 0))), 0).fillna(0).astype('int16').squeeze() 
-            add_var_to_stack(p1amp,f'p1amp_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(p1amp,f'p1amp_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
 
     if any(v in pheno_vars for v in [f'sosd_{temp}',f'sosv_{temp}',f'rog_{temp}', f'los_{temp}']):
         sosv_path = os.path.join(out_dir,f'sosv_{temp}_{start_yr}.tif')
@@ -273,9 +273,9 @@ def prep_pheno_bands(pheno_vars,ts_stack,ds_stack,ts_stack_padded, ds_stack_padd
             sosd2 = sosd_path
             sosv = sosv_path
         if f'sosd_{temp}' in pheno_vars :
-            add_var_to_stack(sosd2,f'sosd_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)       
+            add_var_to_stack(sosd2,f'sosd_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)       
         if f'sosv_{temp}' in pheno_vars:
-            add_var_to_stack(sosv,f'sosv_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(sosv,f'sosv_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
     if any(v in pheno_vars for v in [f'eosd_{temp}',f'eosv_{temp}',f'ros_{temp}', f'los_{temp}']):
         eosv_path = os.path.join(out_dir,f'eosv_{temp}_{start_yr}.tif')
         eosd_path = os.path.join(out_dir,f'eosd_{temp}_{start_yr}.tif')
@@ -290,9 +290,9 @@ def prep_pheno_bands(pheno_vars,ts_stack,ds_stack,ts_stack_padded, ds_stack_padd
             eosd2 = eosd_path
             eosv = eosv_path
         if f'eosd_{temp}' in pheno_vars:
-            add_var_to_stack(eosd2,f'eosd_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(eosd2,f'eosd_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
         if f'eosv_{temp}' in pheno_vars:
-            add_var_to_stack(eosv,f'eosv_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(eosv,f'eosv_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
  
     if f'rog_{temp}' in pheno_vars or f'ros_{temp}' in pheno_vars:
         with gw.open(os.path.join(out_dir,f'posd_{temp}_{start_yr}.tif')) as posd2:
@@ -302,18 +302,18 @@ def prep_pheno_bands(pheno_vars,ts_stack,ds_stack,ts_stack_padded, ds_stack_padd
                 with gw.open(os.path.join(out_dir,f'sosv_{temp}_{start_yr}.tif')) as sosv:
                     rog = sosd2.where(sosd2 == 0, (posv - sosv) / (posd2 - sosd2))
                     rog = rog.astype('int16')
-            add_var_to_stack(rog,f'rog_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(rog,f'rog_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
         if f'ros_{temp}' in pheno_vars or f'ros_{temp}' in pheno_vars:
             with gw.open(os.path.join(out_dir,f'eosd_{temp}_{start_yr}.tif')) as eosd2:      
                 with gw.open(os.path.join(out_dir,f'eosv_{temp}_{start_yr}.tif')) as eosv:
                     ros = eosd2.where(eosd2 == 0, (posv - eosv) / (posd2 - eosd2)) 
                     ros = ros.astype('int16')
-            add_var_to_stack(ros,f'ros_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(ros,f'ros_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
         if f'los_{temp}' in pheno_vars:
             with gw.open(os.path.join(out_dir,f'sosd_{temp}_{start_yr}.tif')) as sosd2:
                 with gw.open(os.path.join(out_dir,f'eosd_{temp}_{start_yr}.tif')) as eosd2:
                     los = eosd2 - sosd2
-            add_var_to_stack(los,f'los_{temp}_{start_yr}',attrs,out_dir,band_names,ras_list,**gw_args)
+            add_var_to_stack(los,f'los_{temp}_{start_yr}',attrs,out_dir,phen_band_names,ras_list,**gw_args)
 
     return peaks
 
@@ -347,7 +347,7 @@ def make_pheno_vars(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,pheno
         pad_days = [0,0]
     else:
         print('padded will add {} days on left and {} days on right \n'.format(pad_days[0],pad_days[1]))
-    print('start doy is: {}, padded start_doy is {}'.format(start_doy, start_doy - pad_days[1]))
+    print('start doy is: {}, padded start_doy is {}'.format(start_doy, start_doy - pad_days[0]))
     for img in sorted(os.listdir(img_dir)):
         if img.endswith('.tif'):
             ## ts images are named YYYYDDD with YYYY=year and DDD=doy
@@ -393,24 +393,25 @@ def make_pheno_vars(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,pheno
                     ts_stack_wet_padded.append(os.path.join(img_dir,img))
                     ds_stack_wet_padded.append(img_date)   
     ras_list = []
-    band_names = []
+    phen_band_names = []
                 
     gw_args = {'verbose':1,'n_workers':1,'n_threads':1,'n_chunks':254, 'gdal_cache':64,'overwrite':True}
     
     ## Convert image stack to XArray using geowombat:
     yr_bands = [b for b in pheno_vars if "_" not in b or b.split("_")[1] == 'yr']
     if len(yr_bands) > 0:
-        sys.stderr.write('working on yr_band {} \n'.format(yr_bands))
-        pheno_comp = prep_pheno_bands(pheno_vars, ts_stack, ds_stack, None, None, 
-                                      out_dir,start_yr,'yr',start_doy, sigdif, band_names, ras_list, **gw_args)
+        sys.stderr.write('working on yr_bands {} \n'.format(yr_bands))
+        pheno_comp = prep_pheno_bands(yr_bands, ts_stack, ds_stack, None, None, 
+                                      out_dir,start_yr,'yr',start_doy, sigdif, phen_band_names, ras_list, **gw_args)
 
     
     wet_bands = [b for b in pheno_vars if "_" in b and b.split("_")[1] == 'wet']
     if len(wet_bands) > 0:
-        pheno_comp = prep_pheno_bands(pheno_vars, ts_stack_wet, ds_stack_wet, ts_stack_wet_padded, ds_stack_wet_padded,
-                                      out_dir,start_yr,'wet', start_doy, sigdif, band_names, ras_list, **gw_args)
+        sys.stderr.write('working on wet_bands {} \n'.format(wet_bands))
+        pheno_comp = prep_pheno_bands(wet_bands, ts_stack_wet, ds_stack_wet, ts_stack_wet_padded, ds_stack_wet_padded,
+                                      out_dir,start_yr,'wet', start_doy, sigdif, phen_band_names, ras_list, **gw_args)
         
-    sys.stderr.write('writing stack for pheno_vars:{}'.format(band_names))
+    sys.stderr.write('writing stack for pheno_vars:{} \n'.format(phen_band_names))
     if len(ras_list)<len(pheno_vars):
         sys.stderr.write('oops--got an unknown band')
          
@@ -422,18 +423,21 @@ def make_pheno_vars(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,pheno
             
         # Read each layer and write it to stack
         
-        out_ras = os.path.join(out_dir,'{:06d}_{}_{}_Phen_wet.tif'.format(int(grid_cell),start_yr,spec_index))
+        if len(ras_list) == 1:
+            out_ras = os.path.join(out_dir,'{:06d}_{}.tif'.format(int(grid_cell),wet_bands[0]))
+        else:
+            out_ras = os.path.join(out_dir,'{:06d}_{}_{}_Phen_wet.tif'.format(int(grid_cell),start_yr,spec_index))
 
         with rio.open(out_ras, 'w', **meta) as dst:
             for id, layer in enumerate(ras_list, start=1):
                 with rio.open(layer) as src1:
                     dst.write(src1.read(1),id)
-            dst.descriptions = tuple(band_names)
+            dst.descriptions = tuple(phen_band_names)
    
     dry_bands = [b for b in pheno_vars if "_" in b and b.split("_")[1] == 'dry']
     if len(dry_bands) > 0:
-        pheno_comp = prep_pheno_bands(pheno_vars, ts_stack_dry, ds_stack_dry, ts_stack_dry_padded, ds_stack_dry_padded, 
-                         out_dir,start_yr,'dry', start_doy, sigdif, band_names, ras_list, **gw_args)
+        pheno_comp = prep_pheno_bands(dry_bands, ts_stack_dry, ds_stack_dry, ts_stack_dry_padded, ds_stack_dry_padded, 
+                         out_dir,start_yr,'dry', start_doy, sigdif, phen_band_names, ras_list, **gw_args)
     
 
-    return out_ras
+    return out_ras, phen_band_names
