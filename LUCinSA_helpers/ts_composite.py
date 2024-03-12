@@ -2,6 +2,7 @@
 # coding: utf-8
 
 import os
+import sys
 from pathlib import Path
 import datetime
 import rasterio as rio
@@ -10,6 +11,44 @@ import geowombat as gw
 import xarray as xr
 import pandas as pd
 
+def check_ts_windows(cell_list, processed_dir, spec_indices, start_check, end_check):
+    cells = []
+    if isinstance(cell_list, list):
+        cells = cell_list
+    elif isinstance(cell_list, str) and cell_list.endswith('.csv'): 
+        with open(cell_list, newline='') as cell_file:
+            for row in csv.reader(cell_file):
+                cells.append (row[0])
+    elif isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
+        cells.append(cell_list) 
+    
+    for ix in spec_indices:
+        sys.stdout.write('WORKING ON {}..... \n'.format(ix))
+        for cell in cells:
+            #sys.stdout.write('  checking cell {} \n ....'.format(cell))
+            ts_dir = os.path.join(processed_dir,'{:06d}'.format(int(cell)),'brdf_ts','ms',ix)
+            if not os.path.exists(ts_dir):
+                sys.stdout.write('    ERROR: no {} created for cell {} \n'.format(ix,cell))
+            else: 
+                ts_imgs = sorted([im for im in os.listdir(ts_dir) if im.endswith('.tif')])
+                first_img_date = int(ts_imgs[0][:7])
+                last_img_date = int(ts_imgs[-1][:7])
+                if first_img_date > start_check:
+                    sys.stdout.write('    ERROR: cell {} index {} starts at {} \n'.format(cell, ix, first_img_date))
+                elif last_img_date < end_check:
+                    sys.stdout.write('    ERROR: cell {} index {} ends at {} \n'.format(cell, ix, last_img_date))            
+                else:
+                    with gw.open(os.path.join(ts_dir,ts_imgs[-1])) as src:
+                        windows = list(src.gw.windows(row_chunks=256, col_chunks=256))
+                    for w in windows:
+                        with rio.open(os.path.join(ts_dir,ts_imgs[-1]), mode='r') as src:
+                            block = src.read(1, window=w)
+                            if block.mean() != 0:
+                                continue
+                            else:
+                                sys.stdout.write('  ERROR: Cell {}, index {} missing data for w {} \n'.format(cell,ix,w))
+                    
+        
 def add_var_to_stack(arr, si_var, attrs, out_dir, comp_band_names, ras_list, **gw_args):
     arr.attrs = attrs
     ras = os.path.join(out_dir,f'{si_var}.tif')

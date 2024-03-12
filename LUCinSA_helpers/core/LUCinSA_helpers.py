@@ -2,7 +2,7 @@
 import argparse
 from LUCinSA_helpers.check_log_files_dl import check_dl_logs
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
-from LUCinSA_helpers.ts_composite import make_ts_composite
+from LUCinSA_helpers.ts_composite import make_ts_composite, check_ts_windows
 from LUCinSA_helpers.pheno import make_pheno_vars
 from LUCinSA_helpers.file_checks import reconstruct_db, get_cell_status, check_valid_pixels, update_cell_status_db
 from LUCinSA_helpers.file_checks import print_files_in_multiple_directories
@@ -39,6 +39,7 @@ def main():
     available_processes = [
                            'version',
                            'check_dl_logs',
+                           'check_ts_windows',
                            'get_cell_status',
                            'update_summary_db',
                            'get_time_series', 
@@ -107,10 +108,14 @@ def main():
             subparser.add_argument('--out_dir', dest='out_dir', help='directory to print list to if print_list==True', default=None)
             
         if process == 'check_ts_windows':
+            subparser.add_argument('--cell_list', dest='cell_list', help='list of cells to check', default=None)
             subparser.add_argument('--processed_dir', dest='processed_dir', help='path to main directory with ts indices') 
-            subparser.add_argument('-- grid_cell', dest='grid_cell', help='grid cell # (1 to 6 digits)')
-            subparser.add_argument('-- spec_index', dest='spec-index', help='spectral index to be processed', default='evi2')
-        
+            subparser.add_argument('--spec_indices', dest='spec_indices', help='list of spectral index to be checked', default='evi2')
+            subparser.add_argument('--start_check', dest='start_check', help='7-digit YYYYDOY of earliest date needed in series',
+                                   default=2000200)
+            subparser.add_argument('--end_check', dest='start_check', help='7-digit YYYYDOY of earliest date needed in series',
+                                   default=2022300)
+            
         if process == 'mosaic':
             subparser.add_argument('--cell_list', dest='cell_list', help='list of cells to mosiac', default=None)
             subparser.add_argument('--in_dir_main', dest='in_dir_main', help='overarching directory with all cells', default=None)
@@ -211,7 +216,10 @@ def main():
             subparser.add_argument('--img_out', dest='img_out',help='Full path name of classified image to be created')
         if process == 'rf_model':
             subparser.add_argument('--model_name', dest='model_name', help='format: sampleMod_FeatureMod_Yr')
-                                  
+            subparser.add_argument('--feature_model', dest = 'feature_model', 
+                                   help='unique name for variable combo (start_Yr (spec_indices*si_vars + singleton_vars + poly_vars))')
+            subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
+                                   help='path to dict defining variable model names. (see example in main folder of this repo)')                      
     args = parser.parse_args()
 
     if args.process == 'version':
@@ -366,7 +374,9 @@ def main():
                  importance_method = args.importance_method,
                  ran_hold = args.ran_hold,
                  model_name = args.model_name,
-                 lut = args.lut)
+                 lut = args.lut,
+                 feature_model = args.feature_model,
+                 feature_mod_dict = args.feature_mod_dict)
                                    
     if args.process == 'rf_classification':
         rf_classification(in_dir = args.in_dir,
@@ -395,10 +405,12 @@ def main():
                  out_dir = args.out_dir,
                  scratch_dir = args.scratch_dir)
 
-    #if process == 'check_ts_windows':
-    #    check_ts_windows(processed_dir = args.processed_dir,
-    #                     grid_cell = args.grid_cell,
-    #                     spec_index = args.spec_index)
+    if process == 'check_ts_windows':
+        check_ts_windows(cell_list = check_for_list(args.cell_list),
+                         processed_dir = args.processed_dir,
+                         spec_indices = check_for_list(args.spec_indices),
+                         start_check = args.start_check,
+                         end_check = args.end_check)
         
 if __name__ == '__main__':
     main()

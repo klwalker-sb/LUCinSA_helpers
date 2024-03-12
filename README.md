@@ -8,7 +8,7 @@ Helper functions and notebooks to interact with data on High-Performance Computi
 * [check download logs ](#check-download-logs)(`check_dl_logs`)
 * [check processing status for cell ](#check-processing-status-for-cell)(`get_cell_status`)
 * [identify external image errors ](#identify-external-image-errors)(`processing.info` with notebook `1a_ExploreData_FileContent.ipynb`)
-* [identify internal image errors ](#identify-internal-image-errors)(`check_valid_pix`, `check_ts_windows`)
+* [identify internal image errors ](#identify-internal-image-errors)(`check_valid_pix`, `check_ts_windows` with notebook `1t_Final_Processing_Checks`)
 * [view effects of coregistration ](#view-coregistration-effects)(Notebook `1p_ExploreProcessing_coregistration.ipynb`)
 * [interactively select images to include/exclude from thumbnails ](#make-thumbails-for-quality-control)(Notebook `2b_ViewTimeSeriesComposite.ipynb`)
 
@@ -135,12 +135,17 @@ LUCinSA_helpers check_valid_pix \
      --data_source 'stac'  
 ```
 `check_ts_windows` will check whether there is data in all of the windows for time-series outputs.
+  (because time-series smoothing is a memory-intensive process, it is processed in windows(chunks). Processing inturruptions can result in missing windows, which can lead to misclassifications in the end product.
+![alt](/MissingTSwindow_1.jpg)
 ```
 LUCinSA_helpers check_ts_windows \
+     --cell_list [XXXXXX, XXXXXX ...] or path/to/.csv  \ 
      --processed_dir 'path/to/main/ts_directory'  \
-     --grid_cell XXXXXX   \
-     --spec_index 'evi2'  
+     --spec_indices ['evi2','kndvi']  \
+     --start_check YYYYDOY  \
+     --end_check YYYYDOY 
 ```
+                         
 ## view coregistration effects
 
 ## make thumbnails for quality control

@@ -11,6 +11,11 @@ import rasterio as rio
 from collections.abc import Iterable
 from osgeo import gdal, ogr, gdal_array
 from rasterio import mask as mask
+import geowombat as gw
+import xarray as xr
+import dask
+from tqdm import tqdm
+from contextlib import ExitStack
 import osgeo  # needed only if running from Windows
 from shapely.geometry import Polygon
 from sklearn.ensemble import RandomForestClassifier
@@ -24,6 +29,7 @@ from joblib import dump, load
 import csv
 from LUCinSA_helpers.ts_composite import make_ts_composite
 from LUCinSA_helpers.pheno import make_pheno_vars
+
 
 ## Tell GDAL to throw Python exceptions, and register all drivers
 gdal.UseExceptions()
@@ -464,7 +470,7 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
             poly_vars = dic[feature_model]['poly_vars']
             combo_bands = dic[feature_model]['combo_bands']
             band_names = dic[feature_model]['band_names']
-            print('using existing model: {} \n spec_indices = {} \n si_vars = {} \n pheno_vars = {} on {} \n singleton_vars={} \n poly_vars = {}'
+            print('using existing model: {} \n spec_indices = {} \n si_vars = {} \n pheno_vars = {} on {} \n singleton_vars={} \n poly_vars = {} \n '
                   .format(feature_model, spec_indices, si_vars, pheno_vars, spec_indices_pheno, singleton_vars, poly_vars))
         else:
             dic[feature_model] = {}
@@ -636,7 +642,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                             with rio.open(singleton_clipped, 'w', **out_meta) as dst:
                                 dst.write(out_image)
                             stack_paths.append(singleton_clipped)
-                            band_names.append(sf)
+                            band_names.append('sing_{}'.format(sf))
 
                 if poly_vars is not None and poly_vars != 'None':
                     sys.stdout.write('getting poly variables... \n')
@@ -709,20 +715,26 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                     dst.descriptions = tuple(band_names)
                 print('done writing {} with {} bands for cell {} \n'.format(os.path.basename(stack_path),len(band_names),cell))     
         
-    
-def classify_raster(var_stack,rf_path,class_img_out):
-
+def get_predictions_gdal(var_stack,rf_path,class_img_out):
+    '''
+    This is old method to apply random forest model to full raster using gdal.
+    This is no longer in use because the xarray / geowombat method below facilitates better memory management
+       and allows more flexibility in adjusting the stack input to the model
+       To use this method, var_stack must be in the exact same order as the variable inputs to the random forest model
+    '''
     img_ds = gdal.Open(var_stack, gdal.GA_ReadOnly)
 
     img = np.zeros((img_ds.RasterYSize, img_ds.RasterXSize, img_ds.RasterCount),
                gdal_array.GDALTypeCodeToNumericTypeCode(img_ds.GetRasterBand(1).DataType))
-    
+    '''
     ## Cut last 5 variables off of image stack if stack contains polygon data and using NoPoly model
     if 'NoPoly' in os.path.basename(rf_path):
         if 'Poly' in os.path.basename(var_stack) and 'NoPoly' not in os.path.basename(var_stack):
             num_bands = img.shape[2]-5
         else:
             num_bands = img.shape[2]
+    '''
+    num_bands = img.shape[2]
     
     for b in range(num_bands):
         img[:, :, b] = img_ds.GetRasterBand(b + 1).ReadAsArray()
@@ -770,10 +782,12 @@ def classify_raster(var_stack,rf_path,class_img_out):
     except NameError:
         sys.stdout.write('No slicing was necessary! \n')
 
-    print(class_prediction)
+    #sys.stdout.write(class_prediction)
+    return(class_prediction)
+
     class_prediction = class_prediction.reshape(img[:, :, 0].shape)
     sys.stdout.write('Reshaped back to {} \n'.format(class_prediction.shape))
-
+    
     cols = img.shape[1]
     rows = img.shape[0]
 
@@ -784,32 +798,136 @@ def classify_raster(var_stack,rf_path,class_img_out):
     outdata.SetGeoTransform(img_ds.GetGeoTransform())##sets same geotransform as input
     outdata.SetProjection(img_ds.GetProjection())##sets same projection as input
     outdata.GetRasterBand(1).WriteArray(class_prediction)
-    outdata.FlushCache() ##saves to disk!!
-    sys.stdout.write('Image saved to: {}'.format(class_img_out))
-         
-def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut):
+    outdata.FlushCache() ##saves to disk!!  
+
+def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
+    '''
+    apply random forest model to full raster using xarray with geowombat wrapper for named bands and wondowed operations
+    
+    Parameters
+    ----------
+    saved_stack: path to multiband geotiff containing a band for each model variable
+        The bands need to have names that match the model variables
+        The stack can have extra bands; only those used in the model will be used. Likewise, the order of the 
+        bands in the file does not matter, as it will be rearanged to match the model here.
+    model_bands: The ordered bands used in the model. 
+        This can be retrieved from 'band_names' in the feature model dictionary
+    rf_path: The path to the .joblib file with the random forest model information
+    class_img_out:  The path for the classified output image
+    '''
+    sys.stderr.write('getting predictions...')
+    rf = load(rf_path) #this load is from joblib -- careful if there are other packages with 'Load' module
+    
+    chunks=256
+    with rio.open(saved_stack) as src0:
+        profile = dict(blockxsize=chunks,
+            blockysize=chunks,
+            crs=src0.crs,
+            transform=src0.transform,
+            driver='GTiff',
+            height=src0.height,
+            width=src0.width,
+            nodata=0,
+            count=1,
+            dtype='uint8',
+            compress='lzw',
+            tiled=True)
+        
+    ## reduce stack bands to match model variables, ensuring same order as model df 
+    with gw.open(saved_stack) as src0:
+        #sys.stdout.write('{}'.format(src0.attrs))
+        stack_bands = src0.attrs['descriptions']
+    bands_out = []
+    band_names = []
+    for b in model_bands:
+        for i, v in enumerate(stack_bands):
+            if v == b:
+                bands_out.append(i+1)
+                band_names.append(v)
+    #sys.stdout.write('bands used for model: {}'.format(bands_out))
+    
+    new_stack = src0.sel(band=bands_out)
+    new_stack.attrs['descriptions'] = band_names
+    #sys.stdout.write(new_stack.attrs['descriptions'])
+
+    #new_stack = new_stack.chunk({"x": len(new_stack.x), "y": len(new_stack.y)})
+ 
+    with gw.open(saved_stack) as src:
+        windows = list(src.gw.windows(row_chunks=chunks, col_chunks=chunks))
+    
+    for w in tqdm(windows, total=len(windows)):
+        #with ExitStack() as stack:
+        stackblock = new_stack[:, w.row_off:w.row_off+w.height, w.col_off:w.col_off+w.width]
+        
+        X = stackblock.stack(s=('y', 'x'))\
+            .transpose()\
+            .astype('int16')\
+            .fillna(0)\
+            .data\
+            .rechunk((stackblock.gw.row_chunks * stackblock.gw.col_chunks, 1))
+
+        feature_band_count = X.shape[1]
+        #sys.stdout.write('num features in df = {}'.format(feature_band_count))
+            
+        X = dask.compute(X, num_workers=4)[0]
+    
+        class_prediction = rf.predict(X)
+        #sys.stdout.write('class_prediction out = {}'.format(class_prediction))
+        class_out = np.uint8(np.squeeze(class_prediction))
+        class_out = class_out.reshape(w.height, w.width)
+        #sys.stdout.write('class_out = {}'.format(class_out))
+    
+        if not os.path.isfile(class_img_out):
+            with rio.open(class_img_out, mode='w', **profile) as dst:
+                pass
+        with rio.open(class_img_out, mode='r+') as dst:
+            #dst.write(class_out, window=w)
+            dst.write(class_out, indexes=1, window=w)
+        
+def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut, feature_model, feature_mod_dict):
     if isinstance(df_in, pd.DataFrame):
         df = df_in
     else:
         df = pd.read_csv(df_in)
+        
     class_col,lut = get_class_col(lc_mod,lut)
     print('class_col = {}'.format(class_col))
     if '{}_name'.format(class_col) in df.columns:
         df2 = df
     else:
-        df2 = df.merge(lut[['USE_NAME','{}'.format(class_col),'{}_name'.format(class_col)]], left_on='Class',right_on='USE_NAME', how='left')
-    train, ho = prep_test_train(df2, out_dir, class_col, model_name)
-    rf = multiclass_rf(train, out_dir, model_name, lc_mod, importance_method, ran_hold, lut)
-    score = get_holdout_scores(ho, rf[0], class_col, out_dir)
+        df2 = df.merge(lut[['USE_NAME','{}'.format(class_col),'{}_name'.format(class_col)]], 
+                       left_on='Class',right_on='USE_NAME', how='left')
+    
+    df3 = df2.reindex(sorted(df2.columns), axis=1)
+    
+    train, ho = prep_test_train(df3, out_dir, class_col, model_name)
 
-    #add the smallholder indication variables to the output df
+    rf = multiclass_rf(train, out_dir, model_name, lc_mod, importance_method, ran_hold, lut)
+    
+    ## add columns back into feature dict to make sure they are in the right order:
+    ordered_vars = [v[4:] for v in df3.columns.to_list() if v.startswith('var')]
+    print('there are {} variables in the model'.format(len(ordered_vars)))
+    sys.stdout.write('model bands are: {} \n'.format(ordered_vars))
+    
+    with open(feature_mod_dict, 'r+') as feature_model_dict:
+        dic = json.load(feature_model_dict)
+        dic[feature_model].update({'band_names':ordered_vars})
+    with open(feature_mod_dict, 'w') as new_feature_model_dict:
+        json.dump(dic, new_feature_model_dict)
+        
+    score = get_holdout_scores(ho, rf[0], class_col, out_dir)
+    ## add the smallholder indication variables to the output df
     #score = pd.DataFrame(score)
     score["smalls_1ha"] = df["smlhld_1ha"]
     score["smalls_halfha"] = df["smlhd_halfha"]
+
     
     return rf, score
 
-def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_mo, samp_mod_name, feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, spec_indices_pheno=None, pheno_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, combo_bands=None, lc_mod=None, lut=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
+def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_mo, samp_mod_name, 
+                      feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, 
+                      spec_indices_pheno=None, pheno_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, 
+                      combo_bands=None, lc_mod=None, lut=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
     
     spec_indices,si_vars,spec_indices_pheno,pheno_vars,singleton_vars,poly_vars,combo_bands,band_names = getset_feature_model(
                                                                   feature_mod_dict,
@@ -827,7 +945,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
     cells = []
     if isinstance(cell_list, list):
         cells = cell_list
-    elif cell_list.endswith('.csv'): 
+    elif isinstance(cell_list, str) and cell_list.endswith('.csv'): 
         with open(cell_list, newline='') as cell_file:
             for row in csv.reader(cell_file):
                 cells.append (row[0])
@@ -835,6 +953,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         cells.append(cell_list) 
                 
     for cell in cells:
+        sys.stdout.write('working on cell... \n'.format(cell))
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         
         stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
@@ -854,19 +973,29 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
                                         pheno_vars,feature_mod_dict,singleton_vars=None, singleton_var_dict=None, 
                                         poly_vars=None, poly_var_path=None, scratch_dir=None)
         
-        
-        #if img_out == None:
-        class_img_out = os.path.join(cell_dir,'comp','{}.tif'.format(model_name))
+        #if img_out is None:
+        class_img_out = os.path.join(cell_dir,'comp','{:06d}_{}.tif'.format(int(cell),model_name))
         #else:
         #    class_img_out = img_out
         
         if rf_mod != None and os.path.isfile(rf_mod):
             sys.stdout.write('using existing model... \n')
-            classify_raster(var_stack, rf_mod, class_img_out)
         else:
             sys.stdout.write('creating rf model... \n')
-            rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut)
-            classify_raster(var_stack, rf_mod,class_img_out)
+            rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut, feature_model, feature_mod_dict)
 
-
-    return overall_metrics
+        with open(feature_mod_dict, 'r+') as feature_model_dict:
+            dic = json.load(feature_model_dict)
+            model_bands = dic[feature_model]['band_names']
+            sys.stdout.write('model bands from dict: {}: \n'.format(model_bands))
+            sys.stdout.flush()
+            
+        ## Old gdal-based method:
+        #class_prediction = get_predictions_gdal(var_stack,rf_path)
+        ## geowombat / xarray method:
+        class_prediction = get_predictions_gw(var_stack, model_bands, rf_mod, class_img_out)
+        
+        
+        sys.stdout.write('Image saved to: {}'.format(class_img_out))    
+    
+        return None
