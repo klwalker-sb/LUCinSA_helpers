@@ -135,8 +135,8 @@ LUCinSA_helpers check_valid_pix \
      --data_source 'stac'  
 ```
 `check_ts_windows` will check whether there is data in all of the windows for time-series outputs.
-  (because time-series smoothing is a memory-intensive process, it is processed in windows(chunks). Processing inturruptions can result in missing windows, which can lead to misclassifications in the end product.
-![alt](/MissingTSwindow_1.jpg)
+  (because time-series smoothing is a memory-intensive process, it is processed in windows(chunks). Processing interruptions can result in missing windows, which can lead to misclassifications in the end product.
+![alt](/images/MissingTSwindow_1.jpg)
 ```
 LUCinSA_helpers check_ts_windows \
      --cell_list [XXXXXX, XXXXXX ...] or path/to/.csv  \ 
