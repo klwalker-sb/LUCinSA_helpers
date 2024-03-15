@@ -185,11 +185,16 @@ def separate_holdout(training_pix_path, out_dir):
     
     return training_pix_path2, holdout_field_pix_path
 
-def get_confusion_matrix(pred_col, obs_col, lut, lc_mod_map, lc_mod_acc, print_cm=False, out_dir=None, model_name=None):
+def get_confusion_matrix(pred_col, obs_col, class_lut, lc_mod_map, lc_mod_acc, print_cm=False, out_dir=None, model_name=None):
     '''
     returns confusion matrix with optional regrouping of classes based on LUT 
     classification schema and class columns defined in get_class_col
     '''
+    if isinstance(class_lut, pd.DataFrame):
+        lut = class_lut
+    else:
+        lut = pd.read_csv(class_lut)
+    
     cmdf = pd.DataFrame()
     cmdf['obs'] = obs_col
     cmdf['pred'] = pred_col
@@ -244,11 +249,11 @@ def quick_accuracy(X_test, y_test, rf_model, lc_mod, out_dir,model_name,lut):
     
     return accuracy, cm
 
-def smallag_acc(rf_mod, lut, cutoff='1ha',print_cm=False,out_dir=None,model_name=None):
+def smallag_acc(rf_scores, lut, cutoff='1ha',print_cm=False,out_dir=None,model_name=None):
     '''
     gets confusion matrix for subset of data with just smallholder fields and noncrop classified as mixed (smallholder) ag 
     '''
-    smallag = rf_mod.loc[(rf_mod['smalls_{}'.format(cutoff)] == 1) | (rf_mod['pred'] == 35)]
+    smallag = rf_scores.loc[(rf_scores['smalls_{}'.format(cutoff)] == 1) | (rf_scores['pred'] == 35)]
     print('There are {} {} smallholder samples in the holdout.'.format(smallag.shape[0], cutoff))
     smcm = get_confusion_matrix(smallag['pred'], smallag['label'],lut,'all','cropNoCrop',False,None,None)
 
@@ -301,10 +306,15 @@ def overall_wave(cnc_metrics, ct_path, model_name,pixdf):
                              "Num_sm_halfha" : [pixdf['smlhd_halfha'].sum()]})
     return overall_metrics
 
-def build_weighted_accuracy_table(out_dir,model_name,rf_scores,pixdf,lut):
+def build_weighted_accuracy_table(out_dir,model_name,rf_scores,df_in,lut):
     '''
-    take the cms and find take the averages of the UAs and PAs
+    take the cms and find take the averages of the accuracies and F1 scores
     '''
+    if isinstance(df_in, pd.DataFrame):
+        pixdf = df_in
+    else:
+        pixdf = pd.read_csv(df_in)
+        
     metrics_dir = os.path.join(out_dir,'metrics')
     os.makedirs(metrics_dir, exist_ok=True) 
     
@@ -844,7 +854,10 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
             if v == b:
                 bands_out.append(i+1)
                 band_names.append(v)
-    #sys.stdout.write('bands used for model: {}'.format(bands_out))
+            elif b.startswith('sing') and v == b.split('_')[1]:
+                bands_out.append(i+1)
+                band_names.append('sing_{}'.format(v))
+    sys.stdout.write('bands used for model: {}'.format(bands_out))
     
     new_stack = src0.sel(band=bands_out)
     new_stack.attrs['descriptions'] = band_names
@@ -883,7 +896,9 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
         with rio.open(class_img_out, mode='r+') as dst:
             #dst.write(class_out, window=w)
             dst.write(class_out, indexes=1, window=w)
-        
+    
+    return class_prediction
+
 def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut, feature_model, feature_mod_dict):
     if isinstance(df_in, pd.DataFrame):
         df = df_in
@@ -953,7 +968,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         cells.append(cell_list) 
                 
     for cell in cells:
-        sys.stdout.write('working on cell... \n'.format(cell))
+        sys.stderr.write('working on cell {}... \n'.format(cell))
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         
         stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
@@ -964,7 +979,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
             poly_model = feature_model.replace('NoPoly','Poly')
             alt_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(poly_model,start_yr))
             if os.path.isfile(alt_path):
-                sys.stderr.write('stack file already exists for model {} \n'.format(poly_model))
+                sys.stderr.write('poly stack file already exists for model {} \n'.format(poly_model))
                 var_stack = alt_path
         else:
             # make variable stack if it does not exist (for example for cells without sample pts)
@@ -979,9 +994,9 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         #    class_img_out = img_out
         
         if rf_mod != None and os.path.isfile(rf_mod):
-            sys.stdout.write('using existing model... \n')
+            sys.stderr.write('using existing model... \n')
         else:
-            sys.stdout.write('creating rf model... \n')
+            sys.stderr.write('creating rf model... \n')
             rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut, feature_model, feature_mod_dict)
 
         with open(feature_mod_dict, 'r+') as feature_model_dict:
@@ -995,7 +1010,8 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         ## geowombat / xarray method:
         class_prediction = get_predictions_gw(var_stack, model_bands, rf_mod, class_img_out)
         
-        
-        sys.stdout.write('Image saved to: {}'.format(class_img_out))    
-    
-        return None
+        if class_prediction is not None:
+            sys.stdout.write('Image saved to: {}'.format(class_img_out))    
+        else:
+            print ('got an error')
+    return None

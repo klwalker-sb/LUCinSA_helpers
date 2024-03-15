@@ -10,6 +10,7 @@ import numpy as np
 import geowombat as gw
 import xarray as xr
 import pandas as pd
+import csv
 
 def check_ts_windows(cell_list, processed_dir, spec_indices, start_check, end_check):
     cells = []

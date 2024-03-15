@@ -61,15 +61,18 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
     output is a dataframe with a pt (named polygonID_pt#)
     on each row and an image index value(named YYYYDDD) in each column
     '''
-    #stack_path = os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr))
-    stack_path = os.path.join(in_dir,'stack.tif')
+    stack_path = os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr))
     if not os.path.exists(stack_path):
+        if 'Poly' in feature_model and 'NoPoly' not in feature_model:
+            nopoly_model = feature_model.replace('Poly','NoPoly')
+            stack_path = os.path.join(in_dir,'{}_{}_stack.tif'.format(feature_model, start_yr))
+    if not os.path.exists(stack_path):       
         sys.stderr.write('path {} does not exist. \n'.format(stack_path))
         sys.stderr.write('need to create variable stack for {}_{} first. \n'.format(feature_model, start_yr))
         ptsgdb = None
     
     else:
-        band_names = getset_feature_model(feature_mod_dict, feature_model)[7]
+        #band_names = getset_feature_model(feature_mod_dict, feature_model)[7]
     
         if load_samp == False:
             if polys:
@@ -84,6 +87,11 @@ def get_variables_at_pts(in_dir, out_dir, feature_model, feature_mod_dict, start
         coords = list(map(list, zip(*xy)))
     
         sys.stdout.write('Extracting variables from stack \n')
+        
+        with gw.open(stack_path) as src0:
+            #sys.stdout.write('{}'.format(src0.attrs))
+            band_names = src0.attrs['descriptions']
+        
         with rio.open(stack_path ,'r') as comp:
             #Open each band and get values
             for b, band in enumerate(band_names):
