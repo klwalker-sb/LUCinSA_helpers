@@ -550,18 +550,18 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
         
         # set the path for the temporary output files prior to final stacking
         if scratch_dir:
-            out_dir = os.path.join(scratch_dir,'{}'.format(cell))
+            out_dir = os.path.join(scratch_dir,'{:06d}'.format(int(cell)),'comp')
         else:
             out_dir = os.path.join(cell_dir,'comp')        
         
         stack_exists = 0
-        stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
+        stack_path = os.path.join(out_dir,'{}_{}_stack.tif'.format(feature_model,start_yr))
         if os.path.isfile(stack_path):
             stack_exists = 1
             #sys.stderr.write('stack file already exists for model {} \n'.format(feature_model))
         elif 'NoPoly' not in feature_model:
             no_poly_model = feature_model.replace('Poly','NoPoly')
-            alt_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(no_poly_model,start_yr))
+            alt_path = os.path.join(out_dir,'{}_{}_stack.tif'.format(no_poly_model,start_yr))
             if os.path.isfile(alt_path):
                 stack_exists = 1
                 #sys.stderr.write('no poly stack file already exists for model {} \n'.format(no_poly_model))
@@ -680,7 +680,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                             ## Write stack without poly variables, but change name to specify
                             if 'Poly' in feature_model and 'NoPoly' not in feature_model:
                                 nop_mod = feature_model.replace('Poly', 'NoPoly')
-                                stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(nop_mod,start_yr))
+                                stack_path = os.path.join(out_dir,'{}_{}_stack.tif'.format(nop_mod,start_yr))
                                 poly_vars = None
                                       
                 sys.stdout.write('Final stack will have {} bands \n'.format(len(band_names)))
@@ -972,12 +972,13 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         
         stack_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(feature_model,start_yr))
+        sys.stderr.write('{}... \n'.format(stack_path))
         if os.path.isfile(stack_path):
             sys.stderr.write('stack file already exists for model {} \n'.format(feature_model))
             var_stack = stack_path
         elif 'NoPoly' in feature_model:
             poly_model = feature_model.replace('NoPoly','Poly')
-            alt_path = os.path.join(cell_dir,'comp','{}_{}_stack.tif'.format(poly_model,start_yr))
+            alt_path = os.path.join(cell_dir, 'comp', '{}_{}_stack.tif'.format(poly_model,start_yr))
             if os.path.isfile(alt_path):
                 sys.stderr.write('poly stack file already exists for model {} \n'.format(poly_model))
                 var_stack = alt_path

@@ -10,6 +10,7 @@ from LUCinSA_helpers.var_dataframe import make_var_dataframe
 from LUCinSA_helpers.var_dataframe import append_feature_dataframe
 from LUCinSA_helpers.rf import make_variable_stack, rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
+from LUCinSA_helpers.ras_tools import downsample_images
 from LUCinSA_helpers.version import __version__
 
 def main():
@@ -54,7 +55,8 @@ def main():
                            'append_feature_dataframe',
                            'rf_model', 
                            'rf_classification', 
-                           'mosaic'
+                           'mosaic',
+                           'downsample'
                           ]
 
     for process in available_processes:
@@ -119,9 +121,17 @@ def main():
         if process == 'mosaic':
             subparser.add_argument('--cell_list', dest='cell_list', help='list of cells to mosiac', default=None)
             subparser.add_argument('--in_dir_main', dest='in_dir_main', help='overarching directory with all cells', default=None)
-            subparser.add_argument('--in_dir_local;', dest='in_dir_local', help='local folder name or path with raster', default=None)
+            subparser.add_argument('--in_dir_local', dest='in_dir_local', help='local folder name or path with raster', default=None)
             subparser.add_argument('--common_str', dest='common_str', help='unique string in file name for mosaic', default=None)
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
+        
+        if process == 'downsample':
+            subparser.add_argument('--cell_list', dest='cell_list', help='list of cells involved', default=None)
+            subparser.add_argument('--in_dir_main', dest='in_dir_main', help='overarching directory with all cells', default=None)
+            subparser.add_argument('--local_dir', dest='local_dir', help='local folder name or path with rasters', default=None)
+            subparser.add_argument('--common_str', dest='common_str', help='unique string starting file name (e.g. year)', default=None)
+            subparser.add_argument('--out_dir_main', dest='out_dir_main', help='out directory for processed outputs', default=None)
+            subparser.add_argument('--new_res', dest='new_res', help='new resolution (in m)', default=None)
         
         if process in ['get_time_series','make_ts_composite','rf_model','rf_classification',
                        'make_var_dataframe','make_var_stack','append_feature_dataframe','make_pheno_vars']:
@@ -270,6 +280,14 @@ def main():
                      common_str = args.common_str,
                      out_dir = args.out_dir)
         
+    if args.process == 'downsample':
+        downsample_images(cell_list = args.cell_list,
+                     in_dir_main = args.in_dir_main,
+                     local_dir = args.local_dir,
+                     common_str = args.common_str,
+                     out_dir_main = args.out_dir_main,
+                     new_res = args.new_res)
+    
     if args.process == 'make_ts_composite':
         make_ts_composite(grid_cell = args.grid_cell,
                         img_dir = args.img_dir,

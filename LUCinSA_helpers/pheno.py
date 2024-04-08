@@ -341,7 +341,8 @@ def make_pheno_vars(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,pheno
     ts_stack_dry_padded = []
     ds_stack_dry_padded = []
             
-    start_doy = int (30.5 * start_mo) - 30
+    #start_doy = int (30.5 * start_mo) - 30
+    start_doy = 305
     
     if pad_days is None or pad_days == " ":
         pad_days = [0,0]
