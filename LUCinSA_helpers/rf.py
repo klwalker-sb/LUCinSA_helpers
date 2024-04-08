@@ -552,7 +552,9 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
         if scratch_dir:
             out_dir = os.path.join(scratch_dir,'{:06d}'.format(int(cell)),'comp')
         else:
-            out_dir = os.path.join(cell_dir,'comp')        
+            out_dir = os.path.join(cell_dir,'comp')
+        os.makedirs(out_dir, exist_ok=True)
+        #sys.stderr.write(f'making dir {out_dir} \n')
         
         stack_exists = 0
         stack_path = os.path.join(out_dir,'{}_{}_stack.tif'.format(feature_model,start_yr))
