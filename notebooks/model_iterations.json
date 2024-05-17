@@ -1,0 +1,1 @@
+{"0": {"feat_model": "base4NoPoly", "samp_model": "bal100", "class_model": "LC2", "n_small": 0, "acc_smallCrop": [0.05747126436781609], "acc_bigCrop": [0.8754208754208754], "acc_noCrop": [0.9746666666666667]}, "1": {"feat_model": "base4NoPoly", "samp_model": "bal100", "class_model": "LC2", "n_small": 

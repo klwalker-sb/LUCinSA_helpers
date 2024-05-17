@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+from ..handler import logger
 from LUCinSA_helpers.check_log_files_dl import check_dl_logs
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite, check_ts_windows
@@ -11,6 +12,7 @@ from LUCinSA_helpers.var_dataframe import append_feature_dataframe
 from LUCinSA_helpers.rf import make_variable_stack, rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.ras_tools import downsample_images
+from LUCinSA_helpers.model_iterations import iterate_all_models_for_sm_test
 from LUCinSA_helpers.version import __version__
 
 def main():
@@ -56,7 +58,8 @@ def main():
                            'rf_model', 
                            'rf_classification', 
                            'mosaic',
-                           'downsample'
+                           'downsample',
+                           'iterate_models'
                           ]
 
     for process in available_processes:
@@ -229,12 +232,23 @@ def main():
             subparser.add_argument('--feature_model', dest = 'feature_model', 
                                    help='unique name for variable combo (start_Yr (spec_indices*si_vars + singleton_vars + poly_vars))')
             subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
-                                   help='path to dict defining variable model names. (see example in main folder of this repo)')                      
+                                   help='path to dict defining variable model names. (see example in main folder of this repo)')
+        if process == 'iterate_models':
+            subparser.add_argument('--sample_pts', dest='sample_pts', help='csv file with all available sample points')
+            subparser.add_argument('--model_dir', dest='model_dir', help='directory for final outputs')
+            subparser.add_argument('--scratch_dir', dest='scratch_dir', help='directory for temp model products')
+            subparser.add_argument('--lut', dest='lut', help='path to class look up table')
+            subparser.add_argument('--samp_model', dest='samp_model', help ='sample model to use (e.g. bal100')
+            subparser.add_argument('--class_models', dest='class_models', help ='class models to test (e.g. [cropNoCrop,all]')
+            subparser.add_argument('--feat_models', dest='feat_models', help ='feature models to test (e.g. [base4NoPoly,base4Poly]')
+            subparser.add_argument('--iterations', dest='iterations', help = 'number of iterations for each increment', default=3)
+            subparser.add_argument('--get_new_hos', dest='get_new_hos', help = 'whether to generate a new holdout sample', default=False)
+                                    
     args = parser.parse_args()
 
     if args.process == 'version':
-      print(__version__)
-      return
+        print(__version__)
+        return
                                    
     if args.process == 'check_dl_logs':
         check_dl_logs(cell_db_path = args.cell_db_path,
@@ -422,7 +436,18 @@ def main():
                  ran_hold = args.ran_hold,
                  out_dir = args.out_dir,
                  scratch_dir = args.scratch_dir)
-
+        
+    if args.process == 'iterate_models':
+        iterate_all_models_for_sm_test(sample_pts = args.sample_pts, 
+                                       model_dir = args.model_dir,
+                                       scratch_dir = args.scratch_dir,
+                                       lut = args.lut,
+                                       samp_model = args.samp_model,
+                                       class_models = check_for_list(args.class_models),
+                                       feat_models = check_for_list(args.feat_models), 
+                                       iterations = args.iterations,
+                                       get_new_hos= args.get_new_hos)
+    
     if process == 'check_ts_windows':
         check_ts_windows(cell_list = check_for_list(args.cell_list),
                          processed_dir = args.processed_dir,
