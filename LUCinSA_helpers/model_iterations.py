@@ -101,6 +101,7 @@ def iterate_all_models_for_sm_test(sample_pts, model_dir, scratch_dir, lut, samp
             allmc = tr['LC25_name'].value_counts()['Crops-mix']
             
             for n in range(200):
+                logger.info(f'iteration {n}...\n')
                 cutoff = (10 * n) / allmc
                 #sys.stderr.write(f'training data had {len(tr)} records \n'))
                 training = tr[(tr['rand'] <= cutoff) | (tr['LC25_name'] != 'Crops-mix')] 
@@ -123,7 +124,7 @@ def iterate_all_models_for_sm_test(sample_pts, model_dir, scratch_dir, lut, samp
                 score_dict[n]['acc_noCrop']=[]
                 
                 for iter in range(iterations):
-                    logger.info(f'iteration {iter}...\n')
+                    sys.stderr.write(f'iteration {iter}...\n')
                     ran = 1 + 23*iter
                     rf0 = rf_model(training,scratch_dir,lcmod,'Impurity',ran,f'{fm}_{samp_model}',
                         lut,fm,0,feature_mod_dict,update_model_dict=False,fixed_ho=True,fixed_ho_dir=fixed_ho_dir)
