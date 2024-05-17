@@ -100,11 +100,11 @@ def iterate_all_models_for_sm_test(sample_pts, model_dir, scratch_dir, lut, samp
             tr = pd.read_csv(os.path.join(fixed_ho_dir,'{}_TRAINING.csv'.format(fm)))
             allmc = tr['LC25_name'].value_counts()['Crops-mix']
             
-            for n in range(2):
+            for n in range(200):
                 cutoff = (10 * n) / allmc
                 #sys.stderr.write(f'training data had {len(tr)} records \n'))
                 training = tr[(tr['rand'] <= cutoff) | (tr['LC25_name'] != 'Crops-mix')] 
-                training = training[(training['rand']<(n/10)) | ((training['LC25_name'] != 'Mixed-path') 
+                training = training[(training['rand']<(n/100)) | ((training['LC25_name'] != 'Mixed-path') 
                                                                  & (training['LC25_name'] !='Mixed-VegEdge'))]
                 #sys.stderr.write(f'training data now has {len(training)} records \n'))
                 if n == 0:
