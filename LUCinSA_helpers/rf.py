@@ -47,6 +47,10 @@ def get_class_col(lc_mod,lut):
         class_col = 'LC3'
     elif lc_mod == 'crop_nocrop_medcrop_tree':
         class_col = 'LC4'
+    elif lc_mod == 'veg_with_crop':
+        class_col = 'LC8'
+    elif lc_mod == 'veg_with_cropType':
+        class_col = 'LC10'
     elif lc_mod == 'veg':
         class_col = 'LC5'
     elif lc_mod == 'cropType':
@@ -66,7 +70,7 @@ def get_class_col(lc_mod,lut):
                 lut['LC1_name'] = f'no_{lc_base}'
                 lut.at[target_class[0],'LC1_name'] = lc_base
     else:
-        sys.stderr.write(f'current options for lc_mod are all, LCTrans, cropNoCrop, crop_nocrop_mixcrop, crop_nocrop_medcrop, crop_nocrop_medcrop_tree, veg, cropType, and single_X with X as any category. You put {lc_mod} \n')
+        sys.stderr.write(f'current options for lc_mod are all, LCTrans, cropNoCrop, crop_nocrop_mixcrop, crop_nocrop_medcrop, crop_nocrop_medcrop_tree, veg, veg_with_crop, veg_with_cropType, cropType, and single_X with X as any category. You put {lc_mod} \n')
     
     '''
     elif lc_mod == 'crop_post':
@@ -1028,8 +1032,10 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
     if f'{class_col}_name' in df.columns:
         df2 = df
     else:
-        df2 = df.merge(lut[['USE_NAME',f'{class_col}',f'{class_col}_name']], 
-                       left_on='Class',right_on='USE_NAME', how='left')
+        lutdf = pd.read_csv(lut)
+        lut_cols = ['USE_NAME',f'{class_col}',f'{class_col}_name']
+        filtered_lut = lutdf.filter(lut_cols)
+        df2 = df.merge(filtered_lut, left_on='Class',right_on='USE_NAME', how='left')
     
     #df3 = df2.reindex(sorted(df2.columns), axis=1)
     full_model_name =  model_name + '_' + class_col

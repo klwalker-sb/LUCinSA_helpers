@@ -17,6 +17,8 @@ FEATMODS=['base4NoPoly']
 #CLASSMODS="[cropNoCrop,crop_nocrop_mixcrop,crop_nocrop_medcrop,crop_nocrop_medcrop_tree,all]"
 CLASSMODS=['all']
 ITER=5
+STOP=1000
+STEP=10
 NEWHO='False'
 LUT='../Class_LUT.csv'
 
@@ -24,6 +26,6 @@ LUT='../Class_LUT.csv'
 conda activate venv.lucinsa38_pipe
 
 # if running from installed module:
-LUCinSA_helpers iterate_models --sample_pts $PTS --model_dir $MODDIR --scratch_dir $SCRATCH --lut $LUT --samp_model $SAMPMOD --feat_models $FEATMODS --class_models $CLASSMODS --get_new_hos $NEWHO
+LUCinSA_helpers iterate_models --sample_pts $PTS --model_dir $MODDIR --scratch_dir $SCRATCH --lut $LUT --samp_model $SAMPMOD --feat_models $FEATMODS --class_models $CLASSMODS --iterations $ITER --stop $STOP --step $STEP --get_new_hos $NEWHO
 
 conda deactivate

@@ -242,6 +242,8 @@ def main():
             subparser.add_argument('--class_models', dest='class_models', help ='class models to test (e.g. [cropNoCrop,all]')
             subparser.add_argument('--feat_models', dest='feat_models', help ='feature models to test (e.g. [base4NoPoly,base4Poly]')
             subparser.add_argument('--iterations', dest='iterations', help = 'number of iterations for each increment', default=3)
+            subparser.add_argument('--stop', dest='stop', help = 'sample size at which to stop', default=1000)
+            subparser.add_argument('--step', dest='step', help = 'number of samples to add at each increment', default=10)
             subparser.add_argument('--get_new_hos', dest='get_new_hos', help = 'whether to generate a new holdout sample', default=False)
                                     
     args = parser.parse_args()
@@ -446,6 +448,8 @@ def main():
                                        class_models = check_for_list(args.class_models),
                                        feat_models = check_for_list(args.feat_models), 
                                        iterations = args.iterations,
+                                       stop = args.stop,
+                                       step = args.step,
                                        get_new_hos= args.get_new_hos)
     
     if process == 'check_ts_windows':
