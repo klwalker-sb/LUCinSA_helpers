@@ -201,12 +201,11 @@ def get_confusion_matrix(pred_col, obs_col, class_lut, lc_mod_map, lc_mod_acc, p
         lut = pd.read_csv(class_lut)
     
     cmdf = pd.DataFrame()
-    cmdf['obs'] = obs_col
     cmdf['pred'] = pred_col
+    cmdf['obs'] = obs_col
     
     if lc_mod_map.startswith('single'):
-        cm=pd.crosstab(cmdf['obs'],cmdf['pred'],margins=True)
-        print(cm)
+        cm=pd.crosstab(cmdf['pred'],cmdf['obs'],margins=True)
     else: 
         map_cat = get_class_col(lc_mod_map,lut)[0]
         acc_cat = get_class_col(lc_mod_acc,lut)[0]
@@ -217,14 +216,26 @@ def get_confusion_matrix(pred_col, obs_col, class_lut, lc_mod_map, lc_mod_acc, p
         cmdf3 = cmdf2.merge(lut[['LC_UNQ', f'{acc_cat}_name']], left_on='pred', right_on='LC_UNQ',how='left')
         cmdf3.rename(columns={f'{acc_cat}_name':'pred_reclass'}, inplace=True)
         cmdf3.drop(['LC_UNQ'],axis=1,inplace=True)
-        cm=pd.crosstab(cmdf3['obs_reclass'],cmdf3['pred_reclass'],margins=True)
-        
+        cm=pd.crosstab(cmdf3['pred_reclass'],cmdf3['obs_reclass'],margins=True)
     cm['correct'] = cm.apply(lambda x: x[x.name] if x.name in cm.columns else 0, axis=1)
     cm['sumcol'] = cm.apply(lambda x: cm.loc['All', x.name] if x.name in cm.columns else 0)
     cm['UA'] = cm['correct']/cm['All']
     cm['PA'] = cm['correct']/cm['sumcol']
     cm['F1'] = (2 * cm['UA'] * cm['PA'])/(cm['UA'] + cm['PA'])
- 
+    cm['F_5'] = (1.25 * cm['UA'] * cm['PA'])/.25*(cm['UA'] + cm['PA'])
+    cm['F_25'] = (1.0625 * cm['UA'] * cm['PA'])/.0625*(cm['UA'] + cm['PA'])
+    total = cm.at['All','correct']
+    cm.at['All','UA'] = (cm['correct'].sum() - total) / total
+    cm.at['All','PA'] = (cm['correct'].sum() - total) / total
+    if acc_cat == 'LC2':
+        cm.at['All','F1']=cm.at['crop','F1']
+        TP = cm.at['crop', 'crop']
+        FP = cm.at['crop', 'nocrop']
+        FN = cm.at['nocrop', 'crop']
+        TN = cm.at['nocrop','nocrop']
+        All = TP + FP + FN + TN
+        cm['Kappa'] = 2*(TP*TN - FN*FP)/((TP+FP)*(FP+TN)+(TP+FN)*(FN+TN))
+    
     '''
     crops = lut.loc[lut['LC2'] == 1]
     no_crops = lut.loc[lut['LC2'] == 0]
@@ -554,6 +565,37 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir,class_type=None)
     pd.DataFrame.to_csv(holdout_fields, os.path.join(out_dir,out_file), sep=',', na_rep='NaN', index=True)
    
     return holdout_fields
+
+def get_AUC(holdoutpix, rf_model):
+    '''
+    Note this only works with 2-class model
+    '''
+                 
+    from sklearn.metrics import roc_curve, auc
+                 
+    if isinstance(holdoutpix, pd.DataFrame):
+        holdout_pix = holdoutpix
+    else:
+        holdout_pix = pd.read_csv(holdoutpix)
+        
+    ho_labels = holdout_pix['LC2']
+    ho_IDs = holdout_pix['OID_']
+    
+    ## Isolate feature set for prediction:
+    vars = [col for col in holdout_pix if col.startswith('var_')]
+    holdouts = holdout_pix[vars]
+
+    ## Calculate scores
+    ho_scores = rf_model.predict_proba(holdouts)[:,1]
+    #ho_scores = rf_model.predict_proba(holdouts)
+    fpr, tpr, thresholds = metrics.roc_curve(ho_labels, ho_scores, pos_label=30)
+    roc_auc = auc(fpr, tpr)
+    
+    precision, recall, thresholds = precision_recall_curve(ho_labels, ho_scores, pos_label=30)
+    precision_recall_auc = auc(recall, precision)
+           
+                 
+    return roc_auc, precision_recall_auc
 
 def get_binary_holdout_score(ho_path, rf_model, out_dir, lut, class_type):
     '''
@@ -1065,10 +1107,21 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
     else:
         score = {}
     if fixed_ho == True:
+        ho_smallcrop = get_holdout_scores(ho_smallCrop_path, rf[0], 'LC2', out_dir, 'smallCrop')[["pred","label","OID"]]
+        ho_bigcrop = get_holdout_scores(ho_bigCrop_path, rf[0], 'LC2', out_dir, 'bigCrop')[["pred","label","OID"]]
+        ho_nocrop = get_holdout_scores(ho_noCrop_path, rf[0], 'LC2', out_dir, 'noCrop')[["pred","label","OID"]]
+        ho = pd.concat([ho_smallcrop,ho_bigcrop,ho_nocrop])
+        cm = get_confusion_matrix(ho['pred'], ho['label'], lut, lc_mod, 'cropNoCrop', print_cm=False, out_dir=None, model_name=None)
+        print(cm)
         score["acc_smallCrop"] = get_binary_holdout_score(ho_smallCrop_path, rf, out_dir, lut, 'smallCrop')
         score["acc_bigCrop"] = get_binary_holdout_score(ho_bigCrop_path, rf, out_dir, lut, 'bigCrop')
         score["acc_noCrop"] =  get_binary_holdout_score(ho_noCrop_path, rf, out_dir, lut, 'noCrop')
-    
+        score["Kappa_cnc"] = cm.at['crop','Kappa']
+        score["F1_cnc"] = cm.at['crop','F1']
+        score["F_5_cnc"] = cm.at['crop','F_5']
+        score["F_25_cnc"] = cm.at['crop','F_25']        
+        score["OA_cnc"] = cm.at['All','UA']
+        
     return rf, score
 
 def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_mo, samp_mod_name, 

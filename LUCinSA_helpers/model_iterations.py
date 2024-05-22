@@ -63,6 +63,7 @@ def iterate_mixed_sample_for_sm_test(n_mixcrop, feat_model, model_dir, scratch_d
 
 def iterate_all_models_for_sm_test(sample_pts, model_dir, scratch_dir, lut, samp_model, class_models, feat_models, iterations=3, stop=1000, step=10, get_new_hos=False):
     
+    master = {}
     ## get fixed holdout and maximum training sets
     samp_file = os.path.join(model_dir,f'ptdf_{samp_model}mix10_2021.csv')
     #sys.stderr.write(f'looking for {samp_file}\n' )
@@ -101,10 +102,10 @@ def iterate_all_models_for_sm_test(sample_pts, model_dir, scratch_dir, lut, samp
             tr = pd.read_csv(os.path.join(fixed_ho_dir,'{}_TRAINING.csv'.format(fm)))
             allmc = tr['LC25_name'].value_counts()['Crops-mix']
             
-            for n in range(stop/step):
+            for n in range(int(stop)//int(step)):
                 logger.info(f'iteration {n}...\n')
                 ## get samples with rannum < cutoff val that would give ~<step> additional samples
-                cutoff = (step * n) / allmc
+                cutoff = (int(step) * n) / allmc
                 #sys.stderr.write(f'training data had {len(tr)} records \n'))
                 training = tr[(tr['rand'] <= cutoff) | (tr['LC25_name'] != 'Crops-mix')] 
                 training = training[(training['rand']<(n/100)) | ((training['LC25_name'] != 'Mixed-path') 
@@ -124,8 +125,13 @@ def iterate_all_models_for_sm_test(sample_pts, model_dir, scratch_dir, lut, samp
                 score_dict[n]['acc_smallCrop']=[]
                 score_dict[n]['acc_bigCrop']=[]
                 score_dict[n]['acc_noCrop']=[]
+                score_dict[n]['Kappa_cnc']=[]
+                score_dict[n]['F1_cnc']=[]
+                score_dict[n]['F_5_cnc']=[]
+                score_dict[n]['F_25_cnc']=[]
+                score_dict[n]['OA_cnc']=[]
                 
-                for iter in range(iterations):
+                for iter in range(int(iterations)):
                     sys.stderr.write(f'iteration {iter}...\n')
                     ran = 1 + 23*iter
                     rf0 = rf_model(training,scratch_dir,lcmod,'Impurity',ran,f'{fm}_{samp_model}',
@@ -134,14 +140,38 @@ def iterate_all_models_for_sm_test(sample_pts, model_dir, scratch_dir, lut, samp
                     score_dict[n]['acc_smallCrop'].append(round(rf0[1]['acc_smallCrop'],3))
                     score_dict[n]['acc_bigCrop'].append(round(rf0[1]['acc_bigCrop'],3))
                     score_dict[n]['acc_noCrop'].append(round(rf0[1]['acc_noCrop'],3))
-    
+                    score_dict[n]['Kappa_cnc'].append(round(rf0[1]['Kappa_cnc'],3))
+                    score_dict[n]['F1_cnc'].append(round(rf0[1]['F1_cnc'],3))
+                    score_dict[n]['F_5_cnc'].append(round(rf0[1]['F_5_cnc'],3))
+                    score_dict[n]['F_25_cnc'].append(round(rf0[1]['F_25_cnc'],3))        
+                    score_dict[n]['OA_cnc'].append(round(rf0[1]['OA_cnc'],3))
+                    master[f'{samp_model}_{fm}_{class_mod}_{n}sh'] = score_dict
+                    
                     with open(os.path.join(model_dir,f'model_iterations_{fm}_{class_mod}.json'), 'w', encoding="utf8") as out_file:
                         out_file.write( json.dumps(score_dict, default=int))
-        
-            mod_dict = json.loads(open(os.path.join(model_dir,'model_iterations_{}_{}.json'.format(fm,class_mod)),"r").read())
+                    with open(os.path.join(model_dir,f'model_iterations_master.json'), 'w', encoding="utf8") as out_file2:
+                        out_file2.write( json.dumps(score_dict, default=int))
+                        
+            mod_dict = json.loads(open(os.path.join(model_dir,f'model_iterations_{fm}_{class_mod}.json'),"r").read())
             df = pd.DataFrame.from_dict(mod_dict, orient='index')
             df['avgacc_smallCrop'] = df.apply(lambda x: round(np.mean(x['acc_smallCrop']),3), axis=1)
             df['avgacc_bigCrop'] = df.apply(lambda x: round(np.mean(x['acc_bigCrop']),3), axis=1)
             df['avgacc_noCrop'] = df.apply(lambda x: round(np.mean(x['acc_noCrop']),3), axis=1)
+            df['avgOA_cnc'] = df.apply(lambda x: round(np.mean(x['OA_cnc']),3), axis=1)
+            df['avgKappa_cnc'] = df.apply(lambda x: round(np.mean(x['Kappa_cnc']),3), axis=1)
+            df['avgF1_cnc'] = df.apply(lambda x: round(np.mean(x['F1_cnc']),3), axis=1)
+            df['avgF_5_cnc'] = df.apply(lambda x: round(np.mean(x['F_5_cnc']),3), axis=1)
+            df['avgF_25_cnc'] = df.apply(lambda x: round(np.mean(x['F_25_cnc']),3), axis=1)
             df.to_csv(os.path.join(model_dir,f'smallCrop_iterations_{fm}_{class_mod}_{step}_{stop}.csv'))
-        
+
+    master_dict = json.loads(open(os.path.join(model_dir,'model_iterations_master.json'),"r").read())
+    df = pd.DataFrame.from_dict(mod_dict, orient='index')
+    df['avgacc_smallCrop'] = df.apply(lambda x: round(np.mean(x['acc_smallCrop']),3), axis=1)
+    df['avgacc_bigCrop'] = df.apply(lambda x: round(np.mean(x['acc_bigCrop']),3), axis=1)
+    df['avgacc_noCrop'] = df.apply(lambda x: round(np.mean(x['acc_noCrop']),3), axis=1)
+    df['avgOA_cnc'] = df.apply(lambda x: round(np.mean(x['OA_cnc']),3), axis=1)
+    df['avgKappa_cnc'] = df.apply(lambda x: round(np.mean(x['Kappa_cnc']),3), axis=1)
+    df['avgF1_cnc'] = df.apply(lambda x: round(np.mean(x['F1_cnc']),3), axis=1)
+    df['avgF_5_cnc'] = df.apply(lambda x: round(np.mean(x['F_5_cnc']),3), axis=1)
+    df['avgF_25_cnc'] = df.apply(lambda x: round(np.mean(x['F_25_cnc']),3), axis=1)
+    df.to_csv(os.path.join(model_dir,f'smallCrop_iterations_master_{step}_{stop}.csv'))
