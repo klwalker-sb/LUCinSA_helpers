@@ -233,6 +233,8 @@ def main():
                                    help='unique name for variable combo (start_Yr (spec_indices*si_vars + singleton_vars + poly_vars))')
             subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
                                    help='path to dict defining variable model names. (see example in main folder of this repo)')
+            subparser.add_argument('--thresh', dest='thresh', default=None,
+                                   help='threshold for holdout sample e.g. 0, 10, 20...')
         if process == 'iterate_models':
             subparser.add_argument('--sample_pts', dest='sample_pts', help='csv file with all available sample points')
             subparser.add_argument('--model_dir', dest='model_dir', help='directory for final outputs')
@@ -410,6 +412,7 @@ def main():
                  model_name = args.model_name,
                  lut = args.lut,
                  feature_model = args.feature_model,
+                 thresh = args.thresh,
                  feature_mod_dict = args.feature_mod_dict)
                                    
     if args.process == 'rf_classification':

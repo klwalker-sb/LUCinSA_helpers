@@ -461,20 +461,21 @@ def prep_test_train(df_in, out_dir, class_col, mod_name, thresh=20, stable=True)
     gets general holdout as a % {thresh} of all pixels that could be used in training
     this is called within rf_mod, so use stable=True to base HO off stable column to compare with other models 
     '''
+    sys.stderr.write(f'df_in = {df_in}\n')
     if isinstance(df_in, pd.DataFrame):
         df_in = df_in
     else:
         df_in = pd.read_csv(df_in, index_col=0)
-    #sys.stderr.write(f'there are {df_in.shape[0]} pts in the full data set \n')
+    sys.stderr.write(f'there are {df_in.shape[0]} pts in the full data set \n')
    
     # remove unknown and other entries where class is not specified a given level (i.e. crop_low if crop type is desired)
-    df_in = df_in[df_in[class_col] < 99]
+    df_in = df_in[df_in[class_col] < 98]
     #sys.stderr.write(f'there are {df_in.shape[0]} sample points after removing those without clear class. \n')
     
     #Separate training and holdout datasets to avoid confusion with numbering
     training_pix_path = os.path.join(out_dir,f'{mod_name}_TRAINING.csv')
     holdout_pix_path = os.path.join(out_dir,f'{mod_name}_HOLDOUT.csv')
-    if thresh == 0:
+    if int(thresh) == 0:
         df_train = df_in  
         df_test = None
     elif stable==True:
@@ -1015,7 +1016,7 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
     
     new_stack = src0.sel(band=bands_out)
     new_stack.attrs['descriptions'] = band_names
-    #sys.stdout.write(new_stack.attrs['descriptions'])
+    sys.stdout.write('{}'.format(new_stack.attrs['descriptions']))
 
     #new_stack = new_stack.chunk({"x": len(new_stack.x), "y": len(new_stack.y)})
  
@@ -1034,15 +1035,15 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
             .rechunk((stackblock.gw.row_chunks * stackblock.gw.col_chunks, 1))
 
         feature_band_count = X.shape[1]
-        #sys.stdout.write(f'num features in df = {feature_band_count} \n')
+        sys.stdout.write(f'num features in df = {feature_band_count} \n')
             
         X = dask.compute(X, num_workers=4)[0]
     
         class_prediction = rf.predict(X)
-        #sys.stdout.write(f'class_prediction out = {class_prediction} \n')
+        sys.stdout.write(f'class_prediction out = {class_prediction} \n')
         class_out = np.uint8(np.squeeze(class_prediction))
         class_out = class_out.reshape(w.height, w.width)
-        #sys.stdout.write(f'class_out = {class_out} \n')
+        sys.stdout.write(f'class_out = {class_out} \n')
     
         if not os.path.isfile(class_img_out):
             with rio.open(class_img_out, mode='w', **profile) as dst:
@@ -1098,12 +1099,14 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
         with open(feature_mod_dict, 'w') as new_feature_model_dict:
             json.dump(dic, new_feature_model_dict)
     
-    if thresh > 0:
+    if int(thresh) > 0:
         score = get_holdout_scores(ho, rf[0], class_col, out_dir)
         ## add the smallholder indication variables to the output df
         #score = pd.DataFrame(score)
         score["smalls_1ha"] = df["smlhld_1ha"]
         score["smalls_halfha"] = df["smlhd_halfha"]
+        pd.DataFrame.to_csv(score, os.path.join(out_dir,f"{model_name}_HO_SCORES"), sep=',', na_rep='NaN', index=True)
+        
     else:
         score = {}
     if fixed_ho == True:
@@ -1157,6 +1160,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         
         stack_path = os.path.join(cell_dir,'comp',f'{feature_model}_{start_yr}_stack.tif')
+        ## Can make a noPoly model with a Poly stack:
         if 'NoPoly' in feature_model:
             poly_model = feature_model.replace('NoPoly','Poly')
             alt_path = os.path.join(cell_dir, 'comp', f'{poly_model}_{start_yr}_stack.tif')
@@ -1181,7 +1185,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         #    class_img_out = img_out
         
         if rf_mod != None and os.path.isfile(rf_mod):
-            sys.stderr.write('using existing model... \n')
+            sys.stderr.write(f'using existing rf model at:{rf_mod} \n')
         else:
             sys.stderr.write('creating rf model... \n')
             rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut, feature_model, feature_mod_dict)

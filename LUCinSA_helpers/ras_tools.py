@@ -9,6 +9,8 @@ from rasterio.enums import Resampling
 import rasterio as rio
 import geopandas as gpd
 import pandas as pd
+import rasterio.mask
+import fiona
 #import rioxarray
 
 def make_test_patch(xpt,ypt,img_in,out_name,out_dir,nbsize,res):
@@ -92,4 +94,22 @@ def downsample_images(cell_list, in_dir_main, local_dir, common_str, out_dir_mai
 
                 with rio.open(os.path.join(out_dir,in_file), "w", **profile) as outdata:
                     outdata.write(data)                            
-    
+
+
+def clip_ras_to_poly(ras_in, polys, out_dir):
+    with fiona.open(polys, "r") as poly_src:
+        shapes = [feature["geometry"] for feature in poly_src]
+
+    for i, shape in enumerate(shapes):
+        with rio.open(ras_in) as src:
+            out_image, out_transform = rasterio.mask.mask(src, [shape], crop=True)
+            out_meta = src.meta
+
+        out_meta.update({"driver": "GTiff",
+                    "height": out_image.shape[1],
+                    "width": out_image.shape[2],
+                    "transform": out_transform})
+
+        with rio.open(os.path.join(out_dir,f"{i}.tif", "w", **out_meta)) as dest:
+            dest.write(out_image)
+

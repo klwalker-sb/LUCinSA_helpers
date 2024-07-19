@@ -66,6 +66,7 @@ def check_logfile_dl(logfile, cell_dict,stop_date='2022-12-31', start_date='2000
     ## also, cell id in logfile title is only 3 digits (because it is array id).
     ## Started printing id within file, but need this for old files that didn't have that printed.
     if cell_id == None:
+        print(f'ERROR: Cannot find cell_id in log for {logfile}')
         cell_id3 = int(logfile.split('.')[2])
         if cell_id3 < 101:
             cell_id = cell_id3 + 4000

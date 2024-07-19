@@ -330,10 +330,8 @@ def make_pheno_vars(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,pheno
         print('made new directory: {}'.format(out_dir))
 
     ## get stack from images in time-series directory that match year and month
-    ts_stack = []
     ts_stack_wet = []
     ts_stack_dry = []
-    ds_stack = []
     ds_stack_wet = []
     ds_stack_dry = []
     ts_stack_wet_padded = []
@@ -393,6 +391,10 @@ def make_pheno_vars(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,pheno
                 elif img_doy < (start_doy - 183) + pad_days[1] :    
                     ts_stack_wet_padded.append(os.path.join(img_dir,img))
                     ds_stack_wet_padded.append(img_date)   
+    ts_stack = list(set(ts_stack_dry_padded + ts_stack_wet_padded))
+    ts_stack.sort()
+    ds_stack = list(set(ds_stack_dry_padded + ds_stack_wet_padded))
+    ds_stack.sort()
     ras_list = []
     phen_band_names = []
                 
@@ -401,6 +403,8 @@ def make_pheno_vars(grid_cell,img_dir,out_dir,start_yr,start_mo,spec_index,pheno
     ## Convert image stack to XArray using geowombat:
     yr_bands = [b for b in pheno_vars if "_" not in b or b.split("_")[1] == 'yr']
     if len(yr_bands) > 0:
+        sys.stderr.write(f'ts_stack: {ts_stack} \n')
+        sys.stderr.write(f'ds_stack: {ds_stack} \n')
         sys.stderr.write('working on yr_bands {} \n'.format(yr_bands))
         pheno_comp = prep_pheno_bands(yr_bands, ts_stack, ds_stack, None, None, 
                                       out_dir,start_yr,'yr',start_doy, sigdif, phen_band_names, ras_list, **gw_args)

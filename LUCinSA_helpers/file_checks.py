@@ -405,7 +405,7 @@ def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default')
     if yrs == None:
         TimeSlice="2010-01-01/2022-12-30"
     else:
-        TimeSlice=f"{yrs[0]}-01-01/{yrs[1]}-12-30"
+        time_slice=f"{yrs[0]}-01-01/{yrs[1]}-12-30"
         
     if sensor.startswith('l'):
         collect=["landsat-c2-l2"]
@@ -420,7 +420,7 @@ def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default')
             api = pystac_client.Client.open("https://planetarycomputer.microsoft.com/api/stac/v1/")
     
     search = api.search(bbox=bb,
-            datetime=TimeSlice,
+            datetime=time_slice,
             collections=collect,
             query={"eo:cloud_cover": {"lt": 90}},
             max_items = 10000)
