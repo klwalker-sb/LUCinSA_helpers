@@ -671,7 +671,7 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
     
 def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_indices,si_vars,spec_indices_pheno,pheno_vars,
                         feature_mod_dict, singleton_vars=None, singleton_var_dict=None, poly_vars=None, 
-                        poly_var_path=None, combo_bands=None,                                         scratch_dir=None):
+                        poly_var_path=None, combo_bands=None, scratch_dir=None):
     
     # get model paramaters if model already exists in dict. Else create new dict entry for this model
     spec_indices, si_vars, spec_indices_pheno, pheno_vars, singleton_vars, poly_vars, combo_bands, band_names = getset_feature_model(
@@ -709,32 +709,33 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
         os.makedirs(out_dir, exist_ok=True)
         #sys.stderr.write(f'making dir {out_dir} \n')
         
-        stack_exists = 0
+        stack_exists = False
         stack_path = os.path.join(out_dir,f'{feature_model}_{start_yr}_stack.tif')
         if os.path.isfile(stack_path):
-            stack_exists = 1
+            stack_exists = True
             #sys.stderr.write(f'stack file already exists for model {feature_model} \n')
         elif 'NoPoly' not in feature_model:
             no_poly_model = feature_model.replace('Poly','NoPoly')
             alt_path = os.path.join(out_dir,f'{no_poly_model}_{start_yr}_stack.tif')
             if os.path.isfile(alt_path):
-                stack_exists = 1
+                stack_exists = True
                 #sys.stderr.write(f'no poly stack file already exists for model {no_poly_model} \n')
-        if stack_exists == 1:
+        if stack_exists == True:
             sys.stderr.write('stack file already exists. \n')
         else:
             stack_paths = []
             band_names = []
             sys.stderr.write(f'making variable stack for cell {cell} \n')
-            keep_going = True
+
             for si in spec_indices:
                 ## check if all spec indices exist before going on:
                 img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
+                
                 if not os.path.exists(img_dir):
                     sys.stderr.write(f'ERROR: missing spec index: {si} \n')
-                    keep_going = False
+                    return False
+                
             for si in spec_indices:
-                if keep_going == True:
                     si_dir_out = os.path.join(out_dir, si) 
                     img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
                     new_vars, new_bands = make_ts_composite(cell, img_dir, si_dir_out, start_yr, start_mo, si, si_vars)
@@ -743,11 +744,12 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                             num_bands = src.count
                     except:    
                         sys.stderr.write(f'ERROR: there is a problem with the time series for {si} \n')
-                        keep_going = False
-                        continue
+                        return False
+
                     if num_bands < len(si_vars):
                         sys.stderr.write(f'ERROR: not all variables could be calculated for {si} \n')
-                        keep_going = False
+                        return False
+                    
                     else:
                         stack_paths.append(new_vars)
                         for b in new_bands:
@@ -813,6 +815,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                     sys.stdout.write('getting poly variables... \n')
                     for pv in poly_vars:
                         poly_path = os.path.join(poly_var_path,f'{pv}_{cell}.tif')
+                        poly_comp_path = os.path.join(poly_var_path,f'pred_PY_{cell}.tif')
                         if os.path.isfile(poly_path):
                             ## pred_area is in m2 with vals too big for stack datatype. Rescale:
                             if pv == 'pred_area':
@@ -830,12 +833,40 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                             else:
                                 stack_paths.append(poly_path)
                                 band_names.append(pv)
-                        else:
+                        elif os.path.isfile(poly_comp_path):
+                            if pv == 'pred_ext':
+                                with rio.open(poly_path) as src:
+                                    vals = src.read([1])
+                                    profile = src.profile
+                                    new_file = os.path.join(out_dir,"pred_ext.tif")
+                                        with rio.open(new_area_file, mode="w",**profile) as new_b:
+                                            new_b.write(vals)
+                                stack_paths.append(new_file)
+                                band_names.append(pv)           
+                            elif pv == 'pred_dist':
+                                with rio.open(poly_path) as src:
+                                    vals = src.read([2])
+                                    profile = src.profile
+                                    new_file = os.path.join(out_dir,"pred_dst.tif")
+                                        with rio.open(new_area_file, mode="w",**profile) as new_b:
+                                            new_b.write(vals)
+                                stack_paths.append(new_file)
+                                band_names.append(pv)    
+                            elif pv == 'pred_cropbnds':
+                                with rio.open(poly_path) as src:
+                                    vals = src.read([3])
+                                    profile = src.profile
+                                    new_file = os.path.join(out_dir,"pred_bnds.tif")
+                                        with rio.open(new_area_file, mode="w",**profile) as new_b:
+                                            new_b.write(vals)
+                                stack_paths.append(new_file)
+                                band_names.append(pv)       
+                        else:   
                             sys.stderr.write(f'variable {pv} does not exist for cell {cell} \n')
                             ## Write stack without poly variables, but change name to specify
                             if 'Poly' in feature_model and 'NoPoly' not in feature_model:
                                 nop_mod = feature_model.replace('Poly', 'NoPoly')
-                                stack_path = os.path.join(out_dir,f'{nop_mod}_{stary_yr}_stack.tif')
+                                stack_path = os.path.join(out_dir,f'{nop_mod}_{start_yr}_stack.tif')
                                 poly_vars = None
                                       
                 sys.stdout.write(f'Final stack will have {band_names} bands \n')
