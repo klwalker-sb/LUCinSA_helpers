@@ -654,7 +654,7 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
             if spec_indices is not None and spec_indices != 'None':
                 for si in spec_indices:
                     for sv in si_vars:
-                        band_names.append(f'{si}_{v}')
+                        band_names.append(f'{si}_{sv}')
             if singleton_vars is not None and singleton_vars != 'None':
                 for sin in singleton_vars:
                     band_names.append(f'sing_{sin}')
@@ -835,30 +835,33 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                 band_names.append(pv)
                         elif os.path.isfile(poly_comp_path):
                             if pv == 'pred_ext':
-                                with rio.open(poly_path) as src:
+                                with rio.open(poly_comp_path) as src:
                                     vals = src.read([1])
                                     profile = src.profile
+                                    profile.update(count = 1)
                                     new_file = os.path.join(out_dir,"pred_ext.tif")
-                                        with rio.open(new_area_file, mode="w",**profile) as new_b:
-                                            new_b.write(vals)
+                                    with rio.open(new_file, mode="w",**profile) as new_b:
+                                        new_b.write(vals)
                                 stack_paths.append(new_file)
                                 band_names.append(pv)           
-                            elif pv == 'pred_dist':
-                                with rio.open(poly_path) as src:
+                            elif pv == 'pred_dst':
+                                with rio.open(poly_comp_path) as src:
                                     vals = src.read([2])
                                     profile = src.profile
+                                    profile.update(count = 1)
                                     new_file = os.path.join(out_dir,"pred_dst.tif")
-                                        with rio.open(new_area_file, mode="w",**profile) as new_b:
-                                            new_b.write(vals)
+                                    with rio.open(new_file, mode="w",**profile) as new_b:
+                                        new_b.write(vals)
                                 stack_paths.append(new_file)
                                 band_names.append(pv)    
                             elif pv == 'pred_cropbnds':
-                                with rio.open(poly_path) as src:
+                                with rio.open(poly_comp_path) as src:
                                     vals = src.read([3])
                                     profile = src.profile
+                                    profile.update(count = 1)
                                     new_file = os.path.join(out_dir,"pred_bnds.tif")
-                                        with rio.open(new_area_file, mode="w",**profile) as new_b:
-                                            new_b.write(vals)
+                                    with rio.open(new_file, mode="w",**profile) as new_b:
+                                        new_b.write(vals)
                                 stack_paths.append(new_file)
                                 band_names.append(pv)       
                         else:   
