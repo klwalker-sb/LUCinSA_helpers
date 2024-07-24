@@ -1051,6 +1051,10 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
             elif b.startswith('poly') and v == b.split('_',1)[1]:
                 bands_out.append(i+1)
                 band_names.append(f'poly_{v}')
+            else:
+                sys.stderr.write(f'ERROR: band {v} not found in stack \n')
+                return False
+            
     sys.stdout.write(f'bands used for model: {bands_out}')
     
     new_stack = src0.sel(band=bands_out)
