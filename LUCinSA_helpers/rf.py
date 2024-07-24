@@ -793,6 +793,8 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                             stack_paths.append(singleton_clipped)
                             band_names.append(sf)
                         else:
+                            comp_dir = os.path.join(cell_dir,'comp')
+                            os.makedirs(comp_dir, exist_ok=True)
                             ## clip large singleton raster to extent of other rasters in stack for grid cell
                             small_ras = stack_paths[0]
                             src_small = gdal.Open(small_ras)
@@ -1014,7 +1016,7 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
     rf_path: The path to the .joblib file with the random forest model information
     class_img_out:  The path for the classified output image
     '''
-    sys.stderr.write('getting predictions...')
+    sys.stderr.write('getting predictions...\n')
     rf = load(rf_path) #this load is from joblib -- careful if there are other packages with 'Load' module
     
     chunks=256
@@ -1046,6 +1048,9 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
             elif b.startswith('sing') and v == b.split('_')[1]:
                 bands_out.append(i+1)
                 band_names.append(f'sing_{v}')
+            elif b.startswith('poly') and v == b.split('_',1)[1]:
+                bands_out.append(i+1)
+                band_names.append(f'poly_{v}')
     sys.stdout.write(f'bands used for model: {bands_out}')
     
     new_stack = src0.sel(band=bands_out)
@@ -1201,10 +1206,10 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         
         sys.stderr.write(f'looking for stack: {stack_path}... \n')
         if os.path.isfile(stack_path):
-            sys.stderr.write('stack file already exists for model {feature_model} \n')
+            sys.stderr.write(f'stack file already exists for model {feature_model} \n')
             var_stack = stack_path
         elif os.path.isfile(alt_path):
-            sys.stderr.write('poly stack file already exists for model {poly_model} \n')
+            sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
             var_stack = alt_path
         else:
             # make variable stack if it does not exist (for example for cells without sample pts)
