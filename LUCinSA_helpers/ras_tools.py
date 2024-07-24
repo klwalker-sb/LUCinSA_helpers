@@ -11,6 +11,7 @@ import geopandas as gpd
 import pandas as pd
 import rasterio.mask
 import fiona
+import numpy as np
 #import rioxarray
 
 def make_test_patch(xpt,ypt,img_in,out_name,out_dir,nbsize,res):
@@ -96,7 +97,10 @@ def downsample_images(cell_list, in_dir_main, local_dir, common_str, out_dir_mai
                     outdata.write(data)                            
 
 
-def clip_ras_to_poly(ras_in, polys, out_dir):
+def clip_ras_to_poly(ras_in, polys, out_dir,prod_name):
+    out_path = Path(os.path.join(out_dir,prod_name))
+    out_path.mkdir(parents=True, exist_ok=True)
+
     with fiona.open(polys, "r") as poly_src:
         shapes = [feature["geometry"] for feature in poly_src]
 
@@ -110,6 +114,50 @@ def clip_ras_to_poly(ras_in, polys, out_dir):
                     "width": out_image.shape[2],
                     "transform": out_transform})
 
-        with rio.open(os.path.join(out_dir,f"{i}.tif", "w", **out_meta)) as dest:
+        with rio.open(os.path.join(out_path,f"{i}.tif"), "w", **out_meta) as dest:
             dest.write(out_image)
 
+def summarize_raster(ras_in,map_dict,map_product):
+    with rio.open(ras_in) as ras:
+        data = ras.read()
+
+    classes = list(map_dict[map_product]['classes'].keys())
+    #print(classes)
+    pix_count = 0
+    if 'crop' in classes:
+        crop_class = map_dict[map_product]['classes']['crop']
+        crop_tot = np.count_nonzero(data == crop_class)
+        pix_count = pix_count + crop_tot
+    if 'tree' in classes:
+        tree_class = map_dict[map_product]['classes']['tree']
+        tree_tot = np.count_nonzero(data == tree_class)
+        pix_count = pix_count + tree_tot
+    other_classes = [c for c in classes if c not in ['crop','tree']]
+    for oc in other_classes:
+        val = map_dict[map_product]['classes'][oc]
+        cat_tot = np.count_nonzero(data == val)
+        pix_count = pix_count + cat_tot
+
+    if 'crop' in classes:
+        per_crop = crop_tot / pix_count
+    else:
+        per_crop = 'NaN'
+    
+    if 'tree' in classes: 
+        per_tree = tree_tot / pix_count
+    else:
+        per_tree = 'NaN'
+        
+    return per_crop,per_tree
+                  
+def summarize_zones(polys,map_dir,clip_dir,map_dict,map_product):
+    ras_in = os.path.join(map_dir,map_dir,map_dict[map_product]['loc'])
+    clip_ras_to_poly(ras_in, polys,clip_dir,map_product)
+    plys = gpd.read_file(polys)
+    plys.drop(['geometry'],axis=1,inplace=True)
+    for i, row in plys.iterrows():
+        per_crop,per_tree = summarize_raster(os.path.join(clip_dir,map_product,f'{i}.tif'),map_dict,map_product)
+        plys.loc[i,'perCrop'] = per_crop
+        plys.loc[i,'perTree'] = per_tree
+
+    return plys
