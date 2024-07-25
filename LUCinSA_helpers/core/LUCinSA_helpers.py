@@ -292,7 +292,7 @@ def main():
                              ptfile = args.ptfile)
                                    
     if args.process == 'mosaic':
-        moasic_cells(cell_list = args.cell_list,
+        mosaic_cells(cell_list = args.cell_list,
                      in_dir_main = args.in_dir_main,
                      in_dir_local = args.in_dir_local,
                      common_str = args.common_str,

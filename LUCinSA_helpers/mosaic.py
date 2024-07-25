@@ -9,6 +9,7 @@ from rasterio.merge import merge
 import rasterio as rio
 
 def mosaic_cells(cell_list, in_dir_main, in_dir_local, common_str, out_dir):
+    out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     output_path = os.path.join(out_dir,'{}_mosaic.tif'.format(common_str))
     
