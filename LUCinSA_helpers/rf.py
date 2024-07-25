@@ -644,6 +644,10 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
             dic[feature_model]['combo_bands'] = combo_bands
             
             band_names = []
+            if spec_indices is not None and spec_indices != 'None':
+                for si in spec_indices:
+                    for sv in si_vars:
+                        band_names.append(f'{si}_{sv}')
             if combo_bands is not None and combo_bands != 'None':
                 for cb in combo_bands:
                     band_names.append(cb)
@@ -651,18 +655,14 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
                 for sip in spec_indices_pheno:
                     for pv in pheno_vars:
                         band_names.append(f'{sip}_{pv}')
-            if spec_indices is not None and spec_indices != 'None':
-                for si in spec_indices:
-                    for sv in si_vars:
-                        band_names.append(f'{si}_{sv}')
             if singleton_vars is not None and singleton_vars != 'None':
                 for sin in singleton_vars:
                     band_names.append(f'sing_{sin}')
             if poly_vars is not None and poly_vars != 'None':       
                 for pv in poly_vars:
                     band_names.append(f'poly_{pv}')
-            all_bands = list(set(band_names))
-            dic[feature_model]['band_names'] = all_bands
+
+            dic[feature_model]['band_names'] = band_names
             with open(feature_mod_dict, 'w') as new_feature_model_dict:
                 json.dump(dic, new_feature_model_dict)
             print(f'created new model: {feature_model} \n spec_indices={spec_indices} \n si_vars={si_vars} \n pheno_vars={pheno_vars} on {spec_indices_pheno} \n singleton_vars={singleton_vars} \n poly_vars={poly_vars} \n combo_bands={ combo_bands} \n')
@@ -816,7 +816,11 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                 if poly_vars is not None and poly_vars != 'None':
                     sys.stdout.write('getting poly variables... \n')
                     for pv in poly_vars:
-                        poly_path = os.path.join(poly_var_path,f'{pv}_{cell}.tif')
+                        if pv.startswith('poly'):
+                            stored_name = pv.replace('poly','pred')
+                            poly_path = os.path.join(poly_var_path,f'{stored_name}_{cell}.tif')
+                        else:
+                            poly_path = os.path.join(poly_var_path,f'{pv}_{cell}.tif')
                         poly_comp_path = os.path.join(poly_var_path,f'pred_PY_{cell}.tif')
                         if os.path.isfile(poly_path):
                             ## pred_area is in m2 with vals too big for stack datatype. Rescale:
@@ -835,8 +839,13 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                             else:
                                 stack_paths.append(poly_path)
                                 band_names.append(pv)
+                        elif pv in ['NovDecGCVI_Std','poly_NovDecStd','NovDecStd']:
+                            alt_poly_path = os.path.join(poly_var_path,f'AvgNovDec_FieldStd_{cell}.tif')
+                            if os.path.isfile(alt_poly_path):
+                                stack_paths.append(alt_poly_path)
+                                band_names.append(pv)
                         elif os.path.isfile(poly_comp_path):
-                            if pv == 'pred_ext':
+                            if pv in ['pred_ext','poly_ext']:
                                 with rio.open(poly_comp_path) as src:
                                     vals = src.read([1])
                                     profile = src.profile
@@ -846,7 +855,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                         new_b.write(vals)
                                 stack_paths.append(new_file)
                                 band_names.append(pv)           
-                            elif pv == 'pred_dst':
+                            elif pv in ['pred_dst','poly_dst']:
                                 with rio.open(poly_comp_path) as src:
                                     vals = src.read([2])
                                     profile = src.profile
@@ -856,7 +865,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                         new_b.write(vals)
                                 stack_paths.append(new_file)
                                 band_names.append(pv)    
-                            elif pv == 'pred_cropbnds':
+                            elif pv in ['pred_cropbnds','poly_cropbnds']:
                                 with rio.open(poly_comp_path) as src:
                                     vals = src.read([3])
                                     profile = src.profile
@@ -875,7 +884,6 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                                 poly_vars = None
                                       
                 sys.stdout.write(f'Final stack will have {band_names} bands \n')
-                sys.stdout.write(f'band names = {band_names} \n')
                 sys.stdout.write('making variable stack... \n')
                 #sys.stdout.write(f'All paths are {stack_paths} \n')
 
