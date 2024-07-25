@@ -1046,22 +1046,38 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
     with gw.open(saved_stack) as src0:
         #sys.stdout.write(f'{src0.attrs} \n')
         stack_bands = src0.attrs['descriptions']
+        sys.stdout.write(f'bands in stack: {stack_bands} \n')
     bands_out = []
     band_names = []
     for b in model_bands:
+        #sys.stdout.write(f'looking for {b}:')
+        found_band = False
         for i, v in enumerate(stack_bands):
+            #sys.stdout.write(f'{v}')
             if v == b:
                 bands_out.append(i+1)
                 band_names.append(v)
+                #sys.stdout.write(' -- found! \n')
+                found_band = True
+                break
             elif b.startswith('sing') and v == b.split('_')[1]:
                 bands_out.append(i+1)
                 band_names.append(f'sing_{v}')
+                #sys.stdout.write(' -- found! \n')
+                found_band = True
+                break
             elif b.startswith('poly') and v == b.split('_',1)[1]:
                 bands_out.append(i+1)
                 band_names.append(f'poly_{v}')
+                #sys.stdout.write(' -- found! \n')
+                found_band = True
+                break
             else:
-                sys.stderr.write(f'ERROR: band {v} not found in stack \n')
-                return False
+                #sys.stdout.write('...')
+                pass
+        if found_band == False:
+            sys.stderr.write(f'ERROR: band {b} not found in stack \n')
+            return False
             
     sys.stdout.write(f'bands used for model: {bands_out}')
     
