@@ -121,43 +121,104 @@ def summarize_raster(ras_in,map_dict,map_product):
     with rio.open(ras_in) as ras:
         data = ras.read()
 
-    classes = list(map_dict[map_product]['classes'].keys())
-    #print(classes)
+    class_dict = {}
     pix_count = 0
-    if 'crop' in classes:
-        crop_class = map_dict[map_product]['classes']['crop']
-        crop_tot = np.count_nonzero(data == crop_class)
-        pix_count = pix_count + crop_tot
-    if 'tree' in classes:
-        tree_class = map_dict[map_product]['classes']['tree']
-        tree_tot = np.count_nonzero(data == tree_class)
-        pix_count = pix_count + tree_tot
-    other_classes = [c for c in classes if c not in ['crop','tree']]
-    for oc in other_classes:
-        val = map_dict[map_product]['classes'][oc]
-        cat_tot = np.count_nonzero(data == val)
-        pix_count = pix_count + cat_tot
-
-    if 'crop' in classes:
-        per_crop = crop_tot / pix_count
-    else:
-        per_crop = 'NaN'
+    mono_crop_tot = 0
+    med_crop_tot = 0
+    mix_crop_tot = 0
+    tree_plant_tot = 0
+    tree_tot = 0
+    crop_tot = 0
+    other_tot = 0
     
-    if 'tree' in classes: 
-        per_tree = tree_tot / pix_count
-    else:
-        per_tree = 'NaN'
+    if map_product.startswith('LUCin') or map_product.startswith('CEL'):
+        mono_crop_classes = list(range(20, 39))
+        for c in mono_crop_classes:
+            c_count = np.count_nonzero(data == c)
+            mono_crop_tot = mono_crop_tot + c_count
+            pix_count = pix_count + c_count
         
-    return per_crop,per_tree
-                  
-def summarize_zones(polys,map_dir,clip_dir,map_dict,map_product):
-    ras_in = os.path.join(map_dir,map_dir,map_dict[map_product]['loc'])
+        mix_crop_class = 35
+        mix_crop_tot = np.count_nonzero(data == mix_crop_class)
+        pix_count = pix_count + mix_crop_tot
+        
+        med_crop_classes = list(range(40, 49))
+        for md in med_crop_classes:
+            md_count = np.count_nonzero(data == md)
+            med_crop_tot = med_crop_tot + md_count
+            pix_count = pix_count + md_count
+        
+        tree_plant_class = 60
+        tree_plant_tot = np.count_nonzero(data == tree_plant_class)
+        pix_count = pix_count + tree_plant_tot
+        
+        tree_classes = [65,68,70,80]
+        for tc in tree_classes:
+            tc_count = np.count_nonzero(data == tc)
+            tree_tot = tree_tot + tc_count
+            pix_count = pix_count + tc_count
+        
+        no_veg = list(range(0, 9))
+        low_veg = list(range(10, 19))
+        med_veg = list(range(50, 59))
+        other_classes = no_veg + low_veg + med_veg
+        for oc in other_classes:
+            oc_count = np.count_nonzero(data == oc)
+            other_tot = other_tot + oc_count
+            pix_count = pix_count + oc_count
+        
+        crop_tot = mono_crop_tot + mix_crop_tot + med_crop_tot
+
+    else:
+        classes = list(map_dict[map_product]['classes'].keys())
+        #print(classes)
+    
+        if 'crop' in classes:
+            crop_class = map_dict[map_product]['classes']['crop']
+            crop_tot = np.count_nonzero(data == crop_class)
+            pix_count = pix_count + crop_tot
+        if 'tree' in classes:
+            tree_class = map_dict[map_product]['classes']['tree']
+            tree_tot = np.count_nonzero(data == tree_class)
+            pix_count = pix_count + tree_tot
+        other_classes = [c for c in classes if c not in ['crop','tree']]
+        for oc in other_classes:
+            val = map_dict[map_product]['classes'][oc]
+            cat_tot = np.count_nonzero(data == val)
+            other_tot = other_tot + cat_tot
+            pix_count = pix_count + cat_tot
+       
+    class_dict['per_crop_mono'] = mono_crop_tot / pix_count
+    class_dict['per_crop_med'] = med_crop_tot / pix_count
+    class_dict['per_crop_mix'] = mix_crop_tot / pix_count
+    class_dict['per_crop'] = crop_tot / pix_count
+    class_dict['per_tree'] = tree_tot / pix_count
+    class_dict['per_tree_plant'] = tree_plant_tot / pix_count
+    class_dict['other'] = other_tot / pix_count
+    class_dict['numpix'] = pix_count
+          
+    return class_dict
+  
+def summarize_zones(polys,map_dir,clip_dir,map_product,map_dict=None,out_dir=None):
+    if map_dict is not None and map_dict !='None':
+        file_name = map_dict[map_product]['loc']
+    else:
+        file_name = f'{map_product}.tif' 
+    ras_in = os.path.join(map_dir,file_name)
     clip_ras_to_poly(ras_in, polys,clip_dir,map_product)
     plys = gpd.read_file(polys)
     plys.drop(['geometry'],axis=1,inplace=True)
     for i, row in plys.iterrows():
-        per_crop,per_tree = summarize_raster(os.path.join(clip_dir,map_product,f'{i}.tif'),map_dict,map_product)
-        plys.loc[i,'perCrop'] = per_crop
-        plys.loc[i,'perTree'] = per_tree
+        per_classes = summarize_raster(os.path.join(clip_dir,map_product,f'{i}.tif'),map_dict,map_product)
+        for key, value in per_classes.items():
+            print(f'class={key},val={value}')
+            if value > 0:
+                plys.loc[i, f'{key}'] = value
 
+    print(plys)
+   
+    if out_dir is not None:
+        out_path = os.path.join(out_dir,f'zone_summary_{map_product}.csv')
+        pd.DataFrame.to_csv(plys, out_path, sep=',', index=True)
+    
     return plys

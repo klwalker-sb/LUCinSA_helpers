@@ -1227,18 +1227,19 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         
         stack_path = os.path.join(cell_dir,'comp',f'{feature_model}_{start_yr}_stack.tif')
-        ## Can make a noPoly model with a Poly stack:
-        if 'NoPoly' in feature_model:
-            poly_model = feature_model.replace('NoPoly','Poly')
-            alt_path = os.path.join(cell_dir, 'comp', f'{poly_model}_{start_yr}_stack.tif')
-        
         sys.stderr.write(f'looking for stack: {stack_path}... \n')
         if os.path.isfile(stack_path):
             sys.stderr.write(f'stack file already exists for model {feature_model} \n')
             var_stack = stack_path
-        elif os.path.isfile(alt_path):
-            sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
-            var_stack = alt_path
+        
+        elif 'NoPoly' in feature_model:
+            ## Can make a noPoly model with a Poly stack
+            poly_model = feature_model.replace('NoPoly','Poly')
+            alt_path = os.path.join(cell_dir, 'comp', f'{poly_model}_{start_yr}_stack.tif')
+            if os.path.isfile(alt_path):
+                sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
+                var_stack = alt_path
+        
         else:
             # make variable stack if it does not exist (for example for cells without sample pts)
             # -- will not be remade if a file named {feature_model}_{start_year}_stack.tif already exists in ts_dir/comp

@@ -13,6 +13,7 @@ from LUCinSA_helpers.rf import make_variable_stack, rf_model, rf_classification
 from LUCinSA_helpers.mosaic import mosaic_cells
 from LUCinSA_helpers.ras_tools import downsample_images
 from LUCinSA_helpers.model_iterations import iterate_all_models_for_sm_test
+from LUCinSA_helpers.ras_tools import summarize_zones
 from LUCinSA_helpers.version import __version__
 
 def main():
@@ -58,6 +59,7 @@ def main():
                            'rf_model', 
                            'rf_classification', 
                            'mosaic',
+                           'summarize_zones',
                            'downsample',
                            'iterate_models'
                           ]
@@ -128,6 +130,15 @@ def main():
             subparser.add_argument('--common_str', dest='common_str', help='unique string in file name for mosaic', default=None)
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
         
+        if process == 'summarize_zones':
+            subparser.add_argument('--polys', dest='polys', help='path to polygon file', default=None)
+            subparser.add_argument('--map_dir', dest='map_dir', help='path to directory containing maps to summarize', default=None)
+            subparser.add_argument('--clip_dir', dest='clip_dir', 
+                                   help='path to directory in which to stoore clipped polygons', default=None)
+            subparser.add_argument('--map_dict', dest='map_dict', help='dictionary with map info', default=None)
+            subparser.add_argument('--map_product', dest='map_product', help='name of map to summarize', default=None)
+            subparser.add_argument('--out_dir', dest='out_dir', help='directory for output summary table', default=None)
+            
         if process == 'downsample':
             subparser.add_argument('--cell_list', dest='cell_list', help='list of cells involved', default=None)
             subparser.add_argument('--in_dir_main', dest='in_dir_main', help='overarching directory with all cells', default=None)
@@ -297,6 +308,14 @@ def main():
                      in_dir_local = args.in_dir_local,
                      common_str = args.common_str,
                      out_dir = args.out_dir)
+        
+    if args.process == 'summarize_zones':
+        summarize_zones(polys = args.polys,
+                        map_dir=args.map_dir,
+                        clip_dir=args.clip_dir,
+                        map_product=args.map_product,
+                        map_dict=args.map_dict,
+                        out_dir=args.out_dir)
         
     if args.process == 'downsample':
         downsample_images(cell_list = args.cell_list,
