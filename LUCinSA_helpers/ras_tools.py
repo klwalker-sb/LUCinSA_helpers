@@ -239,10 +239,12 @@ def get_variables_at_pts_external(out_dir, ras_in,ptfile,out_col,out_name):
     
     return ptsgdb
 
-def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut, lut_colout='LC_UNQ', print_cm=False, out_dir=None, model_name=None):
+def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut, lut_colout='LC_UNQ', nodata=0, print_cm=False, out_dir=None, model_name=None):
     '''
-    returns confusion matrix with optional regrouping of classes based on LUT
+    returns confusion matrix with optional regrouping of classes based on LUT <lut> 
     <lut> contains a column with unique ids called <'LC_UNQ'> (which matches values in <pred_col> and <obs_col> of <samp_file>)
+       <pred_col> is the column with values extracted from the map to summarize
+       <obs_col> is the column with values obeserved with the validation method (e.g. on the ground / high-res imagery)
        <lut_colout> is the name of an optional additional column in <lut> used to group observations
     '''
     if isinstance(samp_file, pd.DataFrame):
@@ -258,6 +260,8 @@ def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut, lut_colout='
     cmdf = pd.DataFrame()
     cmdf['pred'] = samp[pred_col]
     cmdf['obs'] = samp[obs_col]
+    ## drop points that do not overlap map
+    cmdf = cmdf[cmdf['pred'] != nodata]
     
     print(f'getting confusion matrix based on {lut_colout}...')
     cmdf2 = cmdf.merge(lut[['LC_UNQ',f'{lut_colout}_name']], left_on='obs', right_on='LC_UNQ',how='left')
