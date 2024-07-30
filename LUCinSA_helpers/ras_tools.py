@@ -222,3 +222,73 @@ def summarize_zones(polys,map_dir,clip_dir,map_product,map_dict=None,out_dir=Non
         pd.DataFrame.to_csv(plys, out_path, sep=',', index=True)
     
     return plys
+
+def get_variables_at_pts_external(out_dir, ras_in,ptfile,out_col,out_name):
+
+    ptsdf = pd.read_csv(ptfile, index_col=0)
+    ptsgdb = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs='epsg:8858')
+    #pts4326 = ptsgdb.to_crs({'init': 'epsg:4326'})
+    xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
+    coords = list(map(list, zip(*xy)))
+    
+    with rio.open(ras_in, 'r') as comp:
+        comp.np = comp.read()
+        ptsgdb[out_col] = [sample[0] for sample in comp.sample(coords)]     
+
+    pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'samp_2022_base4Poly6_bal300mix2.csv'), sep=',', index=True)
+    
+    return ptsgdb
+
+def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut, lut_colout='LC_UNQ', print_cm=False, out_dir=None, model_name=None):
+    '''
+    returns confusion matrix with optional regrouping of classes based on LUT
+    <lut> contains a column with unique ids called <'LC_UNQ'> (which matches values in <pred_col> and <obs_col> of <samp_file>)
+       <lut_colout> is the name of an optional additional column in <lut> used to group observations
+    '''
+    if isinstance(samp_file, pd.DataFrame):
+        samp = samp_file
+    else:
+        samp = pd.read_csv(samp_file)
+        
+    if isinstance(lut, pd.DataFrame):
+        lut = lut
+    else:
+        lut = pd.read_csv(lut)
+    
+    cmdf = pd.DataFrame()
+    cmdf['pred'] = samp[pred_col]
+    cmdf['obs'] = samp[obs_col]
+    
+    print(f'getting confusion matrix based on {lut_colout}...')
+    cmdf2 = cmdf.merge(lut[['LC_UNQ',f'{lut_colout}_name']], left_on='obs', right_on='LC_UNQ',how='left')
+    cmdf2.rename(columns={f'{lut_colout}_name':'obs_reclass'}, inplace=True)
+    cmdf2.drop(['LC_UNQ'],axis=1,inplace=True)
+    cmdf3 = cmdf2.merge(lut[['LC_UNQ', f'{lut_colout}_name']], left_on='pred', right_on='LC_UNQ',how='left')
+    cmdf3.rename(columns={f'{lut_colout}_name':'pred_reclass'}, inplace=True)
+    cmdf3.drop(['LC_UNQ'],axis=1,inplace=True)
+    cm=pd.crosstab(cmdf3['pred_reclass'],cmdf3['obs_reclass'],margins=True)
+    cm['correct'] = cm.apply(lambda x: x[x.name] if x.name in cm.columns else 0, axis=1)
+    cm['sumcol'] = cm.apply(lambda x: cm.loc['All', x.name] if x.name in cm.columns else 0)
+    cm['UA'] = cm['correct']/cm['All']
+    cm['PA'] = cm['correct']/cm['sumcol']
+    cm['F1'] = (2 * cm['UA'] * cm['PA'])/(cm['UA'] + cm['PA'])
+    #cm['F_5'] = (1.25 * cm['UA'] * cm['PA'])/.25*(cm['UA'] + cm['PA'])
+    #cm['F_25'] = (1.0625 * cm['UA'] * cm['PA'])/.0625*(cm['UA'] + cm['PA'])
+    total = cm.at['All','correct']
+    cm.at['All','UA'] = (cm['correct'].sum() - total) / total
+    cm.at['All','PA'] = (cm['correct'].sum() - total) / total
+    if lut_colout == 'LC2':
+        cm.at['All','F1']=cm.at['crop','F1']
+        TP = cm.at['crop', 'crop']
+        FP = cm.at['crop', 'nocrop']
+        FN = cm.at['nocrop', 'crop']
+        TN = cm.at['nocrop','nocrop']
+        All = TP + FP + FN + TN
+        cm['Kappa'] = 2*(TP*TN - FN*FP)/((TP+FP)*(FP+TN)+(TP+FN)*(FN+TN))
+    
+    #print(f'Confusion Matrix: {cm}')
+    if print_cm == True:
+        mod_path = os.path.join(out_dir,f'cm_{model_name}_{lut_colout}.csv')
+        pd.DataFrame.to_csv(cm, mod_path, sep=',', index=True)
+    
+    return cm

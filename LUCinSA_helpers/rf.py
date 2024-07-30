@@ -1239,7 +1239,12 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
             if os.path.isfile(alt_path):
                 sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
                 var_stack = alt_path
-        
+            else:   ##TODO:  Use grep for this
+                alt_path2 = os.path.join(cell_dir, 'comp',f'{poly_model}6_{start_yr}_stack.tif')
+                if os.path.isfile(alt_path2):
+                     sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
+                     var_stack = alt_path2
+
         else:
             # make variable stack if it does not exist (for example for cells without sample pts)
             # -- will not be remade if a file named {feature_model}_{start_year}_stack.tif already exists in ts_dir/comp
