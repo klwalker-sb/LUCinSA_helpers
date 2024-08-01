@@ -50,6 +50,31 @@ def print_files_in_directory(in_dir,endstring,print_list=False,out_dir=None,data
         
         return filedf
 
+def print_list_of_cells_with_file(cell_dir,sub_dir,filename,noexist=False):
+    cell_list = []
+    missing_list = []
+    cell_dir = Path(cell_dir)
+    for x in cell_dir.iterdir():
+        if x.is_dir():
+            for sx in x.iterdir():
+                if os.path.basename(sx) == sub_dir:
+                    found_f = False
+                    for f in sx.iterdir():
+                        if filename == os.path.basename(f) or f'{os.path.basename(x)}_{filename}' == os.path.basename(f):
+                            cell_list.append(os.path.basename(x))
+                            found_f = True
+                    if found_f == False:
+                        missing_list.append(os.path.basename(x))
+    if noexist==False:
+        cell_list.sort()
+        print(cell_list)
+        return cell_list
+    else:
+        missing_list.sort()
+        print(missing_list)
+        return missing_list
+                       
+                    
 def print_files_in_multiple_directories(full_dir,sub_dir,endstring,print_list=False,out_dir=None):
     '''
     This will return a dataframe with all files ending in {endstring} in each directory named {sub_dir} within the {full_dir}

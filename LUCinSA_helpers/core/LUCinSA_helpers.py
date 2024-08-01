@@ -5,7 +5,8 @@ from LUCinSA_helpers.check_log_files_dl import check_dl_logs
 from LUCinSA_helpers.ts_profile import get_timeseries_for_pts_multicell
 from LUCinSA_helpers.ts_composite import make_ts_composite, check_ts_windows
 from LUCinSA_helpers.pheno import make_pheno_vars
-from LUCinSA_helpers.file_checks import reconstruct_db, get_cell_status, check_valid_pixels, update_cell_status_db
+from LUCinSA_helpers.file_checks import reconstruct_db, get_cell_status, print_list_of_cells_with_file
+from LUCinSA_helpers.file_checks import check_valid_pixels, update_cell_status_db
 from LUCinSA_helpers.file_checks import print_files_in_multiple_directories
 from LUCinSA_helpers.var_dataframe import make_var_dataframe
 from LUCinSA_helpers.var_dataframe import append_feature_dataframe
@@ -52,6 +53,7 @@ def main():
                            'check_valid_pix',
                            'reconstruct_db',
                            'check_ts_windows',
+                           'print_list_of_cells_with_file',
                            'summarize_images_multicell',
                            'make_var_stack',
                            'make_var_dataframe',
@@ -89,6 +91,12 @@ def main():
             subparser.add_argument('--yrs', dest ='yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
             subparser.add_argument('--data_source', dest ='data_source', 
                                    help='stac or GEE', default='stac')
+        if process == 'print_list_of_cells_with_file':
+            subparser.add_argument('--cell_dir', dest='cell_dir', help='main directory with all cell directories to check')
+            subparser.add_argument('--sub_dir', dest='sub_dir', help='name of subfolder to find file')
+            subparser.add_argument('--filename', dest = 'filename', help='name of file to search for')
+            subparser.add_argument('--noexist', dest= 'noexist', help='if true, print list of cells without file in question', 
+                                   default=False)                     
         if process == 'update_summary_db':
             subparser.add_argument('--status_db_path', dest = 'status_db_path', 
                                    help='path to master processing database') 
@@ -278,6 +286,13 @@ def main():
                               cell_list = args.cell_list, 
                               dl_dir = args.raw_dir, 
                               processed_dir = args.processed_dir)
+        
+    if args.process == 'print_list_of_cells_with_file':
+        print_list_of_cells_with_file(
+        cell_dir = args.cell_dir,
+        sub_dir = args.sub_dir,
+        filename = args.filename,
+        noexist= args.noexist)
         
     if args.process == 'summarize_images_multicell':
         print_files_in_multiple_directories(full_dir = args.full_dir,
