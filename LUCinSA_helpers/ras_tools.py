@@ -239,37 +239,47 @@ def get_variables_at_pts_external(out_dir, ras_in,ptfile,out_col,out_name):
     
     return ptsgdb
 
-def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut, lut_colout='LC_UNQ', nodata=0, print_cm=False, out_dir=None, model_name=None):
+def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut_valid, lut_map, lut_colout='LC_UNQ', nodata=None, print_cm=False, out_dir=None, model_name=None):
     '''
-    returns confusion matrix with optional regrouping of classes based on LUT <lut> 
-    <lut> contains a column with unique ids called <'LC_UNQ'> (which matches values in <pred_col> and <obs_col> of <samp_file>)
-       <pred_col> is the column with values extracted from the map to summarize
-       <obs_col> is the column with values obeserved with the validation method (e.g. on the ground / high-res imagery)
-       <lut_colout> is the name of an optional additional column in <lut> used to group observations
+    returns confusion matrix with optional regrouping of classes based on dataframe containing 
+         <pred_col> = the column with values extracted from the map to summarize
+          <obs_col> =  the column with values obeserved with the validation method (e.g. on the ground / high-res imagery)
+    these are linked using the respective <lut_map> and <lut_valid> lookup tables.
+    Both luts need to have a column with unique ids called <'LC_UNQ'> (which matches values in <pred_col> and <obs_col> of <samp_file>). 
+    Unless these are equal, both also need a column with matching translations named <lut_colout>
     '''
     if isinstance(samp_file, pd.DataFrame):
         samp = samp_file
     else:
         samp = pd.read_csv(samp_file)
         
-    if isinstance(lut, pd.DataFrame):
-        lut = lut
+    if isinstance(lut_valid, pd.DataFrame):
+        lut_valid = lut_valid
     else:
-        lut = pd.read_csv(lut)
+        lut_valid = pd.read_csv(lut_valid)
+        
+    if isinstance(lut_map, pd.DataFrame):
+        lut_map = lut_map
+    else:
+        lut_map = pd.read_csv(lut_map)
     
     cmdf = pd.DataFrame()
     cmdf['pred'] = samp[pred_col]
     cmdf['obs'] = samp[obs_col]
     ## drop points that do not overlap map
-    cmdf = cmdf[cmdf['pred'] != nodata]
+    if nodata is not None:
+        cmdf = cmdf[cmdf['pred'] != nodata]
     
     print(f'getting confusion matrix based on {lut_colout}...')
-    cmdf2 = cmdf.merge(lut[['LC_UNQ',f'{lut_colout}_name']], left_on='obs', right_on='LC_UNQ',how='left')
+    ## reclass obs col using lut_valid (match on LC_UNQ, then reclass to <lut_colout>)
+    cmdf2 = cmdf.merge(lut_valid[['LC_UNQ',f'{lut_colout}_name']], left_on='obs', right_on='LC_UNQ',how='left')
     cmdf2.rename(columns={f'{lut_colout}_name':'obs_reclass'}, inplace=True)
     cmdf2.drop(['LC_UNQ'],axis=1,inplace=True)
-    cmdf3 = cmdf2.merge(lut[['LC_UNQ', f'{lut_colout}_name']], left_on='pred', right_on='LC_UNQ',how='left')
+    ## reclass pred col using lut_map (match on LC_UNQ, then reclass to <lut_colout>)
+    cmdf3 = cmdf2.merge(lut_map[['LC_UNQ', f'{lut_colout}_name']], left_on='pred', right_on='LC_UNQ',how='left')
     cmdf3.rename(columns={f'{lut_colout}_name':'pred_reclass'}, inplace=True)
     cmdf3.drop(['LC_UNQ'],axis=1,inplace=True)
+    ## Now use crosstabs to get confusion matrix
     cm=pd.crosstab(cmdf3['pred_reclass'],cmdf3['obs_reclass'],margins=True)
     cm['correct'] = cm.apply(lambda x: x[x.name] if x.name in cm.columns else 0, axis=1)
     cm['sumcol'] = cm.apply(lambda x: cm.loc['All', x.name] if x.name in cm.columns else 0)

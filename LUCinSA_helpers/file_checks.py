@@ -411,13 +411,12 @@ def check_valid_pixels(raw_dir, brdf_dir, grid_cell, image_type='All', yrs=None,
         
     return df_brdf
 
-def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default'):
+def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default', cc=90):
     '''
     Gets list of images available on Planetary Hub for range of years {Yrs} [YYYY, YYYY]
     for {gridCell} CCCC and sensor {'Landsat' or 'Sentinel'}
     returns dataFrame with column of image ids
     '''
-    import pystac_client
     import planetary_computer as pc
     from pystac_client import Client
     from pystac.extensions.eo import EOExtension as eo
@@ -425,34 +424,45 @@ def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default')
     grid = gpd.read_file(grid_file)
     if grid.crs != pyproj.CRS.from_epsg(4326):
         grid = grid.to_crs('epsg:4326')
-    bb = grid.query(f'UNQ == {[grid_cell]}').geometry.total_bounds
+    bb = grid.query(f'UNQ == {grid_cell}').geometry.total_bounds
 
     if yrs == None:
-        TimeSlice="2010-01-01/2022-12-30"
+        time_slice="2010-01-01/2022-12-30"
     else:
         time_slice=f"{yrs[0]}-01-01/{yrs[1]}-12-30"
         
     if sensor.startswith('l'):
         collect=["landsat-c2-l2"]
-        api = pystac_client.Client.open("https://planetarycomputer.microsoft.com/api/stac/v1/")
-
-    elif sensor == ('s'):
         if cat == 'default':
-            collect=['sentinel-s2-l2a-cogs']  #if using element84
-            api =  pystac_client.Client.open("https://earth-search.aws.element84.com/v0")
+            api = Client.open("https://planetarycomputer.microsoft.com/api/stac/v1/")
+        elif cat == 'element84':
+            api =  Client.open("https://earth-search.aws.element84.com/v1")
+    elif sensor == ('s2'):
+        if cat == 'default':
+            collect=["sentinel-2-l2a"]
+            api =  Client.open("https://earth-search.aws.element84.com/v1")
+        elif cat == 'archival2023': 
+            collect=['sentinel-s2-l2a-cogs'] 
+            api =  Client.open("https://earth-search.aws.element84.com/v0")
+            api.add_conforms_to("ITEM_SEARCH") # see https://pystac-client.readthedocs.io/en/latest/usage.html#api-conformance
         elif cat == 'planetary':
             collect=["sentinel-2-l2a"]
             api = pystac_client.Client.open("https://planetarycomputer.microsoft.com/api/stac/v1/")
     
-    search = api.search(bbox=bb,
+    scene_results = api.search(bbox=bb,
             datetime=time_slice,
             collections=collect,
-            query={"eo:cloud_cover": {"lt": 90}},
+            query=[f'eo:cloud_cover<{cc}'],
             max_items = 10000)
     
-    items = list(search.get_items())
-    cat_ids = pd.DataFrame({'id':[o.id for o in items]})
-    print(f"Returned {len(items)} Items")
+    num_found = scene_results.matched()
+    print(f'{num_found} scenes were found meeting criteria')
+    
+    items = list(scene_results.item_collection())
+    cat_ids = pd.DataFrame({'id':[o.id for o in items],
+                            'obs': [o.properties["datetime"]for o in items],
+                            'cloudcov': [o.properties["eo:cloud_cover"]for o in items]
+                            })
 
     return cat_ids
 
