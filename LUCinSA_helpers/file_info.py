@@ -29,7 +29,7 @@ def get_img_date(img, image_type, data_source=None):
     if 'Smooth' in image_type:  #Expects images to be named YYYYDDD
         YYYY = int(img_base[:4])
         doy = int(img_base[4:7])
-    elif image_type not in ['Sentinel','Landsat','Landsat5','Landsat7','Landsat8','Landsat9','AllRaw']:
+    elif image_type not in ['Sentinel2','Landsat','Landsat5','Landsat7','Landsat8','Landsat9','AllRaw']:
         print ('Currently valid image types are Smooth,Smooth_old,Sentinel,Landsat(5,7,8,9) and AllRaw. You put {}'.format(image_type))
     else:
         if image_type == 'Sentinel' and 'brdf' not in str(img_base):
@@ -91,7 +91,7 @@ def get_closest_image(img_dir, image_type, data_source, target_yr, target_day):
                 elif data_source == 'stac' and ('brdf' in str(imdir)):
                     img_typ = os.path.basename(img).split('_')[1][:4]
                 
-                if (image_type in ['Sentinel','AllRaw'] and img_typ[:2] in ['S2','L1']) or (image_type in ['Landsat','AllRaw'] and img_typ[:2] in['LC','LT','LE']) or (image_type == 'Landsat7' and img_typ == 'LE07') or (image_type == 'Landsat8' and img_typ == 'LC08') or (image_type == 'Landsat9' and img_typ == 'LC09') or (image_type == 'Landsat5' and img_typ == 'LT05'):
+                if (image_type in ['Sentinel2','AllRaw'] and img_typ[:2] in ['S2','L1']) or (image_type in ['Landsat','AllRaw'] and img_typ[:2] in['LC','LT','LE']) or (image_type == 'Landsat7' and img_typ == 'LE07') or (image_type == 'Landsat8' and img_typ == 'LC08') or (image_type == 'Landsat9' and img_typ == 'LC09') or (image_type == 'Landsat5' and img_typ == 'LT05'):
                     if all(x not in img for x in ['angles','cloudless']):
                         img_files.append(img)
                         img_date = get_img_date(img, image_type, data_source)

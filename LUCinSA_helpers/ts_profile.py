@@ -281,6 +281,8 @@ def plot_pts_in_polys(polys, npts, samp_id=1, zoom=200, seed=88):
 def calculate_raw_index(nir_val, b2_val, spec_index):
     if spec_index == 'evi2':
         index_val =  10000* 2.5 * ((nir_val/10000 - b2_val/10000) / (nir_val/10000 + 1.0 + 2.4 * b2_val/10000))
+    elif spec_index == 'gcvi':
+        index_val = 10000* (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
     elif spec_index == 'ndvi':
         index_val = 10000* (nir_val - b2_val) / ((nir_val + b2_val) + 1e-9)
     elif spec_index == 'savi':
@@ -340,7 +342,7 @@ def get_index_vals_at_pts(out_dir, ts_stack, image_type, polys, spec_index, num_
             with rio.open(img, 'r') as src:
                 #ptsgdb[img_name] = [sample[0] for sample in src.sample(coords)]
                 pt_dict[img_name] = [sample[0] for sample in src.sample(coords)]
-        elif image_type in ['Sentinel','Landsat','AllRaw']:
+        elif image_type in ['Sentinel2','Landsat','AllRaw']:
             xrimg = xr.open_dataset(img)
             xr_nir = xrimg['nir'].where(xrimg['nir'] < 10000)
             #xr_nir = xrimg['nir'].map({>9999: np.nan, < 10000: xrimg['nir']})
@@ -444,7 +446,7 @@ def get_timeseries_for_pts_multicell(out_dir, spec_index, start_yr, end_yr, img_
                             ts_stack.append(os.path.join(img_dir,cell_dir,img))
             else:
                 cell_dir = os.path.join(img_dir,'{:06d}'.format(cell),'brdf')
-                if image_type == 'Sentinel':
+                if image_type == 'Sentinel2':
                     matchstr = ['S2']
                 if image_type == 'Landsat5':
                     matchstr = ['LT']

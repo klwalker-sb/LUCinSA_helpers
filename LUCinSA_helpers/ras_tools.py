@@ -12,6 +12,7 @@ import pandas as pd
 import rasterio.mask
 import fiona
 import numpy as np
+import json
 #import rioxarray
 
 def make_test_patch(xpt,ypt,img_in,out_name,out_dir,nbsize,res):
@@ -62,7 +63,7 @@ def downsample_images(cell_list, in_dir_main, local_dir, common_str, out_dir_mai
     for cell in cells:
         cell_path = os.path.join(in_dir_main,'{:06d}'.format(int(cell)), local_dir)
         if not os.path.exists(cell_path):
-            print('there is no {} folder for cell {}.'.format(local_dir, cell))
+            print(f'there is no {local_dir} folder for cell {cell}.')
         else:
             out_dir = os.path.join(out_dir_main,'{:06d}'.format(int(cell)), local_dir)
             Path(out_dir).mkdir(parents=True, exist_ok=True)
@@ -132,21 +133,24 @@ def summarize_raster(ras_in,map_dict,map_product):
     other_tot = 0
     
     if map_product.startswith('LUCin') or map_product.startswith('CEL'):
-        mono_crop_classes = list(range(20, 39))
+        mono_crop_classes = [31,32,33,34,36,37,38,39]
         for c in mono_crop_classes:
             c_count = np.count_nonzero(data == c)
             mono_crop_tot = mono_crop_tot + c_count
             pix_count = pix_count + c_count
         
         mix_crop_class = 35
-        mix_crop_tot = np.count_nonzero(data == mix_crop_class)
-        pix_count = pix_count + mix_crop_tot
+        mix_count = np.count_nonzero(data == mix_crop_class)
+        mix_crop_tot = mix_crop_tot + mix_count
+        pix_count = pix_count + mix_count
         
         med_crop_classes = list(range(40, 49))
         for md in med_crop_classes:
             md_count = np.count_nonzero(data == md)
             med_crop_tot = med_crop_tot + md_count
             pix_count = pix_count + md_count
+        
+        crop_tot = mono_crop_tot + mix_crop_tot + med_crop_tot
         
         tree_plant_class = 60
         tree_plant_tot = np.count_nonzero(data == tree_plant_class)
@@ -158,7 +162,7 @@ def summarize_raster(ras_in,map_dict,map_product):
             tree_tot = tree_tot + tc_count
             pix_count = pix_count + tc_count
         
-        no_veg = list(range(0, 9))
+        no_veg = list(range(1, 9))
         low_veg = list(range(10, 19))
         med_veg = list(range(50, 59))
         other_classes = no_veg + low_veg + med_veg
@@ -167,8 +171,6 @@ def summarize_raster(ras_in,map_dict,map_product):
             other_tot = other_tot + oc_count
             pix_count = pix_count + oc_count
         
-        crop_tot = mono_crop_tot + mix_crop_tot + med_crop_tot
-
     else:
         classes = list(map_dict[map_product]['classes'].keys())
         #print(classes)
@@ -188,13 +190,13 @@ def summarize_raster(ras_in,map_dict,map_product):
             other_tot = other_tot + cat_tot
             pix_count = pix_count + cat_tot
        
-    class_dict['per_crop_mono'] = mono_crop_tot / pix_count
-    class_dict['per_crop_med'] = med_crop_tot / pix_count
-    class_dict['per_crop_mix'] = mix_crop_tot / pix_count
-    class_dict['per_crop'] = crop_tot / pix_count
-    class_dict['per_tree'] = tree_tot / pix_count
-    class_dict['per_tree_plant'] = tree_plant_tot / pix_count
-    class_dict['other'] = other_tot / pix_count
+    class_dict['per_crop_mono'] = round((100 * mono_crop_tot / pix_count),1)
+    class_dict['per_crop_med'] = round((100 * med_crop_tot / pix_count),1)
+    class_dict['per_crop_mix'] = round((100 * mix_crop_tot / pix_count),1)
+    class_dict['per_crop'] = round((100 * crop_tot / pix_count),1)
+    class_dict['per_tree'] = round((100 * tree_tot / pix_count),1)
+    class_dict['per_tree_plant'] = round((100 * tree_plant_tot / pix_count),1)
+    class_dict['other'] = round((100 * other_tot / pix_count),1)
     class_dict['numpix'] = pix_count
           
     return class_dict
@@ -211,17 +213,87 @@ def summarize_zones(polys,map_dir,clip_dir,map_product,map_dict=None,out_dir=Non
     for i, row in plys.iterrows():
         per_classes = summarize_raster(os.path.join(clip_dir,map_product,f'{i}.tif'),map_dict,map_product)
         for key, value in per_classes.items():
-            print(f'class={key},val={value}')
+            #print(f'class={key},val={value}')
             if value > 0:
                 plys.loc[i, f'{key}'] = value
 
-    print(plys)
+    #print(plys)
    
     if out_dir is not None:
         out_path = os.path.join(out_dir,f'zone_summary_{map_product}.csv')
         pd.DataFrame.to_csv(plys, out_path, sep=',', index=True)
     
     return plys
+
+
+def summarize_district_polys(polys, map_product, scratch_dir, test=True):
+    
+    Path(scratch_dir).mkdir(parents=True, exist_ok=True)
+    if map_product.startswith('LUCin') or map_product.startswith('CEL'):
+        model= map_product.split('_')[1:3]
+        model_name = f'{model[0]}_{model[1]}_LC25' 
+        map_dir = "/home/downspout-cel/paraguay_lc/mosaics"
+        output_dir = "/home/downspout-cel/paraguay_lc/classification/RF/model_stats"
+        map_dict = None
+        all_scores_tab = os.path.join(output_dir,'CEL_model_scores.csv')
+        all_scores_dict = os.path.join(output_dir,'CEL_model_scores_dict.json')
+    else:
+        map_dir = "/home/downspout-cel/paraguay_lc/lc_prods"
+        output_dir = "/home/downspout-cel/paraguay_lc/lc_prods"
+        map_dict = 'ENTER_THIS'
+        all_scores_tab = os.path.join(output_dir,'other_product_scores.csv')
+        all_scores_dict = os.path.join(output_dir,'other_product_scores.csv')
+    zone_stats = summarize_zones(polys,map_dir,scratch_dir,map_product,map_dict,out_dir=None)
+    zone_stats['crop_dif']=zone_stats['crop_estKW'] - zone_stats['per_crop']
+    zone_stats['perCrop_found']= (100 * zone_stats['per_crop'] / zone_stats['crop_estKW']).round(2)
+    zone_stats['crop_dif_abs'] = np.abs(zone_stats['crop_dif'])
+    zone_stats.to_csv(os.path.join(output_dir,f'district_summary_{model_name}.csv'))
+    avg_crop_dif = np.mean(zone_stats['crop_dif']).round(2)
+    mae_crop = np.mean(zone_stats['crop_dif_abs']).round(2)
+    perCrop_found = np.mean(zone_stats['perCrop_found']).round(2)
+    print(f'avg_crop_dif = {avg_crop_dif}, MAE = {mae_crop}')
+    print(f'perCrop_found = {perCrop_found}')
+    sm = zone_stats[zone_stats['avgFinca22']<5]
+    avg_crop_dif_sm = np.mean(sm['crop_dif']).round(2)
+    mae_crop_sm = np.mean(sm['crop_dif_abs']).round(2)
+    perCrop_found_sm = np.mean(sm['perCrop_found']).round(2)
+    print(f'avg_crop_dif_sm = {avg_crop_dif_sm}, MAE_sm = {mae_crop_sm}')
+    print(f'perCrop_found_sm = {perCrop_found_sm}')
+    lg = zone_stats[zone_stats['avgFinca22']>20]
+    avg_crop_dif_lg = np.mean(lg['crop_dif']).round(2)
+    mae_crop_lg = np.mean(lg['crop_dif_abs']).round(2)
+    perCrop_found_lg = np.mean(lg['perCrop_found']).round(2)
+    print(f'avg_crop_dif_lg = {avg_crop_dif_lg}, MAE_lg = {mae_crop_lg}')
+    print(f'perCrop_found_lg = {perCrop_found_lg}')
+    
+    dict_entry = {}
+    dict_entry["avg_crop_dif"] = avg_crop_dif
+    dict_entry["MAE_crop"] = mae_crop
+    dict_entry["avg_crop_dif_sm"] = avg_crop_dif_sm
+    dict_entry["MAE_crop_sm"] = mae_crop_sm
+    dict_entry["avg_crop_dif_lg"] = avg_crop_dif_lg
+    dict_entry["MAE_crop_lg"] = mae_crop_lg
+    dict_entry["perCrop_found_sm"] = perCrop_found_sm
+    dict_entry["perCrop_found_lg"] = perCrop_found_lg
+    dict_entry["perCrop_found"] = perCrop_found
+    
+    print(dict_entry)
+    if test == False:
+        with open(all_scores_dict, 'r+') as full_dict:
+            dic = json.load(full_dict)
+        #updated_entry = dic[model_name] | dict_entry  ##This works in Python 3.9 and above
+        entry = dic[model_name].copy()
+        entry.update(dict_entry)
+        dic[model_name] = entry
+        print(dic)
+
+        new_scores = pd.DataFrame.from_dict(dic)
+        new_scores.to_csv(all_scores_tab)
+
+        with open(all_scores_dict, 'w') as new_dict:
+            json.dump(dic, new_dict)
+    
+    return zone_stats
 
 def get_variables_at_pts_external(out_dir, ras_in,ptfile,out_col,out_name):
 

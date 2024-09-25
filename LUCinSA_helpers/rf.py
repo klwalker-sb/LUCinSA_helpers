@@ -114,43 +114,51 @@ def balance_training_data(lut, pixdf, out_dir, cutoff, mix_factor):
     allows a factor to be set for mixed (heterogeneous) classes to sample them more heavily than main classes
         (the maximum value will depend on the available samples for these classes. Current max is ~4)
     '''
-    ##   first collect the sample ratios from the LUT
-    lut=pd.read_csv(lut)
-    ordered = lut.sort_values('perLC25E')[["perLC25E", "LC25_name"]]
-    #print(ordered)
-    
-    ##   clean this df for NaN and repeats, check if the percents add up correctly, then divide as integer
-    
-    ordered = ordered.dropna()
-    ordered = ordered.drop_duplicates(subset = "perLC25E") 
-    #print(ordered)
-    
-    tot = ordered["perLC25E"].sum()
-    # print(tot)     # should be close to 1
-    
-    ##   rescale by dividing by min proportion
-    mmax = ordered["perLC25E"].max()
-    ordered["perLC25E"] = ordered["perLC25E"]/mmax
-    #print(ordered)
-    
-    ##  get sample counts for each class 
-    counts = pixdf['LC25_name'].value_counts().rename_axis("LC25_name").reset_index(name="counts")
-    #print(counts)
+    if isinstance(lut, pd.DataFrame):
+        lut = lut
+    else:
+        lut=pd.read_csv(lut)
+    if isinstance(pixdf, pd.DataFrame):
+        pixdf = pixdf
+    else:
+        pixdf = pd.read_csv(pixdf)
+        
+    if 'LC25_name' not in pixdf:
+        pixdf = pixdf.merge(lut[['USE_NAME','LC25','LC25_name','perLC25E']], left_on='Class', right_on='USE_NAME', how='left')
+
+    ## get estimated class percents (this is estimated from other maps and in column in LUT)
+    classprev = lut.sort_values('perLC25E')[["perLC25E", "LC25_name"]]
+    classprev= classprev.dropna()
+    classprev = classprev.drop_duplicates(subset = "perLC25E") 
+    tot = classprev["perLC25E"].sum()
+    # print(tot)     # should be 1
+   
+    ## get highest class percent
+    mmax = classprev["perLC25E"].max()
+    ## convert all class percents to ratio of highest
+          ## (keeping all samples from mmax class (n), n = mmax * TotalSamp  -> TotalSamp = n/mmax )
+    classprev["perLC25E"] = classprev["perLC25E"]/mmax
+    ## get number of samples for each class
+    counts = pixdf['LC25_name'].value_counts().reset_index()
+    counts.columns = ['LC25_name', 'counts']
+    print(counts)
     print(f'Total sample size before balancing is: {sum(counts["counts"])}')
     
-    ## join sample counts with scaled class proportions
-    ratiodf = ordered.merge(counts, left_on="LC25_name", right_on="LC25_name", how='left')
-    print(ratiodf)
+    ratiodf = classprev.merge(counts, left_on="LC25_name", right_on="LC25_name", how='left')
     maxsamp = ratiodf.at[ratiodf['perLC25E'].idxmax(), 'counts']
     print(f'samp size for class with max proportion is {maxsamp}')
-    ## get resample ratio based on class proportion 
+    ##  Get resample ratio based on class proportion. if existing samples are < cutoff, keep all samples. 
+    ##    Otherwise reduce according to proportion, but do not allow to go below cutoff
     ratiodf['ratios'] = np.where(ratiodf["counts"] < cutoff, 1, 
                           np.where(ratiodf["perLC25E"] * maxsamp < ratiodf["counts"], 
                              np.maximum((cutoff / ratiodf["counts"]), (ratiodf["perLC25E"] * maxsamp / ratiodf["counts"])),   
                             1))
+    
+    ## Allow for separate treatment of mixed classes based on mix_factor
     mixed_classes = ["Mixed-VegEdge", "Mixed-path", "Crops-mix"]
     ratiodf['ratios'] = np.where(ratiodf["LC25_name"].isin(mixed_classes), (ratiodf['ratios'] * mix_factor), ratiodf['ratios'])
     
+    ## Use random column to select samples (already in df here, for easy reproduction, but could make new ran column from 0-1)
     pixdf_ratios_rebal = pixdf.merge(ratiodf[['LC25_name','ratios']],left_on="LC25_name", right_on="LC25_name", how='left')
     pixdf_ratios_rebal = pixdf_ratios_rebal[pixdf_ratios_rebal['rand'] < pixdf_ratios_rebal['ratios']]
     print(pixdf_ratios_rebal['LC25_name'].value_counts())
@@ -161,6 +169,7 @@ def balance_training_data(lut, pixdf, out_dir, cutoff, mix_factor):
     pd.DataFrame.to_csv(pixdf_ratios_rebal, pixdf_path)
     
     return pixdf_ratios_rebal
+
     
 def separate_holdout(training_pix_path, holdout_field_pix_path, out_dir):
     '''
@@ -219,14 +228,14 @@ def get_confusion_matrix(pred_col, obs_col, class_lut, lc_mod_map, lc_mod_acc, p
         cm=pd.crosstab(cmdf3['pred_reclass'],cmdf3['obs_reclass'],margins=True)
     cm['correct'] = cm.apply(lambda x: x[x.name] if x.name in cm.columns else 0, axis=1)
     cm['sumcol'] = cm.apply(lambda x: cm.loc['All', x.name] if x.name in cm.columns else 0)
-    cm['UA'] = cm['correct']/cm['All']
-    cm['PA'] = cm['correct']/cm['sumcol']
-    cm['F1'] = (2 * cm['UA'] * cm['PA'])/(cm['UA'] + cm['PA'])
-    cm['F_5'] = (1.25 * cm['UA'] * cm['PA'])/.25*(cm['UA'] + cm['PA'])
-    cm['F_25'] = (1.0625 * cm['UA'] * cm['PA'])/.0625*(cm['UA'] + cm['PA'])
+    cm['UA'] = (cm['correct']/cm['All']).round(3)
+    cm['PA'] = (cm['correct']/cm['sumcol']).round(3)
+    cm['F1'] = ((2 * cm['UA'] * cm['PA'])/(cm['UA'] + cm['PA'])).round(3)
+    cm['F_5'] = ((1.5 * cm['UA'] * cm['PA'])/(.5 * cm['UA'] + cm['PA'])).round(3)
+    cm['F_25'] = ((1.25 * cm['UA'] * cm['PA'])/(.25 * cm['UA'] + cm['PA'])).round(3)
     total = cm.at['All','correct']
-    cm.at['All','UA'] = (cm['correct'].sum() - total) / total
-    cm.at['All','PA'] = (cm['correct'].sum() - total) / total
+    cm.at['All','UA'] = ((cm['correct'].sum() - total) / total).round(3)
+    cm.at['All','PA'] = ((cm['correct'].sum() - total) / total).round(3)
     if acc_cat == 'LC2':
         cm.at['All','F1']=cm.at['crop','F1']
         TP = cm.at['crop', 'crop']
@@ -234,7 +243,7 @@ def get_confusion_matrix(pred_col, obs_col, class_lut, lc_mod_map, lc_mod_acc, p
         FN = cm.at['nocrop', 'crop']
         TN = cm.at['nocrop','nocrop']
         All = TP + FP + FN + TN
-        cm['Kappa'] = 2*(TP*TN - FN*FP)/((TP+FP)*(FP+TN)+(TP+FN)*(FN+TN))
+        cm['Kappa'] = (2*(TP*TN - FN*FP)/((TP+FP)*(FP+TN)+(TP+FN)*(FN+TN))).round(3)
     
     '''
     crops = lut.loc[lut['LC2'] == 1]
@@ -533,6 +542,7 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir,class_type=None)
     
     if isinstance(holdoutpix, pd.DataFrame):
         holdout_pix = holdoutpix
+        holdout_pix.reset_index(drop=True, inplace=True)
     else:
         holdout_pix = pd.read_csv(holdoutpix)
         
@@ -544,7 +554,6 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir,class_type=None)
     vars = [col for col in holdout_pix if col.startswith('var_')]
     
     holdout_fields = holdout_pix[vars]
-    #print(holdout_fields.head())
 
     ## Calculate scores
     #holdout_fields_predicted = rf_model.predict_proba(holdout_fields)
@@ -614,7 +623,7 @@ def get_binary_holdout_score(ho_path, rf_model, out_dir, lut, class_type):
     else:
         num_correct = accdf['LC2'].sum() / 30
     
-    per_correct = num_correct / len(accdf)
+    per_correct = (num_correct / len(accdf)).round(3)
     
     return per_correct
                      
@@ -1125,11 +1134,19 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
              feature_mod_dict=None, update_model_dict=False, fixed_ho=False, fixed_ho_dir=None):
     
     if fixed_ho == True:
-        ho_smallCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop.csv')
-        ho_bigCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_bigCrop.csv')
-        ho_noCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_noCrop.csv')
-        #df_in = os.path.join(fixed_ho_dir,f'GENERAL_TRAINING.csv')
-                     
+        test_df_all = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if f.split('_')[0] == feature_model and f.split('_')[-1] == 'all.csv'][0]
+        if os.path.isfile(test_df_all):
+            test_all = pd.read_csv(test_df_all)
+            ho_smallCrop_path = test_all.loc[(test_all['LC_UNQ'] == 35) | (test_all['LC_UNQ'] == 23)] 
+            ho_bigCrop_path = test_all.loc[(test_all['LC2'] == 30) & (test_all['LC_UNQ'] != 35) & (test_all['LC_UNQ'] != 23) & (test_all['LC_UNQ'] < 40)]
+            ho_noCrop_path = test_all.loc[(test_all['LC2'] == 0) & (test_all['LC_UNQ'] != 19)]
+        else:
+            sys.stderr.write(f'ERR: cannot find fixed test set')
+            # TODO: concat old files in fixed_hos to single 'all' file and delete the following
+            #ho_smallCrop_path = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if f.split('_')[0] == feature_model and f.split('_')[-1] == 'smallCrop.csv'][0]
+            #ho_bigCrop_path = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if f.split('_')[0] == feature_model and f.split('_')[-1] == 'bigCrop.csv'][0]
+            #ho_noCrop_path = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if f.split('_')[0] == feature_model and f.split('_')[-1] == 'noCrop.csv'][0]
+
     if isinstance(df_in, pd.DataFrame):
         df = df_in
         #sys.stderr.write('reading in df as database')
@@ -1176,6 +1193,10 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
         
     else:
         score = {}
+        score["F"] = model_name.split('_')[0]
+        score["S"] = model_name.split('_')[1]
+        score["C"] = class_col
+        score["A"] = "RF"
     if fixed_ho == True:
         ho_smallcrop = get_holdout_scores(ho_smallCrop_path, rf[0], 'LC2', out_dir, 'smallCrop')[["pred","label","OID"]]
         ho_bigcrop = get_holdout_scores(ho_bigCrop_path, rf[0], 'LC2', out_dir, 'bigCrop')[["pred","label","OID"]]
@@ -1183,9 +1204,9 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
         ho = pd.concat([ho_smallcrop,ho_bigcrop,ho_nocrop])
         cm = get_confusion_matrix(ho['pred'], ho['label'], lut, lc_mod, 'cropNoCrop', print_cm=False, out_dir=None, model_name=None)
         print(cm)
-        score["acc_smallCrop"] = get_binary_holdout_score(ho_smallCrop_path, rf, out_dir, lut, 'smallCrop')
-        score["acc_bigCrop"] = get_binary_holdout_score(ho_bigCrop_path, rf, out_dir, lut, 'bigCrop')
-        score["acc_noCrop"] =  get_binary_holdout_score(ho_noCrop_path, rf, out_dir, lut, 'noCrop')
+        score["recall_smallCrop"] = get_binary_holdout_score(ho_smallCrop_path, rf, out_dir, lut, 'smallCrop')
+        score["recall_bigCrop"] = get_binary_holdout_score(ho_bigCrop_path, rf, out_dir, lut, 'bigCrop')
+        score["recall_noCrop"] =  get_binary_holdout_score(ho_noCrop_path, rf, out_dir, lut, 'noCrop')
         score["Kappa_cnc"] = cm.at['crop','Kappa']
         score["F1_cnc"] = cm.at['crop','F1']
         score["F_5_cnc"] = cm.at['crop','F_5']
@@ -1248,6 +1269,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         else:
             # make variable stack if it does not exist (for example for cells without sample pts)
             # -- will not be remade if a file named {feature_model}_{start_year}_stack.tif already exists in ts_dir/comp
+            sys.stderr.write(f'writing variable stack for model {feature_model} ...\n') 
             var_stack = make_variable_stack(in_dir,cell,feature_model,start_yr,start_mo,spec_indices,si_vars,spec_indices_pheno,
                                         pheno_vars,feature_mod_dict,singleton_vars=None, singleton_var_dict=None, 
                                         poly_vars=None, poly_var_path=None, scratch_dir=None)
