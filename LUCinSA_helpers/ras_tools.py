@@ -133,16 +133,17 @@ def summarize_raster(ras_in,map_dict,map_product):
     other_tot = 0
     
     if map_product.startswith('LUCin') or map_product.startswith('CEL'):
-        mono_crop_classes = [31,32,33,34,36,37,38,39]
+        mono_crop_classes = [22,31,32,33,37,38,39]
         for c in mono_crop_classes:
             c_count = np.count_nonzero(data == c)
             mono_crop_tot = mono_crop_tot + c_count
             pix_count = pix_count + c_count
         
-        mix_crop_class = 35
-        mix_count = np.count_nonzero(data == mix_crop_class)
-        mix_crop_tot = mix_crop_tot + mix_count
-        pix_count = pix_count + mix_count
+        mix_crop_classes = [35,23,24,25,26,32,34,36]
+        for mx in mix_crop_classes:
+            mx_count = np.count_nonzero(data == mx)
+            mix_crop_tot = mix_crop_tot + mx_count
+            pix_count = pix_count + mx_count
         
         med_crop_classes = list(range(40, 49))
         for md in med_crop_classes:
@@ -162,9 +163,9 @@ def summarize_raster(ras_in,map_dict,map_product):
             tree_tot = tree_tot + tc_count
             pix_count = pix_count + tc_count
         
-        no_veg = list(range(1, 9))
-        low_veg = list(range(10, 19))
-        med_veg = list(range(50, 59))
+        no_veg = list(range(1, 10))
+        low_veg = list(range(10, 21))
+        med_veg = list(range(50, 60))
         other_classes = no_veg + low_veg + med_veg
         for oc in other_classes:
             oc_count = np.count_nonzero(data == oc)
@@ -172,23 +173,30 @@ def summarize_raster(ras_in,map_dict,map_product):
             pix_count = pix_count + oc_count
         
     else:
+        with open(map_dict, 'r+') as map_dict_in:
+            map_dict = json.load(map_dict_in)
         classes = list(map_dict[map_product]['classes'].keys())
-        #print(classes)
+        print(classes)
     
         if 'crop' in classes:
-            crop_class = map_dict[map_product]['classes']['crop']
-            crop_tot = np.count_nonzero(data == crop_class)
-            pix_count = pix_count + crop_tot
+            crop_classes = map_dict[map_product]['classes']['crop']
+            for c in crop_classes:
+                c_count = np.count_nonzero(data == c)
+                crop_tot = crop_tot + c_count
+                pix_count = pix_count + c_count
         if 'tree' in classes:
-            tree_class = map_dict[map_product]['classes']['tree']
-            tree_tot = np.count_nonzero(data == tree_class)
-            pix_count = pix_count + tree_tot
+            tree_classes = map_dict[map_product]['classes']['tree']
+            for t in tree_classes:
+                tree_count = np.count_nonzero(data == t)
+                tree_tot = tree_tot + tree_count
+                pix_count = pix_count + tree_count
         other_classes = [c for c in classes if c not in ['crop','tree']]
         for oc in other_classes:
-            val = map_dict[map_product]['classes'][oc]
-            cat_tot = np.count_nonzero(data == val)
-            other_tot = other_tot + cat_tot
-            pix_count = pix_count + cat_tot
+            for o in oc:
+                #val = map_dict[map_product]['classes'][oc]
+                cat_tot = np.count_nonzero(data == o)
+                other_tot = other_tot + cat_tot
+                pix_count = pix_count + cat_tot
        
     class_dict['per_crop_mono'] = round((100 * mono_crop_tot / pix_count),1)
     class_dict['per_crop_med'] = round((100 * med_crop_tot / pix_count),1)
@@ -203,7 +211,9 @@ def summarize_raster(ras_in,map_dict,map_product):
   
 def summarize_zones(polys,map_dir,clip_dir,map_product,map_dict=None,out_dir=None):
     if map_dict is not None and map_dict !='None':
-        file_name = map_dict[map_product]['loc']
+        with open(map_dict, 'r+') as map_dict_in:
+            dict_in = json.load(map_dict_in)
+        file_name = dict_in[map_product]['loc']
     else:
         file_name = f'{map_product}.tif' 
     ras_in = os.path.join(map_dir,file_name)
@@ -240,29 +250,30 @@ def summarize_district_polys(polys, map_product, scratch_dir, test=True):
     else:
         map_dir = "/home/downspout-cel/paraguay_lc/lc_prods"
         output_dir = "/home/downspout-cel/paraguay_lc/lc_prods"
-        map_dict = 'ENTER_THIS'
-        all_scores_tab = os.path.join(output_dir,'other_product_scores.csv')
-        all_scores_dict = os.path.join(output_dir,'other_product_scores.csv')
+        map_dict = "/home/downspout-cel/paraguay_lc/lc_prods/prod_dict.json"
+        all_scores_tab = os.path.join(output_dir,'other_product_scores_tab.csv')
+        all_scores_dict = os.path.join(output_dir,'other_product_scores_dict.json')
+        model_name = map_product
     zone_stats = summarize_zones(polys,map_dir,scratch_dir,map_product,map_dict,out_dir=None)
     zone_stats['crop_dif']=zone_stats['crop_estKW'] - zone_stats['per_crop']
-    zone_stats['perCrop_found']= (100 * zone_stats['per_crop'] / zone_stats['crop_estKW']).round(2)
+    zone_stats['perCrop_found']= round(100 * zone_stats['per_crop'] / zone_stats['crop_estKW'],2)
     zone_stats['crop_dif_abs'] = np.abs(zone_stats['crop_dif'])
     zone_stats.to_csv(os.path.join(output_dir,f'district_summary_{model_name}.csv'))
-    avg_crop_dif = np.mean(zone_stats['crop_dif']).round(2)
-    mae_crop = np.mean(zone_stats['crop_dif_abs']).round(2)
-    perCrop_found = np.mean(zone_stats['perCrop_found']).round(2)
+    avg_crop_dif = round(np.mean(zone_stats['crop_dif']),2)
+    mae_crop = round(np.mean(zone_stats['crop_dif_abs']),2)
+    perCrop_found = round(np.mean(zone_stats['perCrop_found']),2)
     print(f'avg_crop_dif = {avg_crop_dif}, MAE = {mae_crop}')
     print(f'perCrop_found = {perCrop_found}')
     sm = zone_stats[zone_stats['avgFinca22']<5]
-    avg_crop_dif_sm = np.mean(sm['crop_dif']).round(2)
-    mae_crop_sm = np.mean(sm['crop_dif_abs']).round(2)
-    perCrop_found_sm = np.mean(sm['perCrop_found']).round(2)
+    avg_crop_dif_sm = round(np.mean(sm['crop_dif']),2)
+    mae_crop_sm = round(np.mean(sm['crop_dif_abs']),2)
+    perCrop_found_sm = round(np.mean(sm['perCrop_found']),2)
     print(f'avg_crop_dif_sm = {avg_crop_dif_sm}, MAE_sm = {mae_crop_sm}')
     print(f'perCrop_found_sm = {perCrop_found_sm}')
     lg = zone_stats[zone_stats['avgFinca22']>20]
-    avg_crop_dif_lg = np.mean(lg['crop_dif']).round(2)
-    mae_crop_lg = np.mean(lg['crop_dif_abs']).round(2)
-    perCrop_found_lg = np.mean(lg['perCrop_found']).round(2)
+    avg_crop_dif_lg = round(np.mean(lg['crop_dif']),2)
+    mae_crop_lg = round(np.mean(lg['crop_dif_abs']),2)
+    perCrop_found_lg = round(np.mean(lg['perCrop_found']),2)
     print(f'avg_crop_dif_lg = {avg_crop_dif_lg}, MAE_lg = {mae_crop_lg}')
     print(f'perCrop_found_lg = {perCrop_found_lg}')
     
@@ -282,9 +293,10 @@ def summarize_district_polys(polys, map_product, scratch_dir, test=True):
         with open(all_scores_dict, 'r+') as full_dict:
             dic = json.load(full_dict)
         #updated_entry = dic[model_name] | dict_entry  ##This works in Python 3.9 and above
-        entry = dic[model_name].copy()
-        entry.update(dict_entry)
-        dic[model_name] = entry
+        #entry = dic[model_name].copy()
+        #entry.update(dict_entry)
+        dic[model_name].update(dict_entry)
+        #dic[model_name] = entry
         print(dic)
 
         new_scores = pd.DataFrame.from_dict(dic)
@@ -297,7 +309,11 @@ def summarize_district_polys(polys, map_product, scratch_dir, test=True):
 
 def get_variables_at_pts_external(out_dir, ras_in,ptfile,out_col,out_name):
 
-    ptsdf = pd.read_csv(ptfile, index_col=0)
+    if isinstance(ptfile, pd.DataFrame):
+        ptsdf = ptfile
+    else:
+        ptsdf = pd.read_csv(ptfile, index_col=0)
+
     ptsgdb = gpd.GeoDataFrame(ptsdf,geometry=gpd.points_from_xy(ptsdf.XCoord,ptsdf.YCoord),crs='epsg:8858')
     #pts4326 = ptsgdb.to_crs({'init': 'epsg:4326'})
     xy = [ptsgdb['geometry'].x, ptsgdb['geometry'].y]
@@ -307,7 +323,7 @@ def get_variables_at_pts_external(out_dir, ras_in,ptfile,out_col,out_name):
         comp.np = comp.read()
         ptsgdb[out_col] = [sample[0] for sample in comp.sample(coords)]     
 
-    pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,'samp_2022_base4Poly6_bal300mix2.csv'), sep=',', index=True)
+    pd.DataFrame.to_csv(ptsgdb,os.path.join(out_dir,out_name), sep=',', index=True)
     
     return ptsgdb
 
@@ -355,14 +371,14 @@ def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut_valid, lut_ma
     cm=pd.crosstab(cmdf3['pred_reclass'],cmdf3['obs_reclass'],margins=True)
     cm['correct'] = cm.apply(lambda x: x[x.name] if x.name in cm.columns else 0, axis=1)
     cm['sumcol'] = cm.apply(lambda x: cm.loc['All', x.name] if x.name in cm.columns else 0)
-    cm['UA'] = cm['correct']/cm['All']
-    cm['PA'] = cm['correct']/cm['sumcol']
-    cm['F1'] = (2 * cm['UA'] * cm['PA'])/(cm['UA'] + cm['PA'])
-    #cm['F_5'] = (1.25 * cm['UA'] * cm['PA'])/.25*(cm['UA'] + cm['PA'])
-    #cm['F_25'] = (1.0625 * cm['UA'] * cm['PA'])/.0625*(cm['UA'] + cm['PA'])
+    cm['UA'] = (cm['correct']/cm['All']).round(3)
+    cm['PA'] = (cm['correct']/cm['sumcol']).round(3)
+    cm['F1'] = ((2 * cm['UA'] * cm['PA'])/(cm['UA'] + cm['PA'])).round(3)
+    cm['F_5'] = ((1.5 * cm['UA'] * cm['PA'])/(.5 * cm['UA'] + cm['PA'])).round(3)
+    cm['F_25'] = ((1.25 * cm['UA'] * cm['PA'])/(.25 * cm['UA'] + cm['PA'])).round(3)
     total = cm.at['All','correct']
-    cm.at['All','UA'] = (cm['correct'].sum() - total) / total
-    cm.at['All','PA'] = (cm['correct'].sum() - total) / total
+    cm.at['All','UA'] = ((cm['correct'].sum() - total) / total).round(3)
+    cm.at['All','PA'] = ((cm['correct'].sum() - total) / total).round(3)
     if lut_colout == 'LC2':
         cm.at['All','F1']=cm.at['crop','F1']
         TP = cm.at['crop', 'crop']
@@ -370,7 +386,7 @@ def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut_valid, lut_ma
         FN = cm.at['nocrop', 'crop']
         TN = cm.at['nocrop','nocrop']
         All = TP + FP + FN + TN
-        cm['Kappa'] = 2*(TP*TN - FN*FP)/((TP+FP)*(FP+TN)+(TP+FN)*(FN+TN))
+        cm['Kappa'] = (2*(TP*TN - FN*FP)/((TP+FP)*(FP+TN)+(TP+FN)*(FN+TN))).round(3)
     
     #print(f'Confusion Matrix: {cm}')
     if print_cm == True:
@@ -378,3 +394,7 @@ def get_confusion_matrix_generic(samp_file, pred_col, obs_col, lut_valid, lut_ma
         pd.DataFrame.to_csv(cm, mod_path, sep=',', index=True)
     
     return cm
+
+
+
+       

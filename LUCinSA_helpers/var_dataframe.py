@@ -147,12 +147,10 @@ def make_var_dataframe(in_dir, out_dir, grid_file, cell_list, feature_model, fea
             sys.stdout.write('skipping this cell \n')
             pass
     
-    pts_out = pd.DataFrame.to_csv(all_pts,os.path.join(out_dir,'ptsgdb.csv'), sep=',', index=True)
-
     pts_in = pd.read_csv(ptfile, index_col=0)
     rfdf = all_pts.merge(pts_in, left_index=True, right_index=True)
-    pd.DataFrame.to_csv(rfdf,os.path.join(out_dir,'RFdf_{}_{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
-    pd.DataFrame.to_csv(all_pts,os.path.join(out_dir,'ptsgdb_{}-{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
+    pd.DataFrame.to_csv(rfdf,os.path.join(out_dir,'forchecking_ptsfeats_{}_{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
+    pd.DataFrame.to_csv(all_pts,os.path.join(out_dir,'ptsfeats_{}_{}.csv'.format(feature_model,start_yr)), sep=',', index=True)
     
 def append_feature_dataframe(in_dir, ptfile, feat_df, cell_list, grid_file, out_dir, start_yr, start_mo, spec_indices, si_vars,
                              spec_indices_pheno=None, pheno_vars=None, singleton_vars=None, singleton_var_dict=None, poly_vars=None, 

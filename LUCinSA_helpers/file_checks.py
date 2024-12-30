@@ -13,6 +13,7 @@ import xarray as xr
 import rasterio as rio
 import math
 from shapely.geometry import box
+#from pystac_client import Client
 import matplotlib.pyplot as plt
 
 #diables all those warnings about chained assignments (which we don't care about here):
@@ -424,7 +425,7 @@ def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default',
     grid = gpd.read_file(grid_file)
     if grid.crs != pyproj.CRS.from_epsg(4326):
         grid = grid.to_crs('epsg:4326')
-    bb = grid.query(f'UNQ == {grid_cell}').geometry.total_bounds
+    bb = grid.query(f'UNQ == "{grid_cell}"').geometry.total_bounds
 
     if yrs == None:
         time_slice="2010-01-01/2022-12-30"
@@ -447,7 +448,7 @@ def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default',
             api.add_conforms_to("ITEM_SEARCH") # see https://pystac-client.readthedocs.io/en/latest/usage.html#api-conformance
         elif cat == 'planetary':
             collect=["sentinel-2-l2a"]
-            api = pystac_client.Client.open("https://planetarycomputer.microsoft.com/api/stac/v1/")
+            api = Client.open("https://planetarycomputer.microsoft.com/api/stac/v1/")
     
     scene_results = api.search(bbox=bb,
             datetime=time_slice,
@@ -455,15 +456,16 @@ def get_img_list_from_cat(sensor, grid_cell, grid_file, yrs=None, cat='default',
             query=[f'eo:cloud_cover<{cc}'],
             max_items = 10000)
     
-    num_found = scene_results.matched()
-    print(f'{num_found} scenes were found meeting criteria')
+    #num_found = scene_results.matched()
+    #print(f'{num_found} scenes were found meeting criteria')
     
     items = list(scene_results.item_collection())
+    print(f'{len(items)} scenes were found meeting criteria')
     cat_ids = pd.DataFrame({'id':[o.id for o in items],
                             'obs': [o.properties["datetime"]for o in items],
                             'cloudcov': [o.properties["eo:cloud_cover"]for o in items]
                             })
-
+    
     return cat_ids
 
 def compare_planetaryHub_w_element84 (sensor, grid_cell, grid_file, yrs=None):

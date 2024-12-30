@@ -211,8 +211,7 @@ def main():
                                    help='list of cells to look for points/poys in. (list or path to .csv file with list, no header' )
             subparser.add_argument('--spec_indices', dest='spec_indices', help='',
                                   default = '[evi2,gcvi,wi,kndvi,nbr,ndmi]')
-            subparser.add_argument('--si_vars', dest='si_vars', help = 'summary variables to run for each index in spec_indices',
-                               default='[maxv_yr,minv_yr,amp_yr,avg_yr,sd_yr,cv_yr,Jan_20,Feb_20,Mar_20,Apr_20,May_20,Jun_20,Jul_20,Aug_20,Sep_20,Oct_20,Nov_20,Dec_20]')
+            subparser.add_argument('--si_vars', dest='si_vars', help = 'summary variables to run for each index in spec_indices',       default='[maxv_yr,minv_yr,amp_yr,avg_yr,sd_yr,cv_yr,Jan_20,Feb_20,Mar_20,Apr_20,May_20,Jun_20,Jul_20,Aug_20,Sep_20,Oct_20,Nov_20,Dec_20]')
             subparser.add_argument('--spec_indices_pheno', dest='spec_indices_pheno', 
                                    help='spec indices to get phenological variables for', default=None)
             subparser.add_argument('--pheno_vars', dest='pheno_vars', help='list of phenological variables', default=None)
@@ -226,7 +225,9 @@ def main():
                                    help = 'path to scratch directory to same temp files without backup', default=None)
             subparser.add_argument('--singleton_var_dict', dest='singleton_var_dict', default=None,
                                    help='path to json describing singleton vars. (see example in main folder of this repo)')
-
+        if process == 'make_var_stack':
+            subparser.add_argument('--overwrite', dest='overwrite', help='whether to overwrite stack file with same name', default=False)
+            
         if process == 'append_feature_dataframe':
             subparser.add_argument('--in_dir', dest='in_dir', help='path to main directory for ts data')
             subparser.add_argument('--ptfile', dest ='ptfile', 
@@ -254,6 +255,7 @@ def main():
                                    help='path to dict defining variable model names. (see example in main folder of this repo)')
             subparser.add_argument('--thresh', dest='thresh', default=None,
                                    help='threshold for holdout sample e.g. 0, 10, 20...')
+            subparser.add_argument('--runnum', dest= 'runnum', default=0)
         if process == 'iterate_models':
             subparser.add_argument('--sample_pts', dest='sample_pts', help='csv file with all available sample points')
             subparser.add_argument('--model_dir', dest='model_dir', help='directory for final outputs')
@@ -399,7 +401,9 @@ def main():
                              poly_vars = check_for_list(args.poly_vars),
                              combo_bands = check_for_list(args.combo_bands),
                              poly_var_path = args.poly_var_path,
-                             scratch_dir = args.scratch_dir)
+                             scratch_dir = args.scratch_dir,
+                             out_dir = args.out_dir,
+                             overwrite = args.overwrite)
                                    
     if args.process == 'make_var_dataframe':
         make_var_dataframe (in_dir = args.in_dir,
@@ -447,7 +451,8 @@ def main():
                  lut = args.lut,
                  feature_model = args.feature_model,
                  thresh = args.thresh,
-                 feature_mod_dict = args.feature_mod_dict)
+                 feature_mod_dict = args.feature_mod_dict,
+                 runnum = args.runnum)
                                    
     if args.process == 'rf_classification':
         rf_classification(in_dir = args.in_dir,

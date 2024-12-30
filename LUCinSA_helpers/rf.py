@@ -24,8 +24,10 @@ from sklearn.inspection import permutation_importance
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import cross_validate
+from sklearn.pipeline import Pipeline
 #import seaborn as sn
 from joblib import dump, load
+import joblib
 import csv
 from LUCinSA_helpers.ts_composite import make_ts_composite
 from LUCinSA_helpers.pheno import make_pheno_vars
@@ -37,6 +39,8 @@ gdal.AllRegister()
 def get_class_col(lc_mod,lut):
     if lc_mod == 'all':
         class_col = 'LC25'
+    elif lc_mod == 'max':
+        class_col = 'LC32'
     elif lc_mod == "trans_cats":
         class_col = 'LCTrans'
     elif lc_mod == 'cropNoCrop':
@@ -112,7 +116,7 @@ def balance_training_data(lut, pixdf, out_dir, cutoff, mix_factor):
     (this estimated map proportion is a column named "perLC25E" in the LUT )
     allows a minimum threshold to be set {cutoff} so that sample sizes are not reduced below the minimum
     allows a factor to be set for mixed (heterogeneous) classes to sample them more heavily than main classes
-        (the maximum value will depend on the available samples for these classes. Current max is ~4)
+        (the maximum value will depend on the available samples for these classes. Current max is ~12)
     '''
     if isinstance(lut, pd.DataFrame):
         lut = lut
@@ -267,7 +271,7 @@ def quick_accuracy(X_test, y_test, rf_model, lc_mod, out_dir,model_name,lut):
     
     predicted = rf_model.predict(X_test)
     accuracy = accuracy_score(y_test, predicted)
-    sys.stderr.write(f'Out-of-bag score estimate: {rf_model.oob_score_:.3} \n')
+    sys.stderr.write(f'Out-of-bag score estimate: {rf_model["forest"].oob_score_:.3} \n')
     sys.stderr.write(f'Mean accuracy score: {accuracy:.3} \n')
     
     cm = get_confusion_matrix(predicted, y_test,lut, lc_mod, lc_mod, out_dir,model_name,lut)                    
@@ -502,12 +506,11 @@ def prep_test_train(df_in, out_dir, class_col, mod_name, thresh=20, stable=True)
 
     return(training_pix_path, holdout_pix_path)
 
-def multiclass_rf(trainfeatures, out_dir, mod_name, lc_mod, importance_method, ran_hold, lut):
+def multiclass_rf(trainfeatures, out_dir, mod_name, lc_mod, importance_method, ran_hold, lut,runnum):
     
     df_train = pd.read_csv(trainfeatures)
     #sys.stderr.write(f'There are {df_train.shape[0]} training samples \n')
-    
-    
+
     class_col = get_class_col(lc_mod,lut)[0]
     y = df_train[class_col]
            
@@ -520,22 +523,30 @@ def multiclass_rf(trainfeatures, out_dir, mod_name, lc_mod, importance_method, r
     y = y.values
     X_train, X_test, y_train, y_test = train_test_split(X, y, stratify=y, test_size = .1, random_state=ran_hold)
 
-    rf = RandomForestClassifier(n_estimators=500, oob_score=True)
-    rf = rf.fit(X_train,y_train)
-    dump(rf, os.path.join(out_dir,f'{mod_name}_RFmod.joblib'))
+    ## wrap sklearn models in Pipeline to ensure they create the same predictions when loaded cold
+    ##    was getting very different results without this whenever models were reloaded!
+    rf_model = Pipeline([('forest', RandomForestClassifier(n_estimators=500, oob_score=True))])
+    rf_model.fit(X_train,y_train)
+    
+    if runnum == 0:
+        rfmodname = f'{mod_name}_RFmod.joblib'
+    else:
+        rfmodname = f'{mod_name}_RFmod{runnum}.joblib'
+        
+    dump(rf_model, os.path.join(out_dir,rfmodname))
 
-    cm = quick_accuracy (X_test, y_test, rf, lc_mod, out_dir,mod_name,lut)
+    cm = quick_accuracy (X_test, y_test, rf_model, lc_mod, out_dir,mod_name,lut)
 
     if importance_method != None:
         if importance_method == "Impurity":
-            var_importances = pd.Series(rf.feature_importances_, index=vars_rf)
+            var_importances = pd.Series(rf_model["forest"].feature_importances_, index=vars_rf)
             pd.Series.to_csv(var_importances,os.path.join(out_dir,f'VarImportance_{mod_name}.csv'),sep=',',index=True)
         elif importance_method == "Permutation":
-            result = permutation_importance(rf, X_test, y_test, n_repeats=10,random_state=ran_hold, n_jobs=2)
+            result = permutation_importance(rf_model, X_test, y_test, n_repeats=10,random_state=ran_hold, n_jobs=2)
             var_importances = pd.Series(result.importances_mean, index=vars_rf)
             pd.Series.to_csv(var_importances,os.path.join(out_dir,f'VarImportance_{mod_name}.csv'),sep=',', index=True)
 
-    return rf, cm
+    return rf_model, cm
 
 def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir,class_type=None):
     ## Save info for extra columns and drop (model is expecting only variable input columns)
@@ -545,6 +556,15 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir,class_type=None)
         holdout_pix.reset_index(drop=True, inplace=True)
     else:
         holdout_pix = pd.read_csv(holdoutpix)
+    
+    if 'entry_lev' in list(holdout_pix.columns):
+        ## filter to remove less confident entries
+        #holdout_pix = holdout_pix[(holdout_pix['entry_lev'] == 4) | (holdout_pix['source'].isin(['ground','GE']))]
+        holdout_pix = holdout_pix[(holdout_pix['entry_lev'] > 1)]
+        if class_type=='noCrop':
+            ## remove mixed fields from no-crop test set, as this is ambiguous
+            holdout_pix = holdout_pix[(holdout_pix['LC'] != 19) & (holdout_pix['smlhld_1ha'] == 0)]
+        holdout_pix.reset_index(drop=True, inplace=True)
         
     holdout_labels = holdout_pix[class_col]
     h_IDs = holdout_pix['OID_']
@@ -559,12 +579,17 @@ def get_holdout_scores(holdoutpix, rf_model, class_col, out_dir,class_type=None)
     #holdout_fields_predicted = rf_model.predict_proba(holdout_fields)
     holdout_fields_predicted = rf_model.predict(holdout_fields)
     
+    #holdout_fields_predicted.to_csv('~/data/ho_p_check.csv')
+    
     ## Add extra columns back in
     holdout_fields = pd.concat([holdout_fields,pd.Series(holdout_fields_predicted),holdout_labels,h_IDs],axis=1)
     new_cols = [-3,-2,-1]
     new_names = ["pred","label","OID"]
     old_names = holdout_fields.columns[new_cols]
     holdout_fields.rename(columns=dict(zip(old_names, new_names)), inplace=True)
+    if class_type=='noCrop':
+        ## remove mixed fields from no-crop test set, as this is ambiguous
+        holdout_fields = holdout_fields[(holdout_fields['label'] != 19)]
 
     ## Print to file
     if class_type:
@@ -612,12 +637,13 @@ def get_binary_holdout_score(ho_path, rf_model, out_dir, lut, class_type):
     Note, this is a specific holdout set where all entries are mixed crop.
     '''
     # We are interested in binary prediciton, here, so use 'LC2' for class
-    mcho_score = get_holdout_scores(ho_path, rf_model[0], 'LC2', out_dir, class_type)
+    mcho_score = get_holdout_scores(ho_path, rf_model, 'LC2', out_dir, class_type)
     ## Need to rejoin with LUT and get L2 class if using any other classification system
     lut2 = pd.read_csv(lut)
     accdf = mcho_score.merge(lut2[['LC_UNQ','LC2']], left_on='pred', right_on='LC_UNQ',how='left')
-    
-    # for LC2, 0 = noCrop and 30 = Crop
+    # for LC2, 0 = noCrop and 30 = Crop (but in LUT noCrop is now 98, so adjust here)
+    accdf['LC2'] = np.where(accdf['LC2'] == 30, 30, 0)
+   
     if class_type == 'noCrop':
         num_correct = len(accdf) - (accdf['LC2'].sum() / 30)
     else:
@@ -680,7 +706,7 @@ def getset_feature_model(feature_mod_dict,feature_model,spec_indices=None,si_var
     
 def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_indices,si_vars,spec_indices_pheno,pheno_vars,
                         feature_mod_dict, singleton_vars=None, singleton_var_dict=None, poly_vars=None, 
-                        poly_var_path=None, combo_bands=None, scratch_dir=None):
+                        poly_var_path=None, combo_bands=None, scratch_dir=None, out_dir=None, overwrite=False):
     
     # get model paramaters if model already exists in dict. Else create new dict entry for this model
     spec_indices, si_vars, spec_indices_pheno, pheno_vars, singleton_vars, poly_vars, combo_bands, band_names = getset_feature_model(
@@ -711,27 +737,41 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
         cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
         
         # set the path for the temporary output files prior to final stacking
-        if scratch_dir:
-            out_dir = os.path.join(scratch_dir,'{:06d}'.format(int(cell)),'comp')
+        if out_dir:
+            out_dir = os.path.join(out_dir,'{:06d}'.format(int(cell)),'comp')
+            if scratch_dir:
+                temp_dir = os.path.join(scratch_dir,'{:06d}'.format(int(cell)),'comp')
+            else:
+                temp_dir = out_dir
         else:
-            out_dir = os.path.join(cell_dir,'comp')
+            if scratch_dir:
+                out_dir = os.path.join(scratch_dir,'{:06d}'.format(int(cell)),'comp')
+            else:
+                out_dir = os.path.join(cell_dir,'comp')
+            temp_dir = out_dir
+
         os.makedirs(out_dir, exist_ok=True)
-        #sys.stderr.write(f'making dir {out_dir} \n')
+        os.makedirs(temp_dir, exist_ok=True)
+        sys.stderr.write(f'making dir {temp_dir} \n')
         
         stack_exists = False
         stack_path = os.path.join(out_dir,f'{feature_model}_{start_yr}_stack.tif')
         if os.path.isfile(stack_path):
             stack_exists = True
             #sys.stderr.write(f'stack file already exists for model {feature_model} \n')
+        ## Can build noPoly models from existing stacks containing polys
         elif 'NoPoly' not in feature_model:
             no_poly_model = feature_model.replace('Poly','NoPoly')
             alt_path = os.path.join(out_dir,f'{no_poly_model}_{start_yr}_stack.tif')
             if os.path.isfile(alt_path):
                 stack_exists = True
                 #sys.stderr.write(f'no poly stack file already exists for model {no_poly_model} \n')
+        keep_running = True
         if stack_exists == True:
             sys.stderr.write('stack file already exists. \n')
-        else:
+            if overwrite == False:
+                keep_running = False
+        if keep_running == True:
             stack_paths = []
             band_names = []
             sys.stderr.write(f'making variable stack for cell {cell} \n')
@@ -745,7 +785,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                     return False
                 
             for si in spec_indices:
-                    si_dir_out = os.path.join(out_dir, si) 
+                    si_dir_out = os.path.join(temp_dir, si) 
                     img_dir = os.path.join(cell_dir,'brdf_ts','ms',si)
                     new_vars, new_bands = make_ts_composite(cell, img_dir, si_dir_out, start_yr, start_mo, si, si_vars)
                     try:
@@ -774,7 +814,7 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                     for psi in spec_indices_pheno:
                         #try:
                         img_dir = os.path.join(cell_dir,'brdf_ts','ms',psi)
-                        psi_dir_out = os.path.join(out_dir, psi) 
+                        psi_dir_out = os.path.join(temp_dir, psi) 
                         new_pheno_vars, pheno_bands = make_pheno_vars(
                             cell,img_dir,psi_dir_out,start_yr,start_mo,psi,pheno_vars,500,[30,0])
                         stack_paths.append(new_pheno_vars)
@@ -832,22 +872,14 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                             poly_path = os.path.join(poly_var_path,f'{pv}_{cell}.tif')
                         poly_comp_path = os.path.join(poly_var_path,f'pred_PY_{cell}.tif')
                         if os.path.isfile(poly_path):
-                            ## pred_area is in m2 with vals too big for stack datatype. Rescale:
-                            if pv == 'pred_area':
-                                with rio.open(poly_path) as src:
-                                    vals = src.read([1])
-                                    profile = src.profile
-                                    if(profile['dtype']) == 'float64':
-                                        scaled_vals = vals * 100
-                                        profile.update(dtype = 'uint16')
-                                        new_area_file = os.path.join(out_dir,"pred_area_scaled.tif")
-                                        with rio.open(new_area_file, mode="w",**profile) as new_area:
-                                            new_area.write(scaled_vals)
-                                stack_paths.append(new_area_file)
-                                band_names.append(pv)
-                            else:
-                                stack_paths.append(poly_path)
-                                band_names.append(pv)
+                            #if pv in ['pred_APR','poly_APR']:
+                            #    poly_path = os.path.join(poly_var_path,f'pred_APRef_{cell}.tif')
+                            #    stack_paths.append(poly_path)
+                            #    band_names.append(pv)
+                            #else:
+                            sys.stdout.write(f'adding {poly_path} to stack for var {pv} \n')
+                            stack_paths.append(poly_path)
+                            band_names.append(pv)
                         elif pv in ['NovDecGCVI_Std','poly_NovDecStd','NovDecStd']:
                             alt_poly_path = os.path.join(poly_var_path,f'AvgNovDec_FieldStd_{cell}.tif')
                             if os.path.isfile(alt_poly_path):
@@ -856,30 +888,30 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                         elif os.path.isfile(poly_comp_path):
                             if pv in ['pred_ext','poly_ext']:
                                 with rio.open(poly_comp_path) as src:
-                                    vals = src.read([1])
+                                    vals = src.read([3])
                                     profile = src.profile
                                     profile.update(count = 1)
-                                    new_file = os.path.join(out_dir,"pred_ext.tif")
+                                    new_file = os.path.join(temp_dir,"pred_ext.tif")
                                     with rio.open(new_file, mode="w",**profile) as new_b:
                                         new_b.write(vals)
                                 stack_paths.append(new_file)
                                 band_names.append(pv)           
                             elif pv in ['pred_dst','poly_dst']:
                                 with rio.open(poly_comp_path) as src:
-                                    vals = src.read([2])
+                                    vals = src.read([1])
                                     profile = src.profile
                                     profile.update(count = 1)
-                                    new_file = os.path.join(out_dir,"pred_dst.tif")
+                                    new_file = os.path.join(temp_dir,"pred_dst.tif")
                                     with rio.open(new_file, mode="w",**profile) as new_b:
                                         new_b.write(vals)
                                 stack_paths.append(new_file)
                                 band_names.append(pv)    
                             elif pv in ['pred_cropbnds','poly_cropbnds']:
                                 with rio.open(poly_comp_path) as src:
-                                    vals = src.read([3])
+                                    vals = src.read([2])
                                     profile = src.profile
                                     profile.update(count = 1)
-                                    new_file = os.path.join(out_dir,"pred_bnds.tif")
+                                    new_file = os.path.join(temp_dir,"pred_bnds.tif")
                                     with rio.open(new_file, mode="w",**profile) as new_b:
                                         new_b.write(vals)
                                 stack_paths.append(new_file)
@@ -911,19 +943,22 @@ def make_variable_stack(in_dir,cell_list,feature_model,start_yr,start_mo,spec_in
                 #sys.stdout.write(f'final indexes: {indexes} \n')
 
                 with rio.open(stack_paths[0],'r') as src0:
-                    kwargs = src0.meta
-                    kwargs.update(count = output_count)
+                    profile = src0.profile
+                    profile.update(count = output_count) 
                 
                 dst_idx = 1
-                with rio.open(stack_path,'w',**kwargs) as dst:
+                with rio.open(stack_path,'w',**profile) as dst:
                     for path, index in zip(stack_paths, indexes):
                         with rio.open(path) as src:
+                            sys.stdout.write(f'inserting {path} at index {dst_idx} \n')
                             if isinstance(index, int):
                                 data = src.read(index)
+                                data_profile = src.profile
+                                sys.stdout.write(str(data_profile))
                                 dst.write(data, dst_idx)
                                 dst_idx += 1
                             elif isinstance(index, Iterable):
-                                sys.stdout.write(f'inserting {path} at index {dst_idx} \n')
+                                #sys.stdout.write(f'inserting {path} at index {dst_idx} \n')
                                 data = src.read(index)
                                 dst.write(data, range(dst_idx, dst_idx + len(index)))
                                 dst_idx += len(index)
@@ -1131,21 +1166,24 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
     return class_prediction
 
 def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut, feature_model, thresh,
-             feature_mod_dict=None, update_model_dict=False, fixed_ho=False, fixed_ho_dir=None):
+             feature_mod_dict=None, update_model_dict=False, fixed_ho=False, fixed_ho_dir=None, runnum=0, existing_mod=False):
     
     if fixed_ho == True:
-        test_df_all = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if f.split('_')[0] == feature_model and f.split('_')[-1] == 'all.csv'][0]
-        if os.path.isfile(test_df_all):
-            test_all = pd.read_csv(test_df_all)
-            ho_smallCrop_path = test_all.loc[(test_all['LC_UNQ'] == 35) | (test_all['LC_UNQ'] == 23)] 
-            ho_bigCrop_path = test_all.loc[(test_all['LC2'] == 30) & (test_all['LC_UNQ'] != 35) & (test_all['LC_UNQ'] != 23) & (test_all['LC_UNQ'] < 40)]
+        test_df_all = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if 
+                       f.split('_')[0] == feature_model and f.split('_')[-1] == 'all.csv']
+        if len(test_df_all)>0:
+            test_all = pd.read_csv(test_df_all)[0]
+            smallcrops = [23,24,25,26,32,34,35,36,39]
+            bigcrops = [22,31,33,37,38]
+            ho_smallCrop_path = test_all.loc[test_all['LC_UNQ'].isin(smallcrops)] 
+            ho_bigCrop_path = test_all.loc[(test_all['LC2'] == 30) & (test_all['LC_UNQ'].isin(bigcrops))]
             ho_noCrop_path = test_all.loc[(test_all['LC2'] == 0) & (test_all['LC_UNQ'] != 19)]
+        elif os.path.isfile(os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop.csv')):
+            ho_smallCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop.csv')
+            ho_bigCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_bigCrop.csv') 
+            ho_noCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_noCrop.csv') 
         else:
             sys.stderr.write(f'ERR: cannot find fixed test set')
-            # TODO: concat old files in fixed_hos to single 'all' file and delete the following
-            #ho_smallCrop_path = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if f.split('_')[0] == feature_model and f.split('_')[-1] == 'smallCrop.csv'][0]
-            #ho_bigCrop_path = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if f.split('_')[0] == feature_model and f.split('_')[-1] == 'bigCrop.csv'][0]
-            #ho_noCrop_path = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if f.split('_')[0] == feature_model and f.split('_')[-1] == 'noCrop.csv'][0]
 
     if isinstance(df_in, pd.DataFrame):
         df = df_in
@@ -1164,12 +1202,18 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
         filtered_lut = lutdf.filter(lut_cols)
         df2 = df.merge(filtered_lut, left_on='Class',right_on='USE_NAME', how='left')
     
-    #df3 = df2.reindex(sorted(df2.columns), axis=1)
-    full_model_name =  model_name + '_' + class_col
+    if len(model_name.split('_')) == 2:
+        full_model_name =  model_name + '_' + class_col
+    else:
+        full_model_name = model_name
         
     train, ho = prep_test_train(df2, out_dir, class_col, full_model_name, thresh=thresh, stable=True)
 
-    rf = multiclass_rf(train, out_dir, full_model_name, lc_mod, importance_method, ran_hold, lut)
+    if existing_mod:
+        rf = load(existing_mod) #this load is from joblib -- careful if there are other packages with 'Load' module
+        print(f'loading existing RFmod from: {existing_mod}')
+    else:
+        rf = multiclass_rf(train, out_dir, full_model_name, lc_mod, importance_method, ran_hold, lut, runnum)
     
     if update_model_dict == True:
         ## add columns back into feature dict to make sure they are in the right order:
@@ -1202,11 +1246,13 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
         ho_bigcrop = get_holdout_scores(ho_bigCrop_path, rf[0], 'LC2', out_dir, 'bigCrop')[["pred","label","OID"]]
         ho_nocrop = get_holdout_scores(ho_noCrop_path, rf[0], 'LC2', out_dir, 'noCrop')[["pred","label","OID"]]
         ho = pd.concat([ho_smallcrop,ho_bigcrop,ho_nocrop])
+        ho.to_csv(os.path.join(out_dir, 'full_ho_check.csv'))
+        print(ho.head())
         cm = get_confusion_matrix(ho['pred'], ho['label'], lut, lc_mod, 'cropNoCrop', print_cm=False, out_dir=None, model_name=None)
         print(cm)
-        score["recall_smallCrop"] = get_binary_holdout_score(ho_smallCrop_path, rf, out_dir, lut, 'smallCrop')
-        score["recall_bigCrop"] = get_binary_holdout_score(ho_bigCrop_path, rf, out_dir, lut, 'bigCrop')
-        score["recall_noCrop"] =  get_binary_holdout_score(ho_noCrop_path, rf, out_dir, lut, 'noCrop')
+        score["recall_smallCrop"] = get_binary_holdout_score(ho_smallCrop_path, rf[0], out_dir, lut, 'smallCrop')
+        score["recall_bigCrop"] = get_binary_holdout_score(ho_bigCrop_path, rf[0], out_dir, lut, 'bigCrop')
+        score["recall_noCrop"] =  get_binary_holdout_score(ho_noCrop_path, rf[0], out_dir, lut, 'noCrop')
         score["Kappa_cnc"] = cm.at['crop','Kappa']
         score["F1_cnc"] = cm.at['crop','F1']
         score["F_5_cnc"] = cm.at['crop','F_5']
@@ -1263,8 +1309,8 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
             else:   ##TODO:  Use grep for this
                 alt_path2 = os.path.join(cell_dir, 'comp',f'{poly_model}6_{start_yr}_stack.tif')
                 if os.path.isfile(alt_path2):
-                     sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
-                     var_stack = alt_path2
+                    sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
+                    var_stack = alt_path2
 
         else:
             # make variable stack if it does not exist (for example for cells without sample pts)
