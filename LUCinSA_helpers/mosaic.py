@@ -11,11 +11,13 @@ import rasterio as rio
 def mosaic_cells(cell_list, in_dir_main, in_dir_local, common_str, out_dir):
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    output_path = os.path.join(out_dir,'{}_mosaic.tif'.format(common_str))
-    
+
     if isinstance(cell_list, list):
         cells = cell_list
-    elif cell_list.endswith('.csv'): 
+        output_path = os.path.join(out_dir,f'{common_str}_mosaic.tif')
+    elif cell_list.endswith('.csv'):
+        grouping = cell_list.split('.')[0]
+        output_path = os.path.join(out_dir,f'{grouping}_{common_str}.tif')
         cells = []
         with open(cell_list, newline='') as cell_file:
             for row in csv.reader(cell_file):

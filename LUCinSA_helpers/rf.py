@@ -529,9 +529,9 @@ def multiclass_rf(trainfeatures, out_dir, mod_name, lc_mod, importance_method, r
     rf_model.fit(X_train,y_train)
     
     if runnum == 0:
-        rfmodname = f'{mod_name}_RFmod.joblib'
+        rfmodname = f'{mod_name}mod.joblib'
     else:
-        rfmodname = f'{mod_name}_RFmod{runnum}.joblib'
+        rfmodname = f'{mod_name}mod{runnum}.joblib'
         
     dump(rf_model, os.path.join(out_dir,rfmodname))
 
@@ -1165,7 +1165,7 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
     
     return class_prediction
 
-def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut, feature_model, thresh,
+def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_model, samp_model, train_yrs, thresh,
              feature_mod_dict=None, update_model_dict=False, fixed_ho=False, fixed_ho_dir=None, runnum=0, existing_mod=False):
     
     if fixed_ho == True:
@@ -1201,11 +1201,14 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
         lut_cols = ['USE_NAME',f'{class_col}',f'{class_col}_name']
         filtered_lut = lutdf.filter(lut_cols)
         df2 = df.merge(filtered_lut, left_on='Class',right_on='USE_NAME', how='left')
-    
-    if len(model_name.split('_')) == 2:
-        full_model_name =  model_name + '_' + class_col
+
+    if isinstance(train_yrs, int):
+        trainyrs = str(train_yrs)[-2:]
+    elif len(train_yrs) == 1:
+        trainyrs = str(train_yrs[0])[-2:]
     else:
-        full_model_name = model_name
+        trainyrs = str(train_yrs[0])[-2:]+str(train_yrs[-1])[-2:]
+    full_model_name = f'{feature_model}_{samp_model}_{class_col}_{trainyrs}_RF'
         
     train, ho = prep_test_train(df2, out_dir, class_col, full_model_name, thresh=thresh, stable=True)
 
@@ -1262,9 +1265,10 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lu
     return rf, score
 
 def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_mo, samp_mod_name, 
-                      feature_mod_dict, singleton_var_dict, rf_mod, img_out, spec_indices=None, si_vars=None, 
+                      feature_mod_dict, singleton_var_dict, rf_mod, img_out, train_yrs, spec_indices=None, si_vars=None, 
                       spec_indices_pheno=None, pheno_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, 
                       combo_bands=None, lc_mod=None, lut=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
+    
     
     spec_indices,si_vars,spec_indices_pheno,pheno_vars,singleton_vars,poly_vars,combo_bands,band_names = getset_feature_model(
                                                                   feature_mod_dict,
@@ -1277,7 +1281,15 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
                                                                   poly_vars,
                                                                   combo_bands)
     
-    model_name = f'{feature_model}_{samp_mod_name}_{start_yr}'
+    class_col = get_class_col(lc_mod,lut)
+    if isinstance(train_yrs, int):
+        trainyrs = str(train_yrs)[-2:]
+    elif len(train_yrs) == 1:
+        trainyrs = str(train_yrs[0])[-2:]
+    else:
+        trainyrs = str(train_yrs[0])[-2:]+str(train_yrs[-1])[-2:]
+    model_name_train = f'{feature_model}_{samp_mod_name}_{class_col}_{trainyrs}_RF'
+    model_name_class = f'{feature_model}_{samp_mod_name}_{class_col}_{trainyrs}_RF_{start_yr}'
     
     cells = []
     if isinstance(cell_list, list):
@@ -1285,7 +1297,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
     elif isinstance(cell_list, str) and cell_list.endswith('.csv'): 
         with open(cell_list, newline='') as cell_file:
             for row in csv.reader(cell_file):
-                cells.append (row[0])
+                cells.append(row[0])
     elif isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
         cells.append(cell_list) 
                 
@@ -1321,7 +1333,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
                                         poly_vars=None, poly_var_path=None, scratch_dir=None)
         
         #if img_out is None:
-        class_img_out = os.path.join(cell_dir,'comp','{:06d}_{}.tif'.format(int(cell),model_name))
+        class_img_out = os.path.join(cell_dir,'comp','{:06d}_{}.tif'.format(int(cell),model_name_class))
         #else:
         #    class_img_out = img_out
         
@@ -1329,7 +1341,7 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
             sys.stderr.write(f'using existing rf model at:{rf_mod} \n')
         else:
             sys.stderr.write('creating rf model... \n')
-            rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, model_name, lut, feature_model, feature_mod_dict)
+            rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_model, samp_model_name, train_yrs, 0, feature_mod_dict)
 
         with open(feature_mod_dict, 'r+') as feature_model_dict:
             dic = json.load(feature_model_dict)

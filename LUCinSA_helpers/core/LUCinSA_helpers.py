@@ -82,32 +82,39 @@ def main():
                                    help='dates to ignore errors for. YYYY-MM-DD,YYYY-MM-DD',default=None)
             subparser.add_argument('--log_path', dest = 'log_path', 
                                    help='location of log files before processing',default=None)
+            
         if process in ['get_cell_status','check_processing','update_summary_db']:
             subparser.add_argument('--raw_dir', dest ='raw_dir', help='directory containing downloaded images')
             subparser.add_argument('--processed_dir', dest ='processed_dir', 
                                    help='directory with processed images -- brdf for check_processing, smooth ts for get_cell_status')
+        
         if process in ['get_cell_status','check_processing']:                           
             subparser.add_argument('--grid_cell', dest ='grid_cell', help='cell to process')
             subparser.add_argument('--yrs', dest ='yrs', help='Years to process, [YYYY,YYYY]. or all if None',default=None)
             subparser.add_argument('--data_source', dest ='data_source', 
                                    help='stac or GEE', default='stac')
+        
         if process == 'print_list_of_cells_with_file':
             subparser.add_argument('--cell_dir', dest='cell_dir', help='main directory with all cell directories to check')
             subparser.add_argument('--sub_dir', dest='sub_dir', help='name of subfolder to find file')
             subparser.add_argument('--filename', dest = 'filename', help='name of file to search for')
             subparser.add_argument('--noexist', dest= 'noexist', help='if true, print list of cells without file in question', 
                                    default=False)                     
+        
         if process == 'update_summary_db':
             subparser.add_argument('--status_db_path', dest = 'status_db_path', 
                                    help='path to master processing database') 
             subparser.add_argument('--cell_list', dest ='cell_list', 
                                    help='list of cells to process. If All, processes all in raw_dir', default='All')
+        
         if process == 'check_valid_pix':
             subparser.add_argument('--image_type', dest ='image_type', 
                                    help='Type of image to process (Landsat(5,7,8,9), Sentinel, or All', default='All')
+        
         if process == 'get_cell_status':
             subparser.add_argument('--print_plot', dest='print_plot', help='whether to generate plot graphics', default=False)
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for plot graphics', default=None)
+            
         if process == 'reconstruct_db':
             subparser.add_argument('--processing_info_path', dest ='processing_info_path', 
                                    help='path to processing.info file for cell')
@@ -155,11 +162,11 @@ def main():
             subparser.add_argument('--out_dir_main', dest='out_dir_main', help='out directory for processed outputs', default=None)
             subparser.add_argument('--new_res', dest='new_res', help='new resolution (in m)', default=None)
         
-        if process in ['get_time_series','make_ts_composite','rf_model','rf_classification',
+        if process in ['get_time_series','make_ts_composite','rf_classification',
                        'make_var_dataframe','make_var_stack','append_feature_dataframe','make_pheno_vars']:
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
-            subparser.add_argument('--start_yr', dest ='start_yr', help='year to map (first if spans two)', default=2010, type=int)
-            subparser.add_argument('--start_mo', dest ='start_mo', default=2010, type=int,
+            subparser.add_argument('--start_yr', dest ='start_yr', help='year to map (first if spans two)', default=2021, type=int)
+            subparser.add_argument('--start_mo', dest ='start_mo', default=7, type=int,
                                    help='month to start calendar (e.g 1 if mapping Jan-Dec; 7 if mapping July-Jun')
 
         if process == 'get_time_series':
@@ -175,7 +182,7 @@ def main():
             subparser.add_argument('--polyfile', dest='polyfile',
                                    help='path to polygons to sample from; only needed if load_samp =False')
             subparser.add_argument('--oldest', dest ='oldest', help='if using ground_polys, oldest poly to use', default=2010)
-            subparser.add_argument('--newest', dest ='newest', help='if using groun_Polys, oldest poly to use', default=2020)
+            subparser.add_argument('--newest', dest ='newest', help='if using groun_Polys, oldest poly to use', default=2024)
             subparser.add_argument('--npts', dest ='npts', help='if using ground_olys, number of pts per poly to sample', default=2)
             subparser.add_argument('--seed', dest ='seed', help='if using ground_olys, seed for random sampling within', default=888)
             subparser.add_argument('--load_samp', dest ='load_samp',
@@ -199,8 +206,10 @@ def main():
             subparser.add_argument('--pad_days', dest ='pad_days', help='number of days to pad on each side of season for curve fitting',
                                   default = '[20,20]')
             
-        if process in ['make_var_dataframe','make_var_stack','rf_classification']:
+        if process in ['make_var_dataframe','make_var_stack','rf_classification','append_feature_dataframe']:
             subparser.add_argument('--in_dir', dest='in_dir', help='')
+        
+        if process in ['make_var_dataframe','make_var_stack','rf_classification','rf_model']:
             subparser.add_argument('--feature_model', dest = 'feature_model', 
                                    help='unique name for variable combo (start_Yr (spec_indices*si_vars + singleton_vars + poly_vars))')
             subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
@@ -225,11 +234,11 @@ def main():
                                    help = 'path to scratch directory to same temp files without backup', default=None)
             subparser.add_argument('--singleton_var_dict', dest='singleton_var_dict', default=None,
                                    help='path to json describing singleton vars. (see example in main folder of this repo)')
+        
         if process == 'make_var_stack':
             subparser.add_argument('--overwrite', dest='overwrite', help='whether to overwrite stack file with same name', default=False)
             
         if process == 'append_feature_dataframe':
-            subparser.add_argument('--in_dir', dest='in_dir', help='path to main directory for ts data')
             subparser.add_argument('--ptfile', dest ='ptfile', 
                                    help='Path to file containing all points in original dataframe')
             subparser.add_argument('--feat_df', dest ='feat_df', help='path to dataframe to append features to')
@@ -242,20 +251,20 @@ def main():
             subparser.add_argument('--importance_method', dest ='importance_method', help='Permultation | Inference | None')
             subparser.add_argument('--ran_hold', dest ='ran_hold', 
                                    help='fixed random number, for repetition of same dataset', type=int, default=0)
-            subparser.add_argument('--samp_model_name', dest ='samp_model_name', help='name of sample model')                          
+            subparser.add_argument('--samp_model_name', dest ='samp_model_name', help='name of sample model')
+            subparser.add_argument('--train_yrs',dest='train_yrs', help='years to include in training data. Can be single int or list.', default=2021)
+        
         if process == 'rf_classification':
             subparser.add_argument('--rf_mod', dest='rf_mod',
                                    help='path to existing random forest model, or None if model is to be created')
             subparser.add_argument('--img_out', dest='img_out',help='Full path name of classified image to be created')
+        
         if process == 'rf_model':
-            subparser.add_argument('--model_name', dest='model_name', help='format: sampleMod_FeatureMod_Yr')
-            subparser.add_argument('--feature_model', dest = 'feature_model', 
-                                   help='unique name for variable combo (start_Yr (spec_indices*si_vars + singleton_vars + poly_vars))')
-            subparser.add_argument('--feature_mod_dict', dest='feature_mod_dict', default=None,
-                                   help='path to dict defining variable model names. (see example in main folder of this repo)')
+            subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
             subparser.add_argument('--thresh', dest='thresh', default=None,
                                    help='threshold for holdout sample e.g. 0, 10, 20...')
             subparser.add_argument('--runnum', dest= 'runnum', default=0)
+        
         if process == 'iterate_models':
             subparser.add_argument('--sample_pts', dest='sample_pts', help='csv file with all available sample points')
             subparser.add_argument('--model_dir', dest='model_dir', help='directory for final outputs')
@@ -447,9 +456,10 @@ def main():
                  lc_mod = args.lc_mod,
                  importance_method = args.importance_method,
                  ran_hold = args.ran_hold,
-                 model_name = args.model_name,
                  lut = args.lut,
                  feature_model = args.feature_model,
+                 samp_model = args.samp_model_name,
+                 train_yrs = args.train_yrs,
                  thresh = args.thresh,
                  feature_mod_dict = args.feature_mod_dict,
                  runnum = args.runnum)
@@ -459,6 +469,7 @@ def main():
                  cell_list = args.cell_list,
                  df_in = args.df_in,
                  feature_model = args.feature_model,
+                 train_yrs = args.train_yrs,
                  start_yr = args.start_yr,
                  start_mo = args.start_mo,
                  samp_mod_name = args.samp_model_name,
