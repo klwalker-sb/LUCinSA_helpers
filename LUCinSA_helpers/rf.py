@@ -74,7 +74,7 @@ def get_class_col(lc_mod,lut):
                 lut['LC1_name'] = f'no_{lc_base}'
                 lut.at[target_class[0],'LC1_name'] = lc_base
     else:
-        sys.stderr.write(f'current options for lc_mod are all, LCTrans, cropNoCrop, crop_nocrop_mixcrop, crop_nocrop_medcrop, crop_nocrop_medcrop_tree, veg, veg_with_crop, veg_with_cropType, cropType, and single_X with X as any category. You put {lc_mod} \n')
+        sys.stderr.write(f'current options for lc_mod are: all, LCTrans, cropNoCrop, crop_nocrop_mixcrop, crop_nocrop_medcrop, crop_nocrop_medcrop_tree, veg, veg_with_crop, veg_with_cropType, cropType, and single_X with X as any category. You put {lc_mod} \n')
     
     '''
     elif lc_mod == 'crop_post':
@@ -1264,32 +1264,24 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_m
         
     return rf, score
 
-def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_mo, samp_mod_name, 
-                      feature_mod_dict, singleton_var_dict, rf_mod, img_out, train_yrs, spec_indices=None, si_vars=None, 
+def rf_classification(cell_dir, cell_list, mod_dir, feature_model, samp_model, lc_mod, train_yrs, start_yr, start_mo, feature_mod_dict, 
+                      rf_mod=None, img_out=None, df_in=None, singleton_var_dict=None, spec_indices=None, si_vars=None, 
                       spec_indices_pheno=None, pheno_vars=None, singleton_vars=None, poly_vars=None, poly_var_path=None, 
-                      combo_bands=None, lc_mod=None, lut=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
-    
+                      combo_bands=None, lut=None, importance_method=None, ran_hold=29, out_dir=None, scratch_dir=None):
     
     spec_indices,si_vars,spec_indices_pheno,pheno_vars,singleton_vars,poly_vars,combo_bands,band_names = getset_feature_model(
-                                                                  feature_mod_dict,
-                                                                  feature_model,
-                                                                  spec_indices,
-                                                                  si_vars,
-                                                                  spec_indices_pheno,
-                                                                  pheno_vars,
-                                                                  singleton_vars,
-                                                                  poly_vars,
-                                                                  combo_bands)
+                     feature_mod_dict,feature_model, spec_indices, si_vars, spec_indices_pheno, pheno_vars, singleton_vars, poly_vars, combo_bands)
     
-    class_col = get_class_col(lc_mod,lut)
+    ## derive model name from components
+    class_col = get_class_col(lc_mod,lut)[0]
     if isinstance(train_yrs, int):
         trainyrs = str(train_yrs)[-2:]
     elif len(train_yrs) == 1:
         trainyrs = str(train_yrs[0])[-2:]
     else:
-        trainyrs = str(train_yrs[0])[-2:]+str(train_yrs[-1])[-2:]
-    model_name_train = f'{feature_model}_{samp_mod_name}_{class_col}_{trainyrs}_RF'
-    model_name_class = f'{feature_model}_{samp_mod_name}_{class_col}_{trainyrs}_RF_{start_yr}'
+        trainyrs = str(train_yrs[0])[-2:]+str(train_yrs[-1])[-2:] 
+    model_name_train = f'{feature_model}_{samp_model}_{class_col}_{trainyrs}_RF'
+    model_name_class = f'{feature_model}_{samp_model}_{class_col}_{trainyrs}_RF_{start_yr}'
     
     cells = []
     if isinstance(cell_list, list):
@@ -1300,10 +1292,11 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
                 cells.append(row[0])
     elif isinstance(cell_list, int) or isinstance(cell_list, str): # if runing individual cells as array via bash script
         cells.append(cell_list) 
-                
+    in_dir = cell_dir
+    
     for cell in cells:
         sys.stderr.write(f'working on cell {cell}... \n')
-        cell_dir = os.path.join(in_dir,'{:06d}'.format(int(cell)))
+        cell_dir = os.path.join(cell_dir,'{:06d}'.format(int(cell)))
         
         stack_path = os.path.join(cell_dir,'comp',f'{feature_model}_{start_yr}_stack.tif')
         sys.stderr.write(f'looking for stack: {stack_path}... \n')
@@ -1313,17 +1306,12 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
         
         elif 'NoPoly' in feature_model:
             ## Can make a noPoly model with a Poly stack
-            poly_model = feature_model.replace('NoPoly','Poly')
+            poly_model = feature_model.replace('NoPoly','Poly6')
             alt_path = os.path.join(cell_dir, 'comp', f'{poly_model}_{start_yr}_stack.tif')
             if os.path.isfile(alt_path):
                 sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
                 var_stack = alt_path
-            else:   ##TODO:  Use grep for this
-                alt_path2 = os.path.join(cell_dir, 'comp',f'{poly_model}6_{start_yr}_stack.tif')
-                if os.path.isfile(alt_path2):
-                    sys.stderr.write(f'poly stack file already exists for model {poly_model} \n')
-                    var_stack = alt_path2
-
+                ##TODO:Use grep for this to accept other versions of poly model (e.g. Poly4) 
         else:
             # make variable stack if it does not exist (for example for cells without sample pts)
             # -- will not be remade if a file named {feature_model}_{start_year}_stack.tif already exists in ts_dir/comp
@@ -1332,16 +1320,30 @@ def rf_classification(in_dir, cell_list, df_in, feature_model, start_yr, start_m
                                         pheno_vars,feature_mod_dict,singleton_vars=None, singleton_var_dict=None, 
                                         poly_vars=None, poly_var_path=None, scratch_dir=None)
         
-        #if img_out is None:
-        class_img_out = os.path.join(cell_dir,'comp','{:06d}_{}.tif'.format(int(cell),model_name_class))
-        #else:
-        #    class_img_out = img_out
-        
-        if rf_mod != None and os.path.isfile(rf_mod):
-            sys.stderr.write(f'using existing rf model at:{rf_mod} \n')
+        if (img_out is None) or (img_out == 'None'):
+            class_img_out = os.path.join(cell_dir,'comp','{:06d}_{}.tif'.format(int(cell),model_name_class))
         else:
-            sys.stderr.write('creating rf model... \n')
-            rf_mod = rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_model, samp_model_name, train_yrs, 0, feature_mod_dict)
+            class_img_out = img_out
+
+        ## Try to use existing rf model. By default, will use rf model named f'{feature_model}_{samp_mod_name}_{class_col}_{trainyrs}_RFmod.joblib'
+        ##    but can force use of a different existing model with rf_mod
+        if (rf_mod != None) and (rf_mod !='None'):
+            if os.path.isfile(os.path.join(mod_dir, rf_mod)):
+                rf_mod = os.path.isfile(os.path.join(mod_dir, rf_mod))
+                sys.stderr.write(f'using existing rf model at:{rf_mod} \n')
+            elif os.path.isfile(rf_mod):
+                rf_mod = rf_mod
+                sys.stderr.write(f'using existing rf model at:{rf_mod} \n')
+            else:
+                sys.stderr.write(f'cannot find existing model {rf_mod} specified with rf_mod parameter. Set rf_mod to None to create new model \n')
+        else:
+            default_model = os.path.join(mod_dir, f'{model_name_train}mod.joblib')
+            if os.path.isfile(default_model):
+                rf_mod = default_model
+                sys.stderr.write(f'using existing rf model at {rf_mod} \n')
+            else:
+                sys.stderr.write(f'Could not find existing model at{default_model}. Creating new rf model... \n')
+                rf_mod = rf_model(df_in, mod_dir, lc_mod, importance_method, ran_hold, lut, feature_model, samp_model, train_yrs, 0, feature_mod_dict)
 
         with open(feature_mod_dict, 'r+') as feature_model_dict:
             dic = json.load(feature_model_dict)

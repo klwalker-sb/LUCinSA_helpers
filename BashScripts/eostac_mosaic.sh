@@ -10,10 +10,14 @@
 ################################################################
 
 ################################################################
-CELLS='/home/downspout-cel/paraguay_lc/mosaics/lists/sm_and_P1.csv'
-MAINDIR='/home//sandbox-cel/paraguay_lc/stac/grid'
+#CELLS='/home/downspout-cel/paraguay_lc/mosaics/lists/CELpy_DistrictSamp.csv'
+CELLS='/home/downspout-cel/paraguay_lc/mosaics/lists/CELPy_Tile2.csv'
+MAINDIR='/home/sandbox-cel/paraguay_lc/stac/grid'
+#MAINDIR='/home/sandbox-cel/paraguay_lc/stac/ts_30m'
 LOCALDIR='comp'
-MOD='base4Poly6_bal300mix3'
+#MOD='base4NoPoly_bal300mix2_21_LC25_RF_2021'
+MOD='base4Poly6_bal300mix8_21_LC32_RF_2021'
+#MOD='base4NoPoly_base1000'
 OUTDIR='/home/downspout-cel/paraguay_lc/mosaics'
 
 # ####################################################

@@ -206,7 +206,7 @@ def main():
             subparser.add_argument('--pad_days', dest ='pad_days', help='number of days to pad on each side of season for curve fitting',
                                   default = '[20,20]')
             
-        if process in ['make_var_dataframe','make_var_stack','rf_classification','append_feature_dataframe']:
+        if process in ['make_var_dataframe','make_var_stack','append_feature_dataframe']:
             subparser.add_argument('--in_dir', dest='in_dir', help='')
         
         if process in ['make_var_dataframe','make_var_stack','rf_classification','rf_model']:
@@ -245,19 +245,24 @@ def main():
             subparser.add_argument('--grid_file', dest ='grid_file', help='path to grid file')
           
         if process in ['rf_model','rf_classification']: 
-            subparser.add_argument('--df_in', dest ='df_in', help='path to sample dataframe with extracted variable data')
-            subparser.add_argument('--lc_mod', dest ='lc_mod', help="All(=LC25),...", default='All' )
-            subparser.add_argument('--lut', dest ='lut', help='path to lut for land cover classificaitons', default=None)
-            subparser.add_argument('--importance_method', dest ='importance_method', help='Permultation | Inference | None')
+            subparser.add_argument('--df_in', dest ='df_in', help='path to sample dataframe with extracted variable data', default=None)
+            subparser.add_argument('--lc_mod', dest='lc_mod', help='all for LC25, max for LC32, etc.', default='all')
+            subparser.add_argument('--lut', dest='lut', help='path to lut for land cover classificaitons', default=None)
+            subparser.add_argument('--importance_method', dest='importance_method', help='Permultation | Inference | None')
             subparser.add_argument('--ran_hold', dest ='ran_hold', 
                                    help='fixed random number, for repetition of same dataset', type=int, default=0)
-            subparser.add_argument('--samp_model_name', dest ='samp_model_name', help='name of sample model')
+            subparser.add_argument('--samp_model', dest='samp_model', help='name of sample model')
             subparser.add_argument('--train_yrs',dest='train_yrs', help='years to include in training data. Can be single int or list.', default=2021)
         
         if process == 'rf_classification':
-            subparser.add_argument('--rf_mod', dest='rf_mod',
-                                   help='path to existing random forest model, or None if model is to be created')
-            subparser.add_argument('--img_out', dest='img_out',help='Full path name of classified image to be created')
+            subparser.add_argument('--cell_dir', dest='cell_dir',
+                                   help='directory of with cell data stacks -- master directory (not for individual cell).')
+            subparser.add_argument('--mod_dir', dest='mod_dir',
+                                   help='directory of existing random forest model or directory to store new rf model.')
+            subparser.add_argument('--rf_mod', dest='rf_mod', default=None,
+                                   help='name of existing rf model if not using default')
+            subparser.add_argument('--img_out', dest='img_out', default=None,
+                                   help='Full path name of classified image to be created if not using default in cell_dir')
         
         if process == 'rf_model':
             subparser.add_argument('--out_dir', dest='out_dir', help='out directory for processed outputs', default=None)
@@ -458,25 +463,27 @@ def main():
                  ran_hold = args.ran_hold,
                  lut = args.lut,
                  feature_model = args.feature_model,
-                 samp_model = args.samp_model_name,
+                 samp_model = args.samp_model,
                  train_yrs = args.train_yrs,
                  thresh = args.thresh,
                  feature_mod_dict = args.feature_mod_dict,
                  runnum = args.runnum)
                                    
     if args.process == 'rf_classification':
-        rf_classification(in_dir = args.in_dir,
+        rf_classification(cell_dir = args.cell_dir,
                  cell_list = args.cell_list,
-                 df_in = args.df_in,
+                 mod_dir = args.mod_dir,
                  feature_model = args.feature_model,
+                 samp_model = args.samp_model,
+                 lc_mod = args.lc_mod,
                  train_yrs = args.train_yrs,
                  start_yr = args.start_yr,
                  start_mo = args.start_mo,
-                 samp_mod_name = args.samp_model_name,
                  feature_mod_dict = args.feature_mod_dict,
-                 singleton_var_dict = args.singleton_var_dict,
                  rf_mod = args.rf_mod,
                  img_out = args.img_out,
+                 df_in = args.df_in,
+                 singleton_var_dict = args.singleton_var_dict,
                  spec_indices = args.spec_indices,
                  si_vars = args.si_vars,
                  spec_indices_pheno = check_for_list(args.spec_indices_pheno),
@@ -485,13 +492,12 @@ def main():
                  poly_vars = args.poly_vars,
                  poly_var_path = args.poly_var_path,
                  combo_bands = check_for_list(args.combo_bands),
-                 lc_mod = args.lc_mod,
                  lut = args.lut,
                  importance_method = args.importance_method,
                  ran_hold = args.ran_hold,
                  out_dir = args.out_dir,
                  scratch_dir = args.scratch_dir)
-        
+
     if args.process == 'iterate_models':
         iterate_all_models_for_sm_test(sample_pts = args.sample_pts, 
                                        model_dir = args.model_dir,
