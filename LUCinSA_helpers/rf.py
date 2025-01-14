@@ -1167,23 +1167,6 @@ def get_predictions_gw(saved_stack, model_bands, rf_path, class_img_out):
 
 def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_model, samp_model, train_yrs, thresh,
              feature_mod_dict=None, update_model_dict=False, fixed_ho=False, fixed_ho_dir=None, runnum=0, existing_mod=False):
-    
-    if fixed_ho == True:
-        test_df_all = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if 
-                       f.split('_')[0] == feature_model and f.split('_')[-1] == 'all.csv']
-        if len(test_df_all)>0:
-            test_all = pd.read_csv(test_df_all)[0]
-            smallcrops = [23,24,25,26,32,34,35,36,39]
-            bigcrops = [22,31,33,37,38]
-            ho_smallCrop_path = test_all.loc[test_all['LC_UNQ'].isin(smallcrops)] 
-            ho_bigCrop_path = test_all.loc[(test_all['LC2'] == 30) & (test_all['LC_UNQ'].isin(bigcrops))]
-            ho_noCrop_path = test_all.loc[(test_all['LC2'] == 0) & (test_all['LC_UNQ'] != 19)]
-        elif os.path.isfile(os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop.csv')):
-            ho_smallCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop.csv')
-            ho_bigCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_bigCrop.csv') 
-            ho_noCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_noCrop.csv') 
-        else:
-            sys.stderr.write(f'ERR: cannot find fixed test set')
 
     if isinstance(df_in, pd.DataFrame):
         df = df_in
@@ -1201,15 +1184,34 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_m
         lut_cols = ['USE_NAME',f'{class_col}',f'{class_col}_name']
         filtered_lut = lutdf.filter(lut_cols)
         df2 = df.merge(filtered_lut, left_on='Class',right_on='USE_NAME', how='left')
-
+        
     if isinstance(train_yrs, int):
         trainyrs = str(train_yrs)[-2:]
     elif len(train_yrs) == 1:
         trainyrs = str(train_yrs[0])[-2:]
     else:
         trainyrs = str(train_yrs[0])[-2:]+str(train_yrs[-1])[-2:]
+
     full_model_name = f'{feature_model}_{samp_model}_{class_col}_{trainyrs}_RF'
+    print(f'model name = {full_model_name}')
         
+    if fixed_ho == True:
+        test_df_all = [os.path.join(fixed_ho_dir,f) for f in os.listdir(fixed_ho_dir) if 
+                       f.split('_')[0] == feature_model and f.split('_')[-2] == 'all' and f.split('_')[-1].startswith(trainyrs)]
+        if len(test_df_all)>0:
+            test_all = pd.read_csv(test_df_all[0])
+            smallcrops = [23,24,25,26,32,34,35,36,39]
+            bigcrops = [22,31,33,37,38]
+            ho_smallCrop_path = test_all.loc[test_all['LC_UNQ'].isin(smallcrops)] 
+            ho_bigCrop_path = test_all.loc[(test_all['LC2'] == 30) & (test_all['LC_UNQ'].isin(bigcrops))]
+            ho_noCrop_path = test_all.loc[(test_all['LC2'] == 98) & (test_all['LC_UNQ'] != 19)]
+        elif os.path.isfile(os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop_{train_yrs}.csv')):
+            ho_smallCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop_{train_yrs}.csv')
+            ho_bigCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_bigCrop_{train_yrs}.csv') 
+            ho_noCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_noCrop_{train_yrs}.csv') 
+        else:
+            sys.stderr.write(f'ERR: cannot find fixed test set')
+  
     train, ho = prep_test_train(df2, out_dir, class_col, full_model_name, thresh=thresh, stable=True)
 
     if existing_mod:
@@ -1236,12 +1238,12 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_m
         #score = pd.DataFrame(score)
         score["smalls_1ha"] = df["smlhld_1ha"]
         score["smalls_halfha"] = df["smlhd_halfha"]
-        pd.DataFrame.to_csv(score, os.path.join(out_dir,f"{model_name}_HO_SCORES"), sep=',', na_rep='NaN', index=True)
+        pd.DataFrame.to_csv(score, os.path.join(out_dir,f"{full_model_name}_HO_SCORES"), sep=',', na_rep='NaN', index=True)
         
     else:
         score = {}
-        score["F"] = model_name.split('_')[0]
-        score["S"] = model_name.split('_')[1]
+        score["F"] = full_model_name.split('_')[0]
+        score["S"] = full_model_name.split('_')[1]
         score["C"] = class_col
         score["A"] = "RF"
     if fixed_ho == True:
