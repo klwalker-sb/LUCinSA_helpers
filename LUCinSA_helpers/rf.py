@@ -1202,13 +1202,13 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_m
             test_all = pd.read_csv(test_df_all[0])
             smallcrops = [23,24,25,26,32,34,35,36,39]
             bigcrops = [22,31,33,37,38]
-            ho_smallCrop_path = test_all.loc[test_all['LC_UNQ'].isin(smallcrops)] 
-            ho_bigCrop_path = test_all.loc[(test_all['LC2'] == 30) & (test_all['LC_UNQ'].isin(bigcrops))]
-            ho_noCrop_path = test_all.loc[(test_all['LC2'] == 98) & (test_all['LC_UNQ'] != 19)]
+            ho_smallCrop = test_all.loc[test_all['LC_UNQ'].isin(smallcrops)] 
+            ho_bigCrop = test_all.loc[(test_all['LC2'] == 30) & (test_all['LC_UNQ'].isin(bigcrops))]
+            ho_noCrop = test_all.loc[(test_all['LC2'] == 98) & (test_all['LC_UNQ'] != 19)]
         elif os.path.isfile(os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop_{train_yrs}.csv')):
-            ho_smallCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop_{train_yrs}.csv')
-            ho_bigCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_bigCrop_{train_yrs}.csv') 
-            ho_noCrop_path = os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_noCrop_{train_yrs}.csv') 
+            ho_smallCrop = pd.read_csv(os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_smallCrop_{train_yrs}.csv'))
+            ho_bigCrop = pd.read_csv(os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_bigCrop_{train_yrs}.csv')) 
+            ho_noCrop = pd.read_csv(os.path.join(fixed_ho_dir,f'{feature_model}_HOLDOUT_noCrop_{train_yrs}.csv'))
         else:
             sys.stderr.write(f'ERR: cannot find fixed test set')
   
@@ -1247,22 +1247,28 @@ def rf_model(df_in, out_dir, lc_mod, importance_method, ran_hold, lut, feature_m
         score["C"] = class_col
         score["A"] = "RF"
     if fixed_ho == True:
-        ho_smallcrop = get_holdout_scores(ho_smallCrop_path, rf[0], 'LC2', out_dir, 'smallCrop')[["pred","label","OID"]]
-        ho_bigcrop = get_holdout_scores(ho_bigCrop_path, rf[0], 'LC2', out_dir, 'bigCrop')[["pred","label","OID"]]
-        ho_nocrop = get_holdout_scores(ho_noCrop_path, rf[0], 'LC2', out_dir, 'noCrop')[["pred","label","OID"]]
-        ho = pd.concat([ho_smallcrop,ho_bigcrop,ho_nocrop])
+        ho_smallcrop_s = get_holdout_scores(ho_smallCrop, rf[0], 'LC2', out_dir, 'smallCrop')[["pred","label","OID"]]
+        ho_bigcrop_s = get_holdout_scores(ho_bigCrop, rf[0], 'LC2', out_dir, 'bigCrop')[["pred","label","OID"]]
+        ho_nocrop_s = get_holdout_scores(ho_noCrop, rf[0], 'LC2', out_dir, 'noCrop')[["pred","label","OID"]]
+        ho = pd.concat([ho_smallcrop_s,ho_bigcrop_s,ho_nocrop_s])
         ho.to_csv(os.path.join(out_dir, 'full_ho_check.csv'))
         print(ho.head())
         cm = get_confusion_matrix(ho['pred'], ho['label'], lut, lc_mod, 'cropNoCrop', print_cm=False, out_dir=None, model_name=None)
         print(cm)
-        score["recall_smallCrop"] = get_binary_holdout_score(ho_smallCrop_path, rf[0], out_dir, lut, 'smallCrop')
-        score["recall_bigCrop"] = get_binary_holdout_score(ho_bigCrop_path, rf[0], out_dir, lut, 'bigCrop')
-        score["recall_noCrop"] =  get_binary_holdout_score(ho_noCrop_path, rf[0], out_dir, lut, 'noCrop')
+        score["recall_smallCrop"] = get_binary_holdout_score(ho_smallCrop, rf[0], out_dir, lut, 'smallCrop')
+        score["recall_bigCrop"] = get_binary_holdout_score(ho_bigCrop, rf[0], out_dir, lut, 'bigCrop')
+        score["recall_noCrop"] =  get_binary_holdout_score(ho_noCrop, rf[0], out_dir, lut, 'noCrop')
         score["Kappa_cnc"] = cm.at['crop','Kappa']
         score["F1_cnc"] = cm.at['crop','F1']
         score["F_5_cnc"] = cm.at['crop','F_5']
         score["F_25_cnc"] = cm.at['crop','F_25']        
         score["OA_cnc"] = cm.at['All','UA']
+        if len(train_yrs)>1:
+            for yr in range(train_yrs[0],train_yrs[1]+1):
+                print(f'getting scores for {yr}')
+                score[f'recall_smallCrop_{yr}'] = get_binary_holdout_score(ho_smallCrop[ho_smallCrop['year']==yr], rf[0], out_dir, lut, 'smallCrop')
+                score[f'recall_bigCrop_{yr}'] = get_binary_holdout_score(ho_bigCrop[ho_bigCrop['year']==yr], rf[0], out_dir, lut, 'bigCrop')
+                score[f'recall_noCrop_{yr}'] = get_binary_holdout_score(ho_noCrop[ho_noCrop['year']==yr], rf[0], out_dir, lut, 'noCrop')
         
     return rf, score
 
@@ -1275,13 +1281,14 @@ def rf_classification(cell_dir, cell_list, mod_dir, feature_model, samp_model, l
                      feature_mod_dict,feature_model, spec_indices, si_vars, spec_indices_pheno, pheno_vars, singleton_vars, poly_vars, combo_bands)
     
     ## derive model name from components
+    lc_mod = 'max'
     class_col = get_class_col(lc_mod,lut)[0]
     if isinstance(train_yrs, int):
         trainyrs = str(train_yrs)[-2:]
     elif len(train_yrs) == 1:
         trainyrs = str(train_yrs[0])[-2:]
     else:
-        trainyrs = str(train_yrs[0])[-2:]+str(train_yrs[-1])[-2:] 
+        trainyrs = str(train_yrs[0])[-2:]+str(train_yrs[1])[-2:] 
     model_name_train = f'{feature_model}_{samp_model}_{class_col}_{trainyrs}_RF'
     model_name_class = f'{feature_model}_{samp_model}_{class_col}_{trainyrs}_RF_{start_yr}'
     

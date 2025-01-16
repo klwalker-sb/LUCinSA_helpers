@@ -464,7 +464,7 @@ def main():
                  lut = args.lut,
                  feature_model = args.feature_model,
                  samp_model = args.samp_model,
-                 train_yrs = args.train_yrs,
+                 train_yrs = check_for_list(args.train_yrs),
                  thresh = args.thresh,
                  feature_mod_dict = args.feature_mod_dict,
                  runnum = args.runnum)
@@ -476,7 +476,7 @@ def main():
                  feature_model = args.feature_model,
                  samp_model = args.samp_model,
                  lc_mod = args.lc_mod,
-                 train_yrs = args.train_yrs,
+                 train_yrs = check_for_list(args.train_yrs),
                  start_yr = args.start_yr,
                  start_mo = args.start_mo,
                  feature_mod_dict = args.feature_mod_dict,
